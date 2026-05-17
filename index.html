@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V9)</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1d20">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        body { background-color: #1a1d20; color: #e9ecef; font-family: system-ui, -apple-system, sans-serif; }
+        .nav-tabs .nav-link { color: #adb5bd; border: none; font-weight: bold; font-size: 13px; padding: 10px 5px; }
+        .nav-tabs .nav-link.active { background-color: #212529; color: #0dcaf0; border-bottom: 3px solid #0dcaf0; }
+        
+        #camera-wrapper { background: #000; border-radius: 12px; overflow: hidden; max-width: 640px; margin: 0 auto; border: 1px solid #495057; }
+        #camera-container { position: relative; aspect-ratio: 4/3; width: 100%; }
+        #video-preview { width: 100%; height: 100%; object-fit: cover; }
+        
+        .preview-box { background: #111; border: 2px dashed #495057; border-radius: 8px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+        .preview-box img { width: 100%; height: 100%; object-fit: contain; }
+        
+        .photo-card { background: #2b3035; border: 1px solid #495057; border-radius: 8px; overflow: hidden; position: relative; transition: transform 0.2s; }
+        .photo-card img { width: 100%; aspect-ratio: 4/3; object-fit: contain; background: #111; border-bottom: 1px solid #343a40; }
+        .photo-card.stitched img { aspect-ratio: 2/1; object-fit: contain; background: #111; }
+        
+        .photo-radio, .photo-checkbox { position: absolute; top: 10px; left: 10px; width: 22px; height: 22px; z-index: 10; cursor: pointer; }
+        
+        .alert-dot { display: inline-block; width: 8px; height: 8px; background-color: #dc3545; border-radius: 50%; margin-left: 4px; animation: blink 1.2s infinite; }
+        @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
+        
+        .section-title { font-size: 14px; font-weight: bold; color: #6c757d; border-bottom: 1px solid #343a40; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; }
+        .empty-box { background: #212529; border: 2px dashed #495057; border-radius: 8px; padding: 20px; text-align: center; color: #6c757d; font-size: 14px; }
+
+        .scrollable-box {
+            max-height: 55vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 5px;
+        }
+        .scrollable-box::-webkit-scrollbar { width: 6px; }
+        .scrollable-box::-webkit-scrollbar-track { background: #212529; border-radius: 4px; }
+        .scrollable-box::-webkit-scrollbar-thumb { background: #495057; border-radius: 4px; }
+        .scrollable-box::-webkit-scrollbar-thumb:hover { background: #0dcaf0; }
+
+        /* Hiệu ứng nhấp nháy khi bộ nhớ đầy báo động */
+        @keyframes pulse-red {
+            0% { background-color: #dc3545; box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { background-color: #b02a37; box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
+            100% { background-color: #dc3545; box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+        .storage-alarm { animation: pulse-red 1.5s infinite; color: #fff !important; border: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid p-2" style="max-width: 800px; margin: 0 auto;">
+    <div class="d-flex align-items-center justify-content-between border-bottom border-secondary pb-2 mb-3 mt-2">
+        <h5 class="text-info m-0 fw-bold"><i class="fa-solid fa-bolt me-2"></i>GIÁM SÁT HIỆN TRƯỜNG</h5>
+        <div class="d-flex align-items-center">
+            <span class="badge bg-dark text-info border border-info px-2 py-1 small">PC Tuyên Quang</span>
+            <span id="storage-status" class="badge bg-dark text-secondary border border-secondary px-2 py-1 small ms-1">Dung lượng: --</span>
+        </div>
+    </div>
+
+    <ul class="nav nav-tabs mb-3 border-secondary" id="mainTabs" role="tablist">
+        <li class="nav-item flex-fill text-center" role="presentation">
+            <button class="nav-link active w-100" id="capture-tab" data-bs-toggle="tab" data-bs-target="#capture-content" type="button" role="tab">
+                <i class="fa-solid fa-camera mb-1 d-block"></i> Máy Ảnh
+            </button>
+        </li>
+        <li class="nav-item flex-fill text-center" role="presentation">
+            <button class="nav-link w-100" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending-content" type="button" role="tab" onclick="renderPending()">
+                <i class="fa-solid fa-layer-group mb-1 d-block"></i> Chờ Ghép 
+                <span id="pending-count" class="badge bg-secondary ms-1">0</span>
+            </button>
+        </li>
+        <li class="nav-item flex-fill text-center" role="presentation">
+            <button class="nav-link w-100" id="gallery-tab" data-bs-toggle="tab" data-bs-target="#gallery-content" type="button" role="tab" onclick="renderGallery()">
+                <i class="fa-solid fa-images mb-1 d-block"></i> Đã Ghép 
+                <span id="gallery-count" class="badge bg-secondary ms-1">0</span>
+                <span id="gallery-alert" class="alert-dot" style="display:none;"></span>
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="mainTabsContent">
+        
+        <div class="tab-pane fade show active" id="capture-content" role="tabpanel">
+            <div id="camera-wrapper" class="shadow mb-3">
+                <div id="camera-container">
+                    <video id="video-preview" autoplay playsinline muted></video>
+                    <div class="position-absolute bottom-0 start-50 translate-middle-x mb-2 text-center w-100 px-3">
+                        <span id="gps-status" class="badge bg-dark bg-opacity-75 text-warning border border-warning small">
+                            <i class="fa-solid fa-location-crosshairs fa-spin me-1"></i> Đang tìm tọa độ GPS...
+                        </span>
+                    </div>
+                </div>
+                <div id="zoom-control-container" style="display: none; padding: 12px 15px; background: #212529; border-top: 1px solid #343a40;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small text-info fw-bold"><i class="fa-solid fa-magnifying-glass me-1"></i> THU PHÓNG</span>
+                        <span id="zoom-value-display" class="badge bg-secondary text-info fw-bold">1.0x</span>
+                    </div>
+                    <input type="range" id="camera-zoom-slider" class="form-range" style="accent-color: #0dcaf0;">
+                </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <button class="btn btn-warning w-100 py-3 fw-bold text-dark shadow" onclick="capturePhoto('TRƯỚC')">
+                        <i class="fa-solid fa-circle-dot me-1"></i> Chụp "TRƯỚC"
+                    </button>
+                </div>
+                <div class="col-6">
+                    <button class="btn btn-success w-100 py-3 fw-bold shadow" onclick="capturePhoto('SAU')">
+                        <i class="fa-solid fa-circle-dot me-1"></i> Chụp "SAU"
+                    </button>
+                </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div id="preview-before" class="preview-box"><span class="text-muted small">Ảnh TRƯỚC</span></div>
+                </div>
+                <div class="col-6">
+                    <div id="preview-after" class="preview-box"><span class="text-muted small">Ảnh SAU</span></div>
+                </div>
+            </div>
+
+            <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
+                <label class="form-label text-info fw-bold small mb-1">TÊN HOẶC MÃ HIỆN TRƯỜNG:</label>
+                <div class="input-group input-group-sm mb-2">
+                    <input type="text" id="tab1-prefix" class="form-control bg-secondary text-white border-secondary" placeholder="TBA_Gia_Tran_01">
+                </div>
+                
+                <label class="form-label text-warning fw-bold small mb-1">GHI CHÚ (Hiển thị giữa 2 ảnh):</label>
+                <div class="input-group input-group-sm mb-3">
+                    <input type="text" id="tab1-note" class="form-control bg-secondary text-white border-secondary" placeholder="Thay sứ, vuốt lại lèo...">
+                </div>
+
+                <button id="btn-stitch-fast" class="btn btn-info w-100 fw-bold py-2 text-dark" disabled onclick="quickStitch()">
+                    GHÉP NGAY & LƯU KHO
+                </button>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pending-content" role="tabpanel">
+            <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
+                <label class="form-label text-info fw-bold small mb-1">TÊN HOẶC MÃ HIỆN TRƯỜNG:</label>
+                <div class="input-group input-group-sm mb-2">
+                    <input type="text" id="tab2-prefix" class="form-control bg-secondary text-white border-secondary" placeholder="TBA_Gia_Tran_01">
+                </div>
+                
+                <label class="form-label text-warning fw-bold small mb-1">GHI CHÚ DÙNG CHUNG (Cho ghép thủ công):</label>
+                <div class="input-group input-group-sm mb-3">
+                    <input type="text" id="tab2-note" class="form-control bg-secondary text-white border-secondary" placeholder="Thay sứ, vuốt lại lèo...">
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-6">
+                        <button class="btn btn-outline-info w-100 fw-bold py-2" onclick="manualStitch()">GHÉP MỤC ĐÃ CHỌN</button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-info text-dark w-100 fw-bold py-2 shadow" onclick="autoStitch()">
+                            <i class="fa-solid fa-wand-magic-sparkles me-1"></i> GHÉP TỰ ĐỘNG
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-2">
+                <div class="col-6">
+                    <div class="section-title text-warning"><i class="fa-solid fa-box-open me-1"></i> Kho "Trước"</div>
+                    <div id="list-before" class="scrollable-box"></div>
+                </div>
+                <div class="col-6">
+                    <div class="section-title text-success"><i class="fa-solid fa-box-open me-1"></i> Kho "Sau"</div>
+                    <div id="list-after" class="scrollable-box"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="gallery-content" role="tabpanel">
+            <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="form-check m-0">
+                        <input class="form-check-input" type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll(this)">
+                        <label class="form-check-label small fw-bold text-light" for="select-all-checkbox">Chọn tất cả</label>
+                    </div>
+                    <span class="small text-secondary" id="selected-counter">Đã chọn: 0 ảnh</span>
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <button class="btn btn-sm btn-outline-danger w-100 fw-bold" onclick="deleteSelectedPhotos()">XÓA ĐÃ CHỌN</button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-sm btn-info text-dark w-100 fw-bold shadow" onclick="shareSelectedPhotos()">CHIA SẺ / TẢI VỀ</button>
+                    </div>
+                </div>
+            </div>
+            <div id="gallery-grid" class="row g-3 scrollable-box"></div>
+            <div id="gallery-empty-msg" class="empty-box d-none">
+                <i class="fa-solid fa-folder-open display-1 mb-2 d-block"></i>Kho ảnh hoàn thiện đang trống.
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="modal fade" id="autoStitchModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title text-info"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Duyệt Ghép Tự Động</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="autoStitchModalBody">
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <button type="button" class="btn btn-info fw-bold" onclick="confirmAutoStitch()">Tiến Hành Ghép</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    let localStream = null;
+    let currentGpsData = { lat: "0.000000", lng: "0.000000", accuracy: "N/A" };
+    let db = null;
+    
+    let repoBefore = [];
+    let repoAfter = [];
+    let repoStitched = [];
+
+    let captureBuffer = { TRƯỚC: null, SAU: null };
+    let windowAutoMatches = [];
+    
+    // 🌟 BIẾN ĐIỀU KHIỂN HẠN NGẠCH BỘ NHỚ TOÀN CỤC
+    let currentStoragePercent = 0;
+
+    const dbRequest = indexedDB.open("AirGapCameraV9", 1);
+    dbRequest.onupgradeneeded = (e) => {
+        let database = e.target.result;
+        if (!database.objectStoreNames.contains("photos")) {
+            database.createObjectStore("photos", { keyPath: "id" });
+        }
+    };
+    dbRequest.onsuccess = (e) => {
+        db = e.target.result;
+        loadDataFromDB();
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        initCamera();
+        initGpsTracking();
+        
+        window.addEventListener('beforeunload', (e) => {
+            if (repoStitched.length > 0 || repoBefore.length > 0 || repoAfter.length > 0) {
+                e.preventDefault();
+                e.returnValue = 'Bạn còn dữ liệu chưa tải về. Nếu thoát có thể mất dữ liệu!';
+                return e.returnValue;
+            }
+        });
+
+        document.getElementById('tab1-prefix').addEventListener('input', (e) => document.getElementById('tab2-prefix').value = e.target.value);
+        document.getElementById('tab2-prefix').addEventListener('input', (e) => document.getElementById('tab1-prefix').value = e.target.value);
+        document.getElementById('tab1-note').addEventListener('input', (e) => document.getElementById('tab2-note').value = e.target.value);
+        document.getElementById('tab2-note').addEventListener('input', (e) => document.getElementById('tab1-note').value = e.target.value);
+    });
+
+    // 🌟 TÍNH NĂNG MỚI: ĐO ĐẠC DUNG LƯỢNG THỰC TẾ TRÊN Ổ CỨNG TRÌNH DUYỆT
+    async function calculateStorageQuota() {
+        if (navigator.storage && navigator.storage.estimate) {
+            try {
+                const estimate = await navigator.storage.estimate();
+                const usedMB = (estimate.usage / (1024 * 1024)).toFixed(1);
+                const totalQuotaMB = (estimate.quota / (1024 * 1024)).toFixed(0);
+                currentStoragePercent = parseFloat(((estimate.usage / estimate.quota) * 100).toFixed(1));
+
+                const statusBadge = document.getElementById("storage-status");
+                if (statusBadge) {
+                    statusBadge.innerText = `Bộ nhớ: ${usedMB}MB / ${totalQuotaMB}MB (${currentStoragePercent}%)`;
+                    
+                    // Đổi màu cảnh báo trực quan theo dung lượng tồn dư
+                    if (currentStoragePercent > 85) {
+                        statusBadge.className = "badge storage-alarm px-2 py-1 small ms-1";
+                    } else if (currentStoragePercent > 60) {
+                        statusBadge.className = "badge bg-warning text-dark px-2 py-1 small ms-1";
+                    } else {
+                        statusBadge.className = "badge bg-dark text-info border border-info px-2 py-1 small ms-1";
+                    }
+                }
+            } catch (err) { console.error("Không đọc được Storage Quota:", err); }
+        } else {
+            // Bộ lọc dự phòng (Fallback) nếu trình duyệt cũ không hỗ trợ API: Đếm tổng số lượng file
+            const totalFiles = repoBefore.length + repoAfter.length + repoStitched.length;
+            document.getElementById("storage-status").innerText = `Kho ảnh: ${totalFiles} file`;
+            currentStoragePercent = (totalFiles / 150) * 100; // Giả định cảnh báo nếu vượt quá 150 file ảnh thô/gộp
+        }
+    }
+
+    function initCamera() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false
+            })
+            .then(stream => {
+                localStream = stream;
+                document.getElementById("video-preview").srcObject = stream;
+                document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
+            }).catch(err => console.warn("Chưa cấp quyền camera."));
+        }
+    }
+
+    function initCameraZoom(stream) {
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+        const settings = track.getSettings();
+        if ('zoom' in capabilities) {
+            document.getElementById('zoom-control-container').style.display = 'block';
+            const slider = document.getElementById('camera-zoom-slider');
+            const display = document.getElementById('zoom-value-display');
+            slider.min = capabilities.zoom.min;
+            slider.max = capabilities.zoom.max;
+            slider.step = capabilities.zoom.step || 0.1;
+            slider.value = settings.zoom || capabilities.zoom.min;
+            if (display) display.innerText = parseFloat(slider.value).toFixed(1) + "x";
+            
+            slider.oninput = (e) => {
+                const val = parseFloat(e.target.value);
+                if (display) display.innerText = val.toFixed(1) + "x";
+                track.applyConstraints({ advanced: [{ zoom: val }] }).catch(() => {});
+            };
+        }
+    }
+
+    function initGpsTracking() {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    currentGpsData.lat = pos.coords.latitude.toFixed(6);
+                    currentGpsData.lng = pos.coords.longitude.toFixed(6);
+                    document.getElementById("gps-status").className = "badge bg-dark bg-opacity-75 text-info border border-info small";
+                    document.getElementById("gps-status").innerHTML = `<i class="fa-solid fa-location-dot text-success me-1"></i> Tọa độ: ${currentGpsData.lat}, ${currentGpsData.lng}`;
+                }, null, { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+    }
+
+    function capturePhoto(type) {
+        // 🌟 CẤP ĐỘ CẢNH BÁO 1: CHẶN KHÔNG CHO CHỤP NẾU BỘ NHỚ QUÁ TẢI NGUY HIỂM (>95%)
+        if (currentStoragePercent > 95) {
+            alert(`⚠️ BÁO ĐỘNG: Bộ nhớ ứng dụng đã đầy nghiêm trọng (${currentStoragePercent}%)!\n\nBạn KHÔNG THỂ chụp tiếp. Vui lòng vào mục "Đã Ghép" chọn Chia sẻ / Tải về máy, sau đó XÓA bớt ảnh cũ để giải phóng không gian lưu trữ.`);
+            return;
+        }
+
+        // 🌟 CẤP ĐỘ CẢNH BÁO 2: CẢNH BÁO NHẸ KHI VƯỢT NGHƯỠNG AN TOÀN KHI BẮT ĐẦU BẤM MÁY (>80%)
+        if (currentStoragePercent > 80) {
+            if (!confirm(`⚠️ CẢNH BÁO: Dung lượng bộ nhớ đệm sắp đầy (${currentStoragePercent}%)!\n\nNếu chụp tiếp có khả năng gây lag hoặc mất dữ liệu. Bạn có muốn tiếp tục chụp không?\n(Khuyên dùng: Nên đẩy ảnh cũ lên nhóm Zalo báo cáo trước).`)) {
+                return;
+            }
+        }
+
+        const video = document.getElementById("video-preview");
+        if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
+        
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = now.toLocaleDateString("vi-VN");
+        const fullTimeStr = `${timeStr} - ${dateStr}`;
+        const scale = canvas.width / 1000;
+        
+        const titleSize = Math.round(36 * scale);
+        const fontSize = Math.round(22 * scale);
+        
+        const typeText = type;
+        const timeText = `T.Gian: ${fullTimeStr}`;
+        const gpsText = `GPS: ${currentGpsData.lat}, ${currentGpsData.lng}`;
+        
+        ctx.font = `bold ${titleSize}px Arial`;
+        const wTitle = ctx.measureText(typeText).width;
+        ctx.font = `${fontSize}px Arial`;
+        const wTime = ctx.measureText(timeText).width;
+        const wGps = ctx.measureText(gpsText).width;
+        
+        const boxWidth = Math.max(wTitle, wTime, wGps) + 40 * scale;
+        const boxHeight = 110 * scale;
+        const padY = canvas.height - boxHeight - 15 * scale;
+        
+        let padX = (type === "TRƯỚC") ? 15 * scale : canvas.width - boxWidth - 15 * scale;
+        
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(padX, padY, boxWidth, boxHeight, 8 * scale) : ctx.rect(padX, padY, boxWidth, boxHeight);
+        ctx.fill();
+        
+        ctx.textBaseline = "top";
+        ctx.fillStyle = type === "TRƯỚC" ? "#ffc107" : "#20c997";
+        ctx.font = `bold ${titleSize}px Arial`;
+        ctx.fillText(typeText, padX + 15 * scale, padY + 12 * scale);
+        
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `${fontSize}px Arial`;
+        ctx.fillText(timeText, padX + 15 * scale, padY + 52 * scale);
+        ctx.fillText(gpsText, padX + 15 * scale, padY + 80 * scale);
+
+        const photoObj = {
+            id: "img_" + Date.now(),
+            type: type,
+            dataUrl: canvas.toDataURL("image/jpeg", 0.85),
+            timestampMs: now.getTime()
+        };
+
+        if (type === "TRƯỚC") repoBefore.unshift(photoObj);
+        else repoAfter.unshift(photoObj);
+        
+        saveToDB(photoObj);
+        
+        captureBuffer[type] = photoObj;
+        document.getElementById(type === "TRƯỚC" ? "preview-before" : "preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`;
+        
+        if (captureBuffer.TRƯỚC && captureBuffer.SAU) {
+            document.getElementById("btn-stitch-fast").removeAttribute("disabled");
+        }
+
+        updateUIState();
+        document.body.style.opacity = 0.5;
+        setTimeout(() => document.body.style.opacity = 1, 100);
+    }
+
+    function quickStitch() {
+        if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
+        processStitching(captureBuffer.TRƯỚC, captureBuffer.SAU, true, null, () => {
+            captureBuffer = { TRƯỚC: null, SAU: null };
+            document.getElementById("preview-before").innerHTML = '<span class="text-muted small">Ảnh TRƯỚC</span>';
+            document.getElementById("preview-after").innerHTML = '<span class="text-muted small">Ảnh SAU</span>';
+            document.getElementById("btn-stitch-fast").setAttribute("disabled", "true");
+        });
+    }
+
+    function manualStitch() {
+        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked');
+        const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
+        if (!checkedBefore || !checkedAfter) return alert("Chọn 1 ảnh TRƯỚC và 1 ảnh SAU để ghép!");
+
+        const bObj = repoBefore.find(x => x.id === checkedBefore.value);
+        const aObj = repoAfter.find(x => x.id === checkedAfter.value);
+        processStitching(bObj, aObj);
+    }
+
+    function autoStitch() {
+        if (repoBefore.length === 0 || repoAfter.length === 0) return alert("Không đủ dữ liệu hai kho để ghép tự động!");
+
+        windowAutoMatches = [];
+        let availableAfters = [...repoAfter];
+        let sortedBefores = [...repoBefore].sort((a,b) => a.timestampMs - b.timestampMs);
+        
+        for (let b of sortedBefores) {
+            if (availableAfters.length === 0) break;
+            
+            let closestA = availableAfters[0];
+            let minDiff = Math.abs(b.timestampMs - closestA.timestampMs);
+            let closestIdx = 0;
+            
+            for (let i = 1; i < availableAfters.length; i++) {
+                let diff = Math.abs(b.timestampMs - availableAfters[i].timestampMs);
+                if (diff < minDiff) { minDiff = diff; closestA = availableAfters[i]; closestIdx = i; }
+            }
+            
+            windowAutoMatches.push({ before: b, after: closestA });
+            availableAfters.splice(closestIdx, 1);
+        }
+        
+        if (windowAutoMatches.length === 0) return alert("Lỗi trích xuất cặp ảnh!");
+
+        let html = `<p class="small text-info mb-3">Tìm thấy <b>${windowAutoMatches.length}</b> cặp ảnh trùng khớp. Hãy xem ảnh thực tế để ghi chú thích chính xác:</p>`;
+        
+        windowAutoMatches.forEach((m, idx) => {
+            const timeB = new Date(m.before.timestampMs).toLocaleTimeString("vi-VN");
+            const timeA = new Date(m.after.timestampMs).toLocaleTimeString("vi-VN");
+            html += `
+                <div class="card bg-secondary mb-3 p-2 border-0 shadow-sm">
+                    <div class="d-flex justify-content-between small fw-bold mb-1">
+                        <span class="text-warning"><i class="fa-solid fa-clock"></i> Trước: ${timeB}</span>
+                        <span class="text-success"><i class="fa-solid fa-clock"></i> Sau: ${timeA}</span>
+                    </div>
+                    
+                    <div class="d-flex gap-1 mb-2">
+                        <div style="flex: 1; aspect-ratio: 4/3; background: #111; border-radius: 4px; overflow: hidden;">
+                            <img src="${m.before.dataUrl}" style="width: 100%; height: 100%; object-fit: contain;">
+                        </div>
+                        <div style="flex: 1; aspect-ratio: 4/3; background: #111; border-radius: 4px; overflow: hidden;">
+                            <img src="${m.after.dataUrl}" style="width: 100%; height: 100%; object-fit: contain;">
+                        </div>
+                    </div>
+                    <input type="text" id="auto-note-${idx}" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Ghi chú cho cặp này (TỰ ĐỘNG IN HOA)...">
+                </div>
+            `;
+        });
+        
+        document.getElementById('autoStitchModalBody').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('autoStitchModal')).show();
+    }
+
+    async function confirmAutoStitch() {
+        const modalEl = document.getElementById('autoStitchModal');
+        bootstrap.Modal.getInstance(modalEl).hide();
+
+        let count = 0;
+        for (let i = 0; i < windowAutoMatches.length; i++) {
+            const match = windowAutoMatches[i];
+            const customNote = document.getElementById('auto-note-' + i).value.trim();
+            await processStitching(match.before, match.after, false, customNote, null);
+            count++;
+        }
+        
+        alert(`Tự động ghép thành công ${count} cặp ảnh!`);
+        renderPending();
+        renderGallery();
+    }
+
+    function processStitching(bObj, aObj, showAlert = true, customNote = null, callback = null) {
+        return new Promise((resolve) => {
+            const stitchCanvas = document.createElement("canvas");
+            const ctx = stitchCanvas.getContext("2d");
+
+            const loadB = new Promise(res => { const i = new Image(); i.src = bObj.dataUrl; i.onload = () => res(i); });
+            const loadA = new Promise(res => { const i = new Image(); i.src = aObj.dataUrl; i.onload = () => res(i); });
+
+            Promise.all([loadB, loadA]).then(([loadedB, loadedA]) => {
+                stitchCanvas.width = loadedB.width + loadedA.width; 
+                stitchCanvas.height = Math.max(loadedB.height, loadedA.height);
+                
+                ctx.drawImage(loadedB, 0, 0, loadedB.width, loadedB.height);
+                ctx.drawImage(loadedA, loadedB.width, 0, loadedA.width, loadedA.height);
+
+                let rawNote = (customNote !== null) ? customNote : document.getElementById("tab1-note").value.trim();
+                let noteText = rawNote.toUpperCase();
+                
+                if (noteText) {
+                    const imgScale = loadedB.width / 1000;
+                    const noteSize = Math.round(36 * imgScale);
+                    ctx.font = `bold ${noteSize}px Arial`;
+                    
+                    const noteWidth = ctx.measureText(noteText).width;
+                    const paddingY = 30 * imgScale;
+                    const noteHeight = noteSize + paddingY;
+                    
+                    const noteX = loadedB.width; 
+                    const noteY = stitchCanvas.height - noteHeight - 30 * imgScale; 
+                    
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                    ctx.beginPath();
+                    ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 25*imgScale, noteY, noteWidth + 50*imgScale, noteHeight, 10*imgScale) 
+                                  : ctx.fillRect(noteX - noteWidth/2 - 25*imgScale, noteY, noteWidth + 50*imgScale, noteHeight);
+                    ctx.fill();
+
+                    ctx.fillStyle = "#0dcaf0";
+                    ctx.textBaseline = "middle";
+                    ctx.textAlign = "center";
+                    ctx.fillText(noteText, noteX, noteY + noteHeight/2);
+                }
+
+                let prefixVal = document.getElementById("tab1-prefix").value.trim();
+                let generalNote = document.getElementById("tab1-note").value.trim();
+                let specificNote = (customNote !== null) ? customNote.trim() : "";
+
+                let nameParts = [];
+                if (prefixVal) nameParts.push(prefixVal);
+                if (generalNote) nameParts.push(generalNote);
+                if (specificNote) nameParts.push(specificNote);
+
+                let combinedPrefix = nameParts
+                    .map(p => p.replace(/\s+/g, '_')) 
+                    .join('_')                        
+                    .replace(/_+/g, '_');             
+
+                let filePrefix = combinedPrefix ? combinedPrefix : "HT";
+
+                const formatTime = (ts) => {
+                    const d = new Date(ts);
+                    return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`;
+                };
+                
+                const timeBStr = formatTime(bObj.timestampMs);
+                const timeAStr = formatTime(aObj.timestampMs);
+                const timeNowStr = formatTime(Date.now());
+                const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
+
+                let finalName = `${filePrefix}_${dateStr}_${timeBStr}-${timeAStr}-${timeNowStr}.jpg`;
+
+                const newItem = { 
+                    id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), 
+                    type: "STITCHED", name: finalName, 
+                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), 
+                    timestampStr: new Date().toLocaleString("vi-VN") 
+                };
+                
+                repoStitched.push(newItem); 
+                saveToDB(newItem);
+                
+                repoBefore = repoBefore.filter(x => x.id !== bObj.id); 
+                repoAfter = repoAfter.filter(x => x.id !== aObj.id);
+                deleteFromDB(bObj.id); 
+                deleteFromDB(aObj.id);
+                updateUIState();
+                
+                if (callback) callback();
+                if (showAlert) {
+                    renderPending(); renderGallery();
+                    alert(`Đã ghép thành công:\n${finalName}`);
+                }
+                resolve();
+            });
+        });
+    }
+
+    function saveToDB(item) { 
+        if (db) {
+            db.transaction("photos", "readwrite").objectStore("photos").put(item);
+            calculateStorageQuota(); // Tính toán lại dung lượng sau khi lưu thêm dữ liệu
+        }
+    }
+    
+    function deleteFromDB(id) { 
+        if (db) {
+            db.transaction("photos", "readwrite").objectStore("photos").delete(id);
+            calculateStorageQuota(); // Tính toán lại dung lượng giải phóng sau khi xóa dữ liệu
+        }
+    }
+    
+    function loadDataFromDB() {
+        if (!db) return;
+        let req = db.transaction("photos", "readonly").objectStore("photos").getAll();
+        req.onsuccess = (e) => {
+            const allData = e.target.result || [];
+            repoBefore = allData.filter(x => x.type === "TRƯỚC").sort((a,b) => b.id.localeCompare(a.id));
+            repoAfter = allData.filter(x => x.type === "SAU").sort((a,b) => b.id.localeCompare(a.id));
+            repoStitched = allData.filter(x => x.type === "STITCHED").sort((a,b) => a.id.localeCompare(b.id));
+            updateUIState();
+        };
+    }
+
+    function updateUIState() {
+        document.getElementById("pending-count").innerText = repoBefore.length + repoAfter.length;
+        document.getElementById("gallery-count").innerText = repoStitched.length;
+        document.getElementById("gallery-alert").style.display = (repoStitched.length > 0 || repoBefore.length > 0 || repoAfter.length > 0) ? "inline-block" : "none";
+        calculateStorageQuota(); // Cập nhật nhãn thủy kế dung lượng lên giao diện
+    }
+
+    function renderPending() {
+        const boxB = document.getElementById("list-before"); const boxA = document.getElementById("list-after");
+        let htmlB = repoBefore.length === 0 ? '<div class="small text-muted p-2 text-center">Trống</div>' : '';
+        repoBefore.forEach(item => {
+            const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN");
+            htmlB += `<div class="photo-card mb-2" id="card_${item.id}"><input type="radio" name="radioBefore" value="${item.id}" class="form-check-input photo-radio"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
+        }); boxB.innerHTML = htmlB;
+
+        let htmlA = repoAfter.length === 0 ? '<div class="small text-muted p-2 text-center">Trống</div>' : '';
+        repoAfter.forEach(item => {
+            const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN");
+            htmlA += `<div class="photo-card mb-2" id="card_${item.id}"><input type="radio" name="radioAfter" value="${item.id}" class="form-check-input photo-radio"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
+        }); boxA.innerHTML = htmlA;
+    }
+
+    function renderGallery() {
+        const grid = document.getElementById("gallery-grid"); const emptyMsg = document.getElementById("gallery-empty-msg");
+        document.getElementById("select-all-checkbox").checked = false; document.getElementById("selected-counter").innerText = "Đã chọn: 0 ảnh";
+        if (repoStitched.length === 0) { grid.innerHTML = ""; emptyMsg.classList.remove("d-none"); return; }
+        emptyMsg.classList.add("d-none");
+        let html = "";
+        repoStitched.forEach(item => {
+            html += `<div class="col-12 col-sm-6" id="card_${item.id}"><div class="photo-card stitched shadow-sm"><input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${item.id}" onchange="calculateSelection()"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-2"><div class="small fw-bold text-info text-break">${item.name}</div><div class="text-secondary" style="font-size:11px;">${item.timestampStr}</div></div></div></div>`;
+        }); grid.innerHTML = html;
+    }
+
+    function calculateSelection() { document.getElementById("selected-counter").innerText = `Đã chọn: ${document.querySelectorAll(".gallery-item-check:checked").length} ảnh`; }
+    function toggleSelectAll(master) { document.querySelectorAll(".gallery-item-check").forEach(cb => cb.checked = master.checked); calculateSelection(); }
+    
+    function deleteSelectedPhotos() {
+        const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked");
+        if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!");
+        if (confirm(`Xóa vĩnh viễn ${checkedBoxes.length} ảnh này khỏi bộ nhớ kho?`)) {
+            const ids = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id"));
+            ids.forEach(id => deleteFromDB(id)); repoStitched = repoStitched.filter(item => !ids.includes(item.id));
+            renderGallery(); updateUIState();
+        }
+    }
+    
+    async function shareSelectedPhotos() {
+        const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked");
+        if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!");
+        const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id"));
+        const itemsToShare = repoStitched.filter(item => selectedIds.includes(item.id));
+
+        if (navigator.canShare && navigator.share) {
+            try {
+                let filesArray = [];
+                for (let item of itemsToShare) {
+                    let arr = item.dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8 = new Uint8Array(n);
+                    while(n--) u8[n] = bstr.charCodeAt(n);
+                    filesArray.push(new File([new Blob([u8], {type:mime})], item.name, { type: "image/jpeg" }));
+                }
+                await navigator.share({ files: filesArray, title: 'Báo cáo PC Tuyên Quang' });
+            } catch (err) { if (err.name !== "AbortError") triggerBatchDownloads(itemsToShare); }
+        } else { triggerBatchDownloads(itemsToShare); }
+    }
+    
+    function triggerBatchDownloads(items) {
+        items.forEach((item, index) => {
+            setTimeout(() => {
+                const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            }, index * 300);
+        });
+    }
+    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
