@@ -726,5 +726,15 @@
     function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Kích hoạt Service Worker ngầm điều khiển PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('PWA Service Worker đã kích hoạt thành công!'))
+                .catch(err => console.error('Lỗi kích hoạt SW:', err));
+        });
+    }
+</script>
 </body>
 </html>
