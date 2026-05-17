@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V12)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
     
-    <!-- Bootstrap 5 & FontAwesome -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
@@ -25,8 +24,8 @@
         .preview-box img { width: 100%; height: 100%; object-fit: contain; }
         
         .photo-card { background: #2b3035; border: 1px solid #495057; border-radius: 8px; overflow: hidden; position: relative; transition: transform 0.2s; }
-        .photo-card img { width: 100%; aspect-ratio: 4/3; object-fit: contain; background: #111; border-bottom: 1px solid #343a40; }
-        .photo-card.stitched img { aspect-ratio: 2/1; object-fit: contain; background: #111; }
+        .photo-card img { width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #111; border-bottom: 1px solid #343a40; }
+        .photo-card.stitched img { aspect-ratio: 16/9; object-fit: contain; background: #111; }
         
         .photo-radio, .photo-checkbox { position: absolute; top: 10px; left: 10px; width: 22px; height: 22px; z-index: 10; cursor: pointer; }
         
@@ -36,22 +35,12 @@
         .section-title { font-size: 14px; font-weight: bold; color: #6c757d; border-bottom: 1px solid #343a40; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; }
         .empty-box { background: #212529; border: 2px dashed #495057; border-radius: 8px; padding: 20px; text-align: center; color: #6c757d; font-size: 14px; }
 
-        .scrollable-box {
-            max-height: 55vh;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding-right: 5px;
-        }
+        .scrollable-box { max-height: 55vh; overflow-y: auto; overflow-x: hidden; padding-right: 5px; }
         .scrollable-box::-webkit-scrollbar { width: 6px; }
         .scrollable-box::-webkit-scrollbar-track { background: #212529; border-radius: 4px; }
         .scrollable-box::-webkit-scrollbar-thumb { background: #495057; border-radius: 4px; }
         .scrollable-box::-webkit-scrollbar-thumb:hover { background: #0dcaf0; }
 
-        @keyframes pulse-red {
-            0% { background-color: #dc3545; box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
-            70% { background-color: #b02a37; box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
-            100% { background-color: #dc3545; box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
-        }
         .storage-alarm { animation: pulse-red 1.5s infinite; color: #fff !important; border: none !important; }
         .cursor-pointer { cursor: pointer; }
     </style>
@@ -96,33 +85,52 @@
         <!-- TAB 1: MÁY ẢNH & GHÉP NHANH -->
         <div class="tab-pane fade show active" id="capture-content" role="tabpanel">
             
-            <!-- TOOLBAR: ĐỔI CAM & CHỤP SELFIE -->
-            <div class="d-flex justify-content-between align-items-end mb-2">
-                <button class="btn btn-sm btn-outline-secondary text-white" onclick="toggleCamera()">
-                    <i class="fa-solid fa-camera-rotate me-1"></i> Đổi Cam
-                </button>
-                <div id="selfie-preview-container" class="d-flex align-items-end d-none">
-                    <span class="small text-warning me-2 mb-1" style="font-size: 11px;">Ảnh người chụp:</span>
-                    <div class="position-relative">
-                        <img id="selfie-preview-img" src="" style="width: 50px; height: 50px; object-fit: cover; border: 2px solid #ffc107; border-radius: 4px;">
-                        <button class="btn btn-sm btn-danger position-absolute top-0 start-100 translate-middle rounded-circle p-0" style="width: 20px; height: 20px; font-size: 10px;" onclick="clearSelfie()"><i class="fa-solid fa-xmark"></i></button>
+            <div class="card bg-dark border-secondary p-2 mb-3 shadow-sm">
+                <label class="form-label text-info fw-bold small mb-2"><i class="fa-solid fa-layer-group me-1"></i> CHÂN TRANG TỰ ĐỘNG TÍCH HỢP:</label>
+                <div class="row g-2">
+                    <div class="col-4">
+                        <div class="border border-secondary rounded p-1 text-center bg-black position-relative">
+                            <span class="small text-warning d-block mb-1" style="font-size:10px; font-weight:bold;">NGƯỜI CHỤP</span>
+                            <img id="img-selfie" src="" class="w-100 d-none" style="aspect-ratio: 1; object-fit: cover; border-radius: 4px;">
+                            <div class="btn-group w-100" id="btn-grp-selfie">
+                                <button class="btn btn-sm btn-outline-warning p-1" onclick="captureExtra('selfie')"><i class="fa-solid fa-camera"></i></button>
+                                <label class="btn btn-sm btn-outline-info p-1 m-0"><i class="fa-solid fa-upload"></i><input type="file" hidden accept="image/*" onchange="uploadExtra(event, 'selfie')"></label>
+                            </div>
+                            <button id="clear-selfie" class="btn btn-sm btn-danger position-absolute top-0 start-100 translate-middle rounded-circle p-0 d-none" style="width: 20px; height: 20px; font-size: 10px;" onclick="clearExtra('selfie')"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border border-secondary rounded p-1 text-center bg-black position-relative">
+                            <span class="small text-success d-block mb-1" style="font-size:10px; font-weight:bold;">BẢN ĐỒ</span>
+                            <canvas id="canvas-map" class="w-100 bg-secondary" width="200" height="200" style="aspect-ratio: 1; border-radius: 4px;"></canvas>
+                            <img id="img-map" src="" class="w-100 d-none" style="aspect-ratio: 1; object-fit: cover; border-radius: 4px;">
+                            <label class="btn btn-sm btn-outline-info w-100 mt-1 p-0" style="font-size:10px;"><i class="fa-solid fa-upload me-1"></i> Tải đè<input type="file" hidden accept="image/*" onchange="uploadExtra(event, 'map')"></label>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border border-secondary rounded p-1 text-center bg-black position-relative">
+                            <span class="small text-danger d-block mb-1" style="font-size:10px; font-weight:bold;">LA BÀN</span>
+                            <canvas id="canvas-compass" class="w-100 bg-dark" width="200" height="200" style="aspect-ratio: 1; border-radius: 4px; border: 1px solid #495057;"></canvas>
+                            <img id="img-compass" src="" class="w-100 d-none" style="aspect-ratio: 1; object-fit: cover; border-radius: 4px;">
+                            <label class="btn btn-sm btn-outline-info w-100 mt-1 p-0" style="font-size:10px;"><i class="fa-solid fa-upload me-1"></i> Tải đè<input type="file" hidden accept="image/*" onchange="uploadExtra(event, 'compass')"></label>
+                        </div>
                     </div>
                 </div>
-                <button class="btn btn-sm btn-warning text-dark fw-bold" onclick="captureSelfie()">
-                    <i class="fa-solid fa-user-tie me-1"></i> Chụp Người Chụp
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+                <button class="btn btn-sm btn-outline-secondary text-white text-nowrap" onclick="toggleCamera()">
+                    <i class="fa-solid fa-camera-rotate"></i>
                 </button>
+                <input type="text" id="tab1-team" class="form-control form-control-sm bg-secondary text-white border-secondary text-center" placeholder="Tổ đội / Người thực hiện...">
+                <span id="gps-status" class="badge bg-dark bg-opacity-75 text-warning border border-warning small text-nowrap" style="font-size: 10px;">
+                    <i class="fa-solid fa-location-crosshairs fa-spin me-1"></i> GPS...
+                </span>
             </div>
 
             <div id="camera-wrapper" class="shadow mb-3">
                 <div id="camera-container">
                     <video id="video-preview" autoplay playsinline muted></video>
-                    <div class="position-absolute bottom-0 start-50 translate-middle-x mb-2 text-center w-100 px-3">
-                        <span id="gps-status" class="badge bg-dark bg-opacity-75 text-warning border border-warning small">
-                            <i class="fa-solid fa-location-crosshairs fa-spin me-1"></i> Đang tìm tọa độ GPS...
-                        </span>
-                    </div>
                 </div>
-                <!-- Thanh Zoom -->
                 <div id="zoom-control-container" style="display: none; padding: 12px 15px; background: #212529; border-top: 1px solid #343a40;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="small text-info fw-bold"><i class="fa-solid fa-magnifying-glass me-1"></i> THU PHÓNG</span>
@@ -131,6 +139,9 @@
                     <input type="range" id="camera-zoom-slider" class="form-range" style="accent-color: #0dcaf0;">
                 </div>
             </div>
+
+            <!-- BỘ ẢNH PHỤ TRỢ MỚI TỰ ĐỘNG -->
+            
 
             <div class="row g-2 mb-3">
                 <div class="col-6">
@@ -156,18 +167,14 @@
             </div>
 
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
+                
+
                 <label class="form-label text-info fw-bold small mb-1">TÊN HOẶC MÃ HIỆN TRƯỜNG:</label>
                 <div class="input-group input-group-sm mb-2">
                     <input type="text" id="tab1-prefix" class="form-control bg-secondary text-white border-secondary" placeholder="TBA_Gia_Tran_01">
                 </div>
                 
-                <!-- 🌟 THÊM MỚI: TRƯỜNG DỮ LIỆU TÙY CHỌN NHẬP TÊN TỔ ĐỘI / NGƯỜI THỰC HIỆN -->
-                <label class="form-label text-info fw-bold small mb-1">TỔ ĐỘI / NGƯỜI THỰC HIỆN (Tùy chọn):</label>
-                <div class="input-group input-group-sm mb-2">
-                    <input type="text" id="tab1-team" class="form-control bg-secondary text-white border-secondary" placeholder="Đội xung kích, Đội QLVH...">
-                </div>
-                
-                <label class="form-label text-warning fw-bold small mb-1">GHI CHÚ (Hiển thị giữa 2 ảnh):</label>
+                <label class="form-label text-warning fw-bold small mb-1">GHI CHÚ (Hiển thị chân ảnh ghép):</label>
                 <div class="input-group input-group-sm mb-3">
                     <input type="text" id="tab1-note" class="form-control bg-secondary text-white border-secondary" placeholder="Thay sứ, vuốt lại lèo...">
                 </div>
@@ -181,15 +188,14 @@
         <!-- TAB 2: KHO PHỤ & GHÉP ẢNH -->
         <div class="tab-pane fade" id="pending-content" role="tabpanel">
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
-                <label class="form-label text-info fw-bold small mb-1">TÊN HOẶC MÃ HIỆN TRƯỜNG:</label>
-                <div class="input-group input-group-sm mb-2">
-                    <input type="text" id="tab2-prefix" class="form-control bg-secondary text-white border-secondary" placeholder="TBA_Gia_Tran_01">
-                </div>
-                
-                <!-- SYNC TRƯỜNG TỔ ĐỘI SANG TAB 2 -->
                 <label class="form-label text-info fw-bold small mb-1">TỔ ĐỘI / NGƯỜI THỰC HIỆN (Tùy chọn):</label>
                 <div class="input-group input-group-sm mb-2">
                     <input type="text" id="tab2-team" class="form-control bg-secondary text-white border-secondary" placeholder="Đội xung kích, Đội QLVH...">
+                </div>
+
+                <label class="form-label text-info fw-bold small mb-1">TÊN HOẶC MÃ HIỆN TRƯỜNG:</label>
+                <div class="input-group input-group-sm mb-2">
+                    <input type="text" id="tab2-prefix" class="form-control bg-secondary text-white border-secondary" placeholder="TBA_Gia_Tran_01">
                 </div>
                 
                 <label class="form-label text-warning fw-bold small mb-1">GHI CHÚ DÙNG CHUNG (Cho ghép thủ công):</label>
@@ -214,7 +220,7 @@
                     <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-1 mb-2">
                         <span class="section-title text-primary m-0 border-0"><i class="fa-solid fa-box-open me-1"></i> Kho "Trước"</span>
                         <label class="btn btn-sm btn-outline-primary p-1 px-2 m-0 cursor-pointer" style="font-size:11px;">
-                            <i class="fa-solid fa-upload"></i> Từ bộ nhớ
+                            <i class="fa-solid fa-upload"></i> Tải ảnh
                             <input type="file" class="d-none" accept="image/*" multiple onchange="handleFileUpload(event, 'TRƯỚC')">
                         </label>
                     </div>
@@ -224,7 +230,7 @@
                     <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-1 mb-2">
                         <span class="section-title text-success m-0 border-0"><i class="fa-solid fa-box-open me-1"></i> Kho "Sau"</span>
                         <label class="btn btn-sm btn-outline-success p-1 px-2 m-0 cursor-pointer" style="font-size:11px;">
-                            <i class="fa-solid fa-upload"></i> Từ bộ nhớ
+                            <i class="fa-solid fa-upload"></i> Tải ảnh
                             <input type="file" class="d-none" accept="image/*" multiple onchange="handleFileUpload(event, 'SAU')">
                         </label>
                     </div>
@@ -243,7 +249,7 @@
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <span class="small text-secondary" id="selected-counter">Đã chọn: 0</span>
-                        <label class="btn btn-sm btn-outline-secondary py-0 px-2 m-0 cursor-pointer" style="font-size:11px;" title="Tải ảnh đã ghép sẵn vào kho">
+                        <label class="btn btn-sm btn-outline-secondary py-0 px-2 m-0 cursor-pointer" style="font-size:11px;">
                             <i class="fa-solid fa-plus"></i> Thêm ngoài
                             <input type="file" class="d-none" accept="image/*" multiple onchange="handleFileUpload(event, 'STITCHED')">
                         </label>
@@ -267,7 +273,6 @@
     </div>
 </div>
 
-<!-- Modal Nhập Ghi Chú Tự Động -->
 <div class="modal fade" id="autoStitchModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content bg-dark text-light border-secondary">
@@ -287,8 +292,9 @@
 <script>
     let localStream = null;
     let currentFacingMode = "environment";
-    let currentGpsData = { lat: "0.000000", lng: "0.000000", accuracy: "N/A" };
+    let currentGpsData = { lat: 0, lng: 0, accuracy: "N/A", text: "0.000000, 0.000000" };
     let db = null;
+    let currentHeading = 0;
     
     let repoBefore = [];
     let repoAfter = [];
@@ -297,8 +303,10 @@
     let captureBuffer = { TRƯỚC: null, SAU: null };
     let windowAutoMatches = [];
     let currentStoragePercent = 0;
+    
+    let globalExtras = { selfie: null, map: null, compass: null };
 
-    const dbRequest = indexedDB.open("AirGapCameraV12", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV17", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) {
@@ -313,6 +321,7 @@
     document.addEventListener("DOMContentLoaded", () => {
         initCamera();
         initGpsTracking();
+        initCompassListener();
         
         window.addEventListener('beforeunload', (e) => {
             if (repoStitched.length > 0 || repoBefore.length > 0 || repoAfter.length > 0) {
@@ -320,15 +329,14 @@
             }
         });
 
-        // Đồng bộ các trường nhập liệu giữa Tab 1 và Tab 2
         document.getElementById('tab1-prefix').addEventListener('input', (e) => document.getElementById('tab2-prefix').value = e.target.value);
         document.getElementById('tab2-prefix').addEventListener('input', (e) => document.getElementById('tab1-prefix').value = e.target.value);
-        
         document.getElementById('tab1-team').addEventListener('input', (e) => document.getElementById('tab2-team').value = e.target.value);
         document.getElementById('tab2-team').addEventListener('input', (e) => document.getElementById('tab1-team').value = e.target.value);
-        
         document.getElementById('tab1-note').addEventListener('input', (e) => document.getElementById('tab2-note').value = e.target.value);
         document.getElementById('tab2-note').addEventListener('input', (e) => document.getElementById('tab1-note').value = e.target.value);
+        
+        setInterval(drawCompassCanvas, 200); // Update compass drawing
     });
 
     async function calculateStorageQuota() {
@@ -395,42 +403,172 @@
         if ("geolocation" in navigator) {
             navigator.geolocation.watchPosition(
                 (pos) => {
-                    currentGpsData.lat = pos.coords.latitude.toFixed(6);
-                    currentGpsData.lng = pos.coords.longitude.toFixed(6);
+                    currentGpsData.lat = pos.coords.latitude;
+                    currentGpsData.lng = pos.coords.longitude;
+                    currentGpsData.text = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
                     document.getElementById("gps-status").className = "badge bg-dark bg-opacity-75 text-info border border-info small";
-                    document.getElementById("gps-status").innerHTML = `<i class="fa-solid fa-location-dot text-success me-1"></i> Tọa độ: ${currentGpsData.lat}, ${currentGpsData.lng}`;
+                    document.getElementById("gps-status").innerHTML = `<i class="fa-solid fa-location-dot text-success me-1"></i> ${currentGpsData.text}`;
+                    if(!globalExtras.map) updateMapCanvas(); // Auto update map if not manually overridden
                 }, null, { enableHighAccuracy: true, timeout: 10000 }
             );
         }
     }
 
-    function captureSelfie() {
+    function initCompassListener() {
+        window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+        window.addEventListener('deviceorientation', handleOrientation, true);
+    }
+
+    function handleOrientation(event) {
+        let alpha = event.alpha;
+        let webkitAlpha = event.webkitCompassHeading;
+        if (webkitAlpha !== undefined) {
+            currentHeading = webkitAlpha;
+        } else if (alpha !== null) {
+            currentHeading = Math.abs(alpha - 360);
+        }
+    }
+
+    function drawCompassCanvas() {
+        if(globalExtras.compass) return; // overridden
+        const c = document.getElementById('canvas-compass');
+        const ctx = c.getContext('2d');
+        const cx = c.width / 2; const cy = c.height / 2; const r = cx - 10;
+        
+        ctx.clearRect(0, 0, c.width, c.height);
+        
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-currentHeading * Math.PI / 180);
+        
+        // Vòng la bàn
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI);
+        ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4; ctx.stroke();
+        
+        // Kim la bàn (Đỏ chỉ Bắc)
+        ctx.beginPath(); ctx.moveTo(0, -r + 10); ctx.lineTo(10, 0); ctx.lineTo(-10, 0); ctx.fillStyle = "#dc3545"; ctx.fill();
+        // Nửa Nam
+        ctx.beginPath(); ctx.moveTo(0, r - 10); ctx.lineTo(10, 0); ctx.lineTo(-10, 0); ctx.fillStyle = "#ffffff"; ctx.fill();
+        
+        ctx.fillStyle = "#ffffff"; ctx.font = "bold 20px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("N", 0, -r - 15); ctx.fillText("S", 0, r + 15);
+        ctx.fillText("E", r + 15, 0); ctx.fillText("W", -r - 15, 0);
+        ctx.restore();
+        
+        // Độ số ở giữa
+        ctx.fillStyle = "#ffc107"; ctx.font = "bold 24px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(`${Math.round(currentHeading)}°`, cx, cy);
+    }
+
+    function updateMapCanvas() {
+        const c = document.getElementById('canvas-map');
+        const ctx = c.getContext('2d');
+        const zoom = 16;
+        const latRad = currentGpsData.lat * Math.PI / 180;
+        const n = Math.pow(2, zoom);
+        const xtile = Math.floor((currentGpsData.lng + 180.0) / 360.0 * n);
+        const ytile = Math.floor((1.0 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2.0 * n);
+
+        const img = new Image();
+        img.crossOrigin = "Anonymous"; // Required for Canvas toDataUrl later
+        img.src = `https://a.tile.openstreetmap.org/${zoom}/${xtile}/${ytile}.png`;
+        
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            // Draw Pin
+            ctx.fillStyle = "rgba(220, 53, 69, 0.4)";
+            ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 20, 0, 2*Math.PI); ctx.fill();
+            ctx.fillStyle = "#dc3545";
+            ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 8, 0, 2*Math.PI); ctx.fill();
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+        };
+        img.onerror = () => {
+            // Fallback offline map graphic
+            ctx.fillStyle = "#2b3035"; ctx.fillRect(0, 0, c.width, c.height);
+            ctx.strokeStyle = "#495057"; ctx.lineWidth = 1;
+            for(let i=0; i<c.width; i+=20) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,c.height); ctx.stroke(); }
+            for(let i=0; i<c.height; i+=20) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(c.width,i); ctx.stroke(); }
+            ctx.fillStyle = "#dc3545";
+            ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 10, 0, 2*Math.PI); ctx.fill();
+        };
+    }
+
+    function captureExtra(key) {
         const video = document.getElementById("video-preview");
         if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
-
+        
         const canvas = document.createElement("canvas");
-        canvas.width = 640; canvas.height = 640 * (video.videoHeight / video.videoWidth);
+        let size = Math.min(video.videoWidth, video.videoHeight);
+        canvas.width = 640; canvas.height = 640;
         const ctx = canvas.getContext("2d");
         
         if (currentFacingMode === "user") {
             ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
         }
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const imgEl = document.getElementById("selfie-preview-img");
-        imgEl.src = canvas.toDataURL("image/jpeg", 0.8);
-        document.getElementById("selfie-preview-container").classList.remove("d-none");
+        
+        let sx = (video.videoWidth - size) / 2;
+        let sy = (video.videoHeight - size) / 2;
+        ctx.drawImage(video, sx, sy, size, size, 0, 0, 640, 640);
+        
+        let dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        globalExtras[key] = dataUrl;
+        
+        document.getElementById(`img-${key}`).src = dataUrl;
+        document.getElementById(`img-${key}`).classList.remove('d-none');
+        document.getElementById(`btn-grp-${key}`).classList.add('d-none');
+        document.getElementById(`clear-${key}`).classList.remove('d-none');
+        if(key==='map') document.getElementById('canvas-map').classList.add('d-none');
+        if(key==='compass') document.getElementById('canvas-compass').classList.add('d-none');
         
         document.body.style.opacity = 0.5;
         setTimeout(() => document.body.style.opacity = 1, 100);
     }
 
-    function clearSelfie() {
-        document.getElementById("selfie-preview-img").src = "";
-        document.getElementById("selfie-preview-container").classList.add("d-none");
+    function uploadExtra(event, key) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                let size = Math.min(img.width, img.height);
+                canvas.width = 640; canvas.height = 640;
+                const ctx = canvas.getContext("2d");
+                
+                let sx = (img.width - size) / 2;
+                let sy = (img.height - size) / 2;
+                ctx.drawImage(img, sx, sy, size, size, 0, 0, 640, 640);
+                
+                let dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+                globalExtras[key] = dataUrl;
+                
+                document.getElementById(`img-${key}`).src = dataUrl;
+                document.getElementById(`img-${key}`).classList.remove('d-none');
+                
+                if(key==='selfie') {
+                    document.getElementById(`btn-grp-${key}`).classList.add('d-none');
+                    document.getElementById(`clear-${key}`).classList.remove('d-none');
+                } else {
+                    document.getElementById(`canvas-${key}`).classList.add('d-none');
+                }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        event.target.value = "";
     }
 
-    function capturePhoto(type) {
+    function clearExtra(key) {
+        globalExtras[key] = null;
+        document.getElementById(`img-${key}`).src = "";
+        document.getElementById(`img-${key}`).classList.add('d-none');
+        document.getElementById(`btn-grp-${key}`).classList.remove('d-none');
+        document.getElementById(`clear-${key}`).classList.add('d-none');
+    }
+
+    // 🌟 LÕI CHỤP ẢNH MỚI: TẠO CHÂN TRANG NGAY KHI CHỤP TỪNG ẢNH TRƯỚC/SAU
+            async function capturePhoto(type) {
         if (currentStoragePercent > 95) return alert(`⚠️ Bộ nhớ đầy (${currentStoragePercent}%)!`);
         if (currentStoragePercent > 80 && !confirm(`⚠️ Bộ nhớ sắp đầy (${currentStoragePercent}%)! Tiếp tục?`)) return;
 
@@ -438,77 +576,124 @@
         if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
         
         const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         const ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const scale = canvas.width / 1000;
         
-        // CHÈN ẢNH SELFIE NGƯỜI CHỤP
-        const selfieContainer = document.getElementById("selfie-preview-container");
-        const selfieImg = document.getElementById("selfie-preview-img");
-        if (!selfieContainer.classList.contains("d-none") && selfieImg.src) {
-            const sWidth = canvas.width * 0.18; 
-            const sHeight = selfieImg.naturalHeight * (sWidth / selfieImg.naturalWidth);
-            // Bo góc và bám sát mép (margin = 0)
-            const sY = 0; 
-            const sX = (type === "TRƯỚC") ? 0 : canvas.width - sWidth;
+        const scale = video.videoWidth / 1000;
+        
+        // Tính toán kích thước footer
+        const imgBoxSize = Math.min(280 * scale, video.videoWidth * 0.18);
+        const footerH = imgBoxSize + 40 * scale; 
+        
+        canvas.width = video.videoWidth; 
+        canvas.height = video.videoHeight + footerH; 
+        
+        // 1. Vẽ video gốc
+        ctx.save();
+        if (currentFacingMode === "user") {
+            ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, video.videoHeight);
+        ctx.restore();
 
-            ctx.drawImage(selfieImg, sX, sY, sWidth, sHeight);
-            
-            // Vẽ viền vàng (đẩy lùi vào trong một nửa độ dày viền để không bị cắt xén)
-            const lw = 6 * scale;
-            ctx.lineWidth = lw; 
-            ctx.strokeStyle = "#ffc107";
-            ctx.strokeRect(sX + lw/2, sY + lw/2, sWidth - lw, sHeight - lw);
+        // 2. Vẽ nền Chân trang (Footer)
+        const fY = video.videoHeight;
+        ctx.fillStyle = "#111111";
+        ctx.fillRect(0, fY, canvas.width, footerH);
+        ctx.strokeStyle = "#343a40";
+        ctx.lineWidth = 4 * scale;
+        ctx.strokeRect(0, fY, canvas.width, footerH);
+
+        // 3. Chuẩn bị Văn bản
+        const now = new Date();
+        const timeStr = `${now.toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - ${now.toLocaleDateString("vi-VN")}`;
+        const teamText = document.getElementById("tab1-team").value.trim();
+        
+        // 4. Tính toán tọa độ X cho các phần tử theo yêu cầu V16
+        const pad = 20 * scale;
+        let maxTextW = canvas.width - (3 * imgBoxSize) - (5 * pad); 
+        if (maxTextW < 100) maxTextW = 100;
+        
+        let textX, selfieX, mapX, compassX;
+        if (type === "TRƯỚC") {
+            textX = pad;
+            selfieX = textX + maxTextW + pad;
+            mapX = selfieX + imgBoxSize + pad;
+            compassX = mapX + imgBoxSize + pad;
+        } else {
+            compassX = pad;
+            mapX = compassX + imgBoxSize + pad;
+            selfieX = mapX + imgBoxSize + pad;
+            textX = canvas.width - pad;
         }
 
-        // ĐÓNG DẤU VĂN BẢN
-        const now = new Date();
-        const fullTimeStr = `${now.toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - ${now.toLocaleDateString("vi-VN")}`;
-        
-        // Đọc thông tin tổ đội
-        let teamVal = document.getElementById("tab1-team").value.trim();
-        const teamText = teamVal ? `Nhân sự: ${teamVal}` : "";
+        const drawExtraSync = (sourceDataUrl, canvasSourceId, labelText, xPos) => {
+            return new Promise((resolve) => {
+                let sourceToDraw = sourceDataUrl;
+                if (!sourceToDraw && canvasSourceId) {
+                    let c = document.getElementById(canvasSourceId);
+                    if (c && !c.classList.contains('d-none')) {
+                        try { sourceToDraw = c.toDataURL("image/jpeg", 0.9); } catch(e) {}
+                    }
+                }
+                
+                if (!sourceToDraw) { resolve(); return; }
+                
+                let img = new Image();
+                img.onload = () => {
+                    ctx.fillStyle = "#000";
+                    ctx.fillRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
+                    ctx.drawImage(img, xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
+                    
+                    ctx.strokeStyle = "#495057";
+                    ctx.lineWidth = 4 * scale;
+                    ctx.strokeRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
+                    
+                    let labelH = imgBoxSize * 0.18;
+                    ctx.fillStyle = "rgba(0,0,0,0.7)";
+                    ctx.fillRect(xPos, fY + 20 * scale + imgBoxSize - labelH, imgBoxSize, labelH);
+                    
+                    ctx.fillStyle = "#0dcaf0";
+                    ctx.font = `bold ${labelH * 0.6}px Arial`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(labelText, xPos + imgBoxSize/2, fY + 20 * scale + imgBoxSize - labelH/2);
+                    
+                    resolve();
+                };
+                img.onerror = resolve;
+                img.src = sourceToDraw;
+            });
+        };
 
-        const titleSize = Math.round(36 * scale);
-        const fontSize = Math.round(22 * scale);
+        // Vẽ ĐỒNG BỘ: đợi load xong từng ảnh phụ trợ rồi mới đi tiếp
+        await Promise.all([
+            drawExtraSync(globalExtras.compass, 'canvas-compass', "LA BÀN", compassX),
+            drawExtraSync(globalExtras.map, 'canvas-map', "BẢN ĐỒ", mapX),
+            drawExtraSync(globalExtras.selfie, null, "NGƯỜI CHỤP", selfieX)
+        ]);
+
+        // 5. Vẽ Thông tin Văn bản
+        let startY = fY + 40 * scale;
+        let lineGap = (footerH - 60 * scale) / 3;
         
-        ctx.font = `bold ${titleSize}px Arial`;
-        const wTitle = ctx.measureText(type).width;
-        ctx.font = `${fontSize}px Arial`;
-        const wTime = ctx.measureText(`T.Gian: ${fullTimeStr}`).width;
-        const wGps = ctx.measureText(`GPS: ${currentGpsData.lat}, ${currentGpsData.lng}`).width;
-        const wTeam = teamText ? ctx.measureText(teamText).width : 0;
+                ctx.textAlign = type === "TRƯỚC" ? "left" : "right";
+        ctx.textBaseline = "middle";
         
-        // Tính toán kích thước hộp đen linh hoạt dựa trên sự tồn tại của trường Tổ đội
-        let linesCount = teamText ? 4 : 3;
-        const boxWidth = Math.max(wTitle, wTime, wGps, wTeam) + 40 * scale;
-        const boxHeight = (linesCount === 4 ? 138 : 110) * scale;
-        const padY = canvas.height - boxHeight - 15 * scale;
-        
-        let padX = (type === "TRƯỚC") ? 15 * scale : canvas.width - boxWidth - 15 * scale;
-        
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(padX, padY, boxWidth, boxHeight, 8 * scale) : ctx.rect(padX, padY, boxWidth, boxHeight);
-        ctx.fill();
-        
-        ctx.textBaseline = "top";
         ctx.fillStyle = type === "TRƯỚC" ? "#0d6efd" : "#20c997";
-        ctx.font = `bold ${titleSize}px Arial`;
-        ctx.fillText(type, padX + 15 * scale, padY + 12 * scale);
+        ctx.font = `bold ${lineGap * 0.7}px Arial`;
+        ctx.fillText(`${type}`, textX, startY, maxTextW);
         
         ctx.fillStyle = "#ffffff";
-        ctx.font = `${fontSize}px Arial`;
-        ctx.fillText(`T.Gian: ${fullTimeStr}`, padX + 15 * scale, padY + 52 * scale);
-        ctx.fillText(`GPS: ${currentGpsData.lat}, ${currentGpsData.lng}`, padX + 15 * scale, padY + 80 * scale);
+        ctx.font = `bold ${lineGap * 0.55}px Arial`;
+        ctx.fillText(`THỜI GIAN: ${timeStr}`, textX, startY + lineGap, maxTextW);
+        ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, textX, startY + lineGap * 2, maxTextW);
         
-        // 🌟 Vẽ dòng thông tin tổ đội/người thực hiện lên ảnh nếu có dữ liệu
         if (teamText) {
-            ctx.fillText(teamText, padX + 15 * scale, padY + 108 * scale);
+            ctx.fillStyle = "#ffc107";
+            ctx.fillText(`TỔ ĐỘI: ${teamText}`, textX, startY + lineGap * 3, maxTextW);
         }
 
+        // 6. LƯU ẢNH
         const photoObj = {
             id: "img_" + Date.now(),
             type: type,
@@ -656,7 +841,7 @@
         renderPending(); renderGallery();
     }
 
-    // LÕI XỬ LÝ GHÉP ẢNH & ĐÓNG GÓI TIỀN TỐ FILE MỚI KÈM TÊN TỔ ĐỘI
+    // 🌟 LÕI GHÉP ẢNH TỐI ƯU: ĐẶT GHI CHÚ VÀO GIỮA 2 CHÂN TRANG
     function processStitching(bObj, aObj, showAlert = true, customNote = null, callback = null) {
         return new Promise((resolve) => {
             const stitchCanvas = document.createElement("canvas");
@@ -666,46 +851,54 @@
             const loadA = new Promise(res => { const i = new Image(); i.src = aObj.dataUrl; i.onload = () => res(i); });
 
             Promise.all([loadB, loadA]).then(([loadedB, loadedA]) => {
+                
                 stitchCanvas.width = loadedB.width + loadedA.width; 
                 stitchCanvas.height = Math.max(loadedB.height, loadedA.height);
                 
                 ctx.drawImage(loadedB, 0, 0, loadedB.width, loadedB.height);
                 ctx.drawImage(loadedA, loadedB.width, 0, loadedA.width, loadedA.height);
 
+                // Ghi chú Ghép nằm giữa khu vực Chân Trang của 2 ảnh
                 let rawNote = (customNote !== null) ? customNote : document.getElementById("tab1-note").value.trim();
                 let noteText = rawNote.toUpperCase();
                 
                 if (noteText) {
                     const imgScale = loadedB.width / 1000;
-                    const noteSize = Math.round(36 * imgScale);
+                    const noteSize = Math.round(45 * imgScale);
                     ctx.font = `bold ${noteSize}px Arial`;
                     
                     const noteWidth = ctx.measureText(noteText).width;
-                    const paddingY = 30 * imgScale; const noteHeight = noteSize + paddingY;
-                    const noteX = loadedB.width; const noteY = stitchCanvas.height - noteHeight - 30 * imgScale; 
+                    const paddingY = 40 * imgScale; const noteHeight = noteSize + paddingY;
                     
-                    ctx.fillStyle = "rgba(0, 0, 0, 0.7)"; ctx.beginPath();
-                    ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 25*imgScale, noteY, noteWidth + 50*imgScale, noteHeight, 10*imgScale) 
-                                  : ctx.fillRect(noteX - noteWidth/2 - 25*imgScale, noteY, noteWidth + 50*imgScale, noteHeight);
+                    // Tự động tính toán chiều cao chân trang theo tỷ lệ ảnh
+                    const singleImgBoxSize = Math.min(280 * imgScale, loadedB.width * 0.18);
+                    const footerH = singleImgBoxSize + 40 * imgScale; 
+                    
+                    // Tâm là điểm cắt nhau giữa 4 khu vực: (X = loadedB.width, Y = stitchCanvas.height - footerH)
+                    const noteX = loadedB.width; 
+                    const noteY = stitchCanvas.height - footerH; 
+                    
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
+                    ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) 
+                                  : ctx.fillRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight);
                     ctx.fill();
+                    
+                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
+                    ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) 
+                                  : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight);
+                    ctx.stroke();
 
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
-                    ctx.fillText(noteText, noteX, noteY + noteHeight/2);
+                    ctx.fillText(noteText, noteX, noteY);
                 }
 
-                // -------------------------------------------------------------
-                // 🌟 HIỆU CHỈNH LƯU TÊN FILE: BỔ SUNG TRƯỜNG TỔ ĐỘI VÀO TIỀN TỐ
-                // -------------------------------------------------------------
+                // Cấu trúc tên file
                 let prefixVal = document.getElementById("tab1-prefix").value.trim();
                 let teamVal = document.getElementById("tab1-team").value.trim();
-                let generalNote = document.getElementById("tab1-note").value.trim();
-                let specificNote = (customNote !== null) ? customNote.trim() : "";
-
                 let nameParts = [];
                 if (prefixVal) nameParts.push(prefixVal);
-                if (teamVal) nameParts.push(teamVal); // Đưa tên tổ đội vào cấu trúc tên tệp quản trị
-                if (generalNote) nameParts.push(generalNote);
-                if (specificNote) nameParts.push(specificNote);
+                if (teamVal) nameParts.push(teamVal);
+                if (rawNote) nameParts.push(rawNote);
 
                 let combinedPrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_');             
                 let filePrefix = combinedPrefix ? combinedPrefix : "HT";
