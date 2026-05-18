@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V48.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V49.0)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -409,6 +409,32 @@
                 <ul class="text-secondary ps-3 mb-0">
                     <li>Khi mở **Bóc băng độc lập**, màn hình Camera hiện trường sẽ tạm thời đóng luồng để nhường phần cứng thu âm hoàn toàn cho bộ nhận diện chữ AI. Khi bấm **DỪNG**, Camera sẽ tự động mở lại ngay.</li>
                 </ul>
+				<p class="text-warning fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> 1. LƯU Ý QUAN TRỌNG VỀ PWA (BẮT BUỘC):</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li>Để ứng dụng hoạt động <b>Offline (không cần mạng)</b> và full màn hình, bắt buộc phải chọn <b>"Thêm vào màn hình chính" (Add to Home Screen)</b> trên Chrome/Safari.</li>
+                    <li>Khi có bản cập nhật mới, cần xóa biểu tượng app cũ ngoài màn hình, vào phần Cài đặt của trình duyệt xóa "Dữ liệu trang web", sau đó tải lại link và ghim lại ra màn hình.</li>
+                </ul>
+
+                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-hard-drive me-1"></i> 2. GIỚI HẠN DUNG LƯỢNG KHO LƯU TRỮ:</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li>Trình duyệt (Chrome/Safari) cấp một dung lượng bộ nhớ giới hạn cho ứng dụng. Thanh trạng thái ở góc trên bên phải sẽ báo số % đã dùng.</li>
+                    <li>Khi báo <span class="text-danger fw-bold">Màu Đỏ (>80%)</span>, bộ nhớ sắp đầy. Anh em cần tải các ảnh ở tab "Đã Ghép" về máy, sau đó <b>XÓA ẢNH TRÊN APP</b> để giải phóng dung lượng. Nếu đầy 100%, app sẽ không thể lưu thêm ảnh.</li>
+                </ul>
+
+                <p class="text-info fw-bold mb-1"><i class="fa-solid fa-camera me-1"></i> 3. THAO TÁC CHỤP & GHÉP ẢNH:</p>
+                <ol class="text-secondary ps-3 mb-0">
+                    <li><b>Chuẩn bị:</b> Nhập Tên Tổ Đội và Mã Hiện Trường. Cài đặt các ảnh chân trang (Selfie, Bản đồ, La bàn) ở khung trên cùng.</li>
+                    <li><b>Chụp ảnh:</b> Bấm [Chụp TRƯỚC] và [Chụp SAU]. Hệ thống tự động đóng dấu Tọa độ, Thời gian và các ảnh phụ trợ vào chân trang (không đè lên ảnh gốc).</li>
+                    <li><b>Ghép ảnh:</b> Nhập "Ghi chú", bấm [GHÉP NGAY] nếu vừa chụp xong 1 cặp. Hoặc vào Tab "Chờ Ghép" để ghép tự động/thủ công nhiều ảnh. Dòng ghi chú sẽ tự động nằm ở tâm giao điểm giữa 2 bức ảnh ghép.</li>
+                    <li><b>Xuất báo cáo:</b> Vào Tab "Đã Ghép", chọn các ảnh hoàn thiện và bấm [CHIA SẺ / TẢI VỀ].</li>
+                </ol>
+
+                <p class="text-danger fw-bold mb-1 mt-3"><i class="fa-solid fa-video me-1"></i> 4. QUAY VIDEO HIỆN TRƯỜNG:</p>
+                <ul class="text-secondary ps-3 mb-0">
+                    <li><b>Giới hạn 30s:</b> Để tránh treo máy và quá tải bộ nhớ, mỗi video chỉ được quay tối đa 30 giây. Hết giờ hệ thống tự ngắt và tự xuất file.</li>
+                    <li><b>Đóng dấu & Âm thanh:</b> Chức năng sẽ ghi lại toàn bộ <b>âm thanh hiện trường</b> (tiếng người nói, tiếng thiết bị) và tự động đóng dấu Tọa độ, Thời gian, Tổ đội ở một dải băng đen dưới đáy màn hình.</li>
+                    <li><b>Lưu trữ an toàn:</b> Khác với ảnh, video quay xong sẽ <b>KHÔNG</b> nằm trong kho của app mà <b>tự động tải thẳng xuống thư viện thiết bị (thư mục Downloads hoặc Ảnh)</b>. Cơ chế này đảm bảo app không bao giờ bị báo đầy bộ nhớ vì video.</li>
+                </ul>
             </div>
         </div>
 
@@ -550,12 +576,12 @@
     function closeModal(id) {
         const el = document.getElementById(id); if (!el) return;
         if (window.bootstrap && window.bootstrap.Modal) {
-            const modalObj = bootstrap.Modal.getInstance(el); if (modalObj) modalObj.hide();
+            const modalObj = bootstrap.Modal.getInstance(modalObj); if (modalObj) modalObj.hide();
         } else { el.style.display = "none"; el.classList.remove("show"); document.body.style.overflow = "auto"; }
     }
 
     // --- INDEXEDDB STORAGE ---
-    const dbRequest = indexedDB.open("AirGapCameraV48", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV49", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) { database.createObjectStore("photos", { keyPath: "id" }); }
@@ -807,8 +833,6 @@
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT";
                 if (itemTypeMarker === "QT") filePrefix = "QT_" + filePrefix; else if (itemTypeMarker === "FULL") filePrefix = "FULL_" + filePrefix;
-                
-                // 🛠️ PWA V48.0: Bổ sung trường lõi thời gian timestampMs cho ảnh ghép hàng loạt bên thứ ba
                 const newItem = { id: "stitched_" + Date.now() + Math.floor(Math.random()*100), type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_GRP_${Date.now()}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), timestampStr: new Date().toLocaleString("vi-VN") };
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 let objIds = loaded.map(l => l.obj.id);
@@ -844,8 +868,6 @@
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT"; if (isQT) filePrefix = "QT_" + filePrefix;
                 const formatTime = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; };
-                
-                // 🛠️ PWA V48.0: Bổ sung trường lõi thời gian timestampMs cho ảnh ghép đôi
                 const newItem = { id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), type: isQT ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), timestampStr: new Date().toLocaleString("vi-VN") };
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 if (isQT) repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id); else { repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id); }
@@ -866,7 +888,7 @@
     async function quickStitchTSOnly() {
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
-        processStitching(captureBuffer.TRƯBEFORE || captureBuffer.TRƯỚC, captureBuffer.SAU, true, customNote, () => {
+        processStitching(captureBuffer.TRƯỚC, captureBuffer.SAU, true, customNote, () => {
             captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
             document.getElementById("preview-before").innerHTML = '<span class="text-muted small text-center">TRƯỚC</span>';
             document.getElementById("preview-after").innerHTML = '<span class="text-muted small text-center">SAU</span>';
@@ -992,7 +1014,6 @@
     function saveToDB(item) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").put(item); calculateStorageQuota(); } }
     function deleteFromDB(id) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").delete(id); calculateStorageQuota(); } }
     
-    // 🛠️ PWA V48.0: SỬA LỖI SẮP XẾP KHO ẢNH - Ép toàn bộ hệ thống gom và xếp theo lõi thời gian thay vì text ID chuỗi
     function loadDataFromDB() {
         if (!db) return;
         db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
@@ -1062,23 +1083,49 @@
     function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
     function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
     
-    // 🛠️ PWA V48.0: Nâng cấp hàm tính phiên với trị tuyệt đối để ngăn chặn lỗi khi trộn lẫn ảnh upload ngoài
+    // 🛠️ HÀM PHÂN PHIÊN THÔNG MINH HÒA TRỘN GIỮA V40 & V48 CHUẨN XÁC TUYẾN TÍNH
     function renderPending() {
-        const renderListWithSeparators = (repo, inputName, inputType, color) => {
+        const GAP_MS = 15 * 60 * 1000;
+        const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => {
             if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>';
-            let listHtml = ''; const GAP_MS = 15 * 60 * 1000;
+            let listHtml = '';
             repo.forEach((item, index) => {
-                listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}</div></div>`;
+                const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' });
+                listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
+                
                 if (index < repo.length - 1) {
-                    const nextItem = repo[index+1]; 
-                    let isNewSession = Math.abs(item.timestampMs - nextItem.timestampMs) > GAP_MS;
-                    if (isNewSession) { listHtml += `<div class="w-100 text-center my-2" style="height: 20px;"><span class="badge bg-dark text-${color} border border-${color}" style="font-size:9px;">Chuyển Phiên</span></div>`; }
+                    const nextItem = repo[index+1];
+                    // Vì danh sách đã được sắp xếp giảm dần (Newest -> Oldest), item luôn lớn tuổi thời gian hơn nextItem
+                    let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
+                    
+                    // 🛠️ ĐỐI SOÁT LIÊN KẾT CHÉO ĐỘC QUYỀN TỪ V40: 
+                    // Nếu không vượt ngưỡng 15p, kiểm tra xem có ảnh của kho đối nghịch nào chèn vào giữa chuỗi thời gian của 2 ảnh liền kề này không
+                    if (!isNewSession) {
+                        if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') {
+                            isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs);
+                        } else if (typeStr === 'SAU') {
+                            isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs);
+                        }
+                    }
+                    
+                    if (isNewSession) {
+                        listHtml += `<div class="w-100 text-center my-2 position-relative" style="height: 20px;">
+                                <div class="position-absolute w-100 border-bottom border-${color}" style="top: 10px; border-style: dashed !important; opacity: 0.4;"></div>
+                                <span class="badge bg-dark text-${color} border border-${color} position-relative px-1" style="font-size:9px;">Chuyển Phiên</span>
+                              </div>`;
+                    }
                 }
-            }); return listHtml;
+            });
+            return listHtml;
         };
-        document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary');
-        document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning');
-        document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success');
+
+        const boxB = document.getElementById("list-before"); 
+        const boxP = document.getElementById("list-process"); 
+        const boxA = document.getElementById("list-after");
+        
+        boxB.innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
+        boxP.innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
+        boxA.innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
     }
     
     function renderGallery() {
@@ -1323,7 +1370,7 @@
         offlineRecognition = new SpeechRecognition(); offlineRecognition.lang = 'vi-VN'; offlineRecognition.continuous = true; offlineRecognition.interimResults = true; const textArea = document.getElementById("transcribe-result"); textArea.value = "⏳ Đang trích xuất chữ..."; let finalTranscript = '';
         offlineRecognition.onresult = (event) => { let interimTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = finalTranscript + interimTranscript; };
         offlineRecognition.onstart = () => { player.play(); }; offlineRecognition.onend = () => { document.getElementById("btn-start-transcribe").innerHTML = `PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info"); };
-        try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
+        try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤCT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
     }
     
     function initLiveSubtitle() {
