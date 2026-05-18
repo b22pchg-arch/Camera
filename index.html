@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V46.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V47.0)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -555,7 +555,7 @@
     }
 
     // --- INDEXEDDB STORAGE ---
-    const dbRequest = indexedDB.open("AirGapCameraV46", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV47", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) { database.createObjectStore("photos", { keyPath: "id" }); }
@@ -951,14 +951,11 @@
         document.getElementById('autoStitchModalBody').innerHTML = html; openModal('autoStitchModal');
     }
     
-    // 🛠️ SỬA LỖI ĐẾM QT COUNT: Đưa biến đếm ra trước tiến trình giải phóng lưu trữ
     async function confirmAutoStitch() {
         closeModal('autoStitchModal'); let count = 0;
         for (let i = 0; i < windowAutoMatches.length; i++) {
             const match = windowAutoMatches[i]; const customNote = document.getElementById('auto-note-' + i).value.trim();
             let minT = Math.min(match.before.timestampMs, match.after.timestampMs); let maxT = Math.max(match.before.timestampMs, match.after.timestampMs);
-            
-            // Tính số lượng ảnh QT có trong khoảng Trước-Sau trước khi bị gom cụm xóa
             let autoQtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
             
             await handleSessionQTStitch(match.before, match.after, customNote); 
@@ -1088,7 +1085,7 @@
         }); grid.innerHTML = html;
     }
 
-    // --- MODULE QUAY VIDEO CAO CẤP (XỬ LÝ TRIỆT ĐỂ LỖI CÚ PHÁP CANVAS) ---
+    // --- MODULE QUAY VIDEO CAO CẤP ---
     function toggleRecording() { if (isRecording) stopRecording(); else startRecording(); }
     
     async function startRecording() {
@@ -1119,7 +1116,6 @@
             const canvasStream = canvas.captureStream(25); 
             const combinedStream = new MediaStream();
             
-            // 🛠️ SỬA LỖI ĐÓNG GÓI CANVAS: Trích xuất trực tiếp Track của Stream, không gọi lặp hàm khởi tạo
             if (canvasStream && canvasStream.getVideoTracks().length > 0) {
                 combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
             }
@@ -1179,6 +1175,25 @@
         const scale = canvas.width / 1000; const imgBoxSize = Math.min(280 * scale, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scale; const videoRenderHeight = canvas.height - footerH;
         ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight); ctx.restore();
+        
+        // 🛠️ SỬA LỖI 1: In trực tiếp phụ đề bóc băng lên màn hình Canvas video phía trên chân trang đen
+        if (document.getElementById("toggle-subtitle").checked && currentSubtitle) {
+            ctx.save();
+            ctx.font = `bold ${24 * scale}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            let subWidth = ctx.measureText(currentSubtitle).width;
+            let subX = canvas.width / 2;
+            let subY = videoRenderHeight - 45 * scale;
+            
+            // Hộp nền đen mờ bo tròn nhẹ hỗ trợ đọc chữ chống lóa cực tốt ngoài công trường
+            ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+            ctx.fillRect(subX - subWidth/2 - 15*scale, subY - 18*scale, subWidth + 30*scale, 36*scale);
+            
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(currentSubtitle, subX, subY);
+            ctx.restore();
+        }
         
         ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fillRect(0, canvas.height - footerH, canvas.width, footerH);
         const drawExtra = (cachedImg, x) => { if (cachedImg && cachedImg.complete) ctx.drawImage(cachedImg, x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); };
@@ -1302,8 +1317,10 @@
         offlineRecognition = new SpeechRecognition(); offlineRecognition.lang = 'vi-VN'; offlineRecognition.continuous = true; offlineRecognition.interimResults = true; const textArea = document.getElementById("transcribe-result"); textArea.value = "⏳ Đang trích xuất chữ..."; let finalTranscript = '';
         offlineRecognition.onresult = (event) => { let interimTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = finalTranscript + interimTranscript; };
         offlineRecognition.onstart = () => { player.play(); }; offlineRecognition.onend = () => { document.getElementById("btn-start-transcribe").innerHTML = `PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info"); };
-        try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤCT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
+        try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
     }
+    
+    // --- 🛠️ SỬA LỖI 2: Tối ưu bộ nhận diện chữ, thêm hàm tự động kết nối lại khi Chrome tự ngắt quãng do im lặng
     function initLiveSubtitle() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -1313,7 +1330,16 @@
                 for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript; else interimTranscript += event.results[i][0].transcript; }
                 let combined = (finalTranscript + " " + interimTranscript).trim();
                 if (combined !== '') { let words = combined.split(/\s+/); currentSubtitle = words.slice(Math.floor((words.length - 1) / 12) * 12).join(' '); }
-            }; try { recognition.start(); } catch(e) {}
+            }; 
+            
+            recognition.onend = () => {
+                // Nếu video vẫn đang trong trạng thái bấm ghi hình, tự động chạy lại luồng dịch chữ liên tục
+                if (isRecording && document.getElementById("toggle-subtitle").checked) {
+                    try { recognition.start(); } catch(e){}
+                }
+            };
+            recognition.onerror = (e) => { console.log("Lỗi engine phụ đề: ", e.error); };
+            try { recognition.start(); } catch(e) {}
         }
     }
 
