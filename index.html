@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V31)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -123,9 +123,14 @@
                 </div>
             </div>
             <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
-                <button class="btn btn-sm btn-outline-secondary text-white text-nowrap" onclick="toggleCamera()">
-                    <i class="fa-solid fa-camera-rotate"></i>
-                </button>
+                <div class="btn-group">
+                    <button id="btn-power-camera" class="btn btn-sm btn-outline-success text-white text-nowrap" onclick="toggleCameraPower()">
+                        <i class="fa-solid fa-video"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary text-white text-nowrap" onclick="toggleCamera()">
+                        <i class="fa-solid fa-camera-rotate"></i>
+                    </button>
+                </div>
                 <input type="text" id="tab1-team" class="form-control form-control-sm bg-secondary text-white border-secondary text-center" placeholder="Tổ đội / Người thực hiện...">
                 <span id="gps-status" class="badge bg-dark bg-opacity-75 text-warning border border-warning small text-nowrap" style="font-size: 10px;">
                     <i class="fa-solid fa-location-crosshairs fa-spin me-1"></i> GPS...
@@ -165,23 +170,33 @@
                     </button>
                 </div>
             </div>
-            <div class="row g-2 mb-3">
-                <div class="col-12 mb-1">
-                    <div class="form-check form-switch bg-dark border border-secondary rounded p-2 d-flex align-items-center">
-                        <input class="form-check-input ms-1 me-2" type="checkbox" role="switch" id="toggle-subtitle">
-                        <label class="form-check-label text-warning small fw-bold" style="padding-top:2px;" for="toggle-subtitle"><i class="fa-solid fa-closed-captioning me-1"></i>Bật Phụ Đề Trực Tiếp (Cần mạng 4G)</label>
+            <!-- NÚT BẬT TẮT KHUNG QUAY VIDEO & GHI ÂM -->
+            <button class="btn btn-outline-info w-100 mb-2 py-2 fw-bold text-uppercase d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#media-controls" aria-expanded="false" aria-controls="media-controls" style="font-size: 13px;">
+                <span><i class="fa-solid fa-photo-film me-1"></i> Hiện chức năng Quay Video / Ghi Âm</span>
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
+            
+            <div class="collapse mb-3" id="media-controls">
+                <div class="card card-body bg-dark border-secondary p-2">
+                    <div class="row g-2">
+                        <div class="col-12 mb-1">
+                            <div class="form-check form-switch border border-secondary rounded p-2 d-flex align-items-center" style="background-color: #1a1d20;">
+                                <input class="form-check-input ms-1 me-2" type="checkbox" role="switch" id="toggle-subtitle">
+                                <label class="form-check-label text-warning small fw-bold" style="padding-top:2px;" for="toggle-subtitle"><i class="fa-solid fa-closed-captioning me-1"></i>Bật Phụ Đề Trực Tiếp (Cần mạng 4G)</label>
+                            </div>
+                        </div>
+                        <div class="col-7">
+                            <button id="btn-record-video" class="btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger" onclick="toggleRecording()" style="font-size: 13px;">
+                                <i class="fa-solid fa-video me-1"></i> QUAY VIDEO
+                            </button>
+                            <canvas id="video-canvas" class="d-none"></canvas>
+                        </div>
+                        <div class="col-5">
+                            <button id="btn-record-audio" class="btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary" onclick="toggleAudioRecording()" style="font-size: 13px;">
+                                <i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="col-7">
-                    <button id="btn-record-video" class="btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger" onclick="toggleRecording()" style="font-size: 13px;">
-                        <i class="fa-solid fa-video me-1"></i> QUAY VIDEO
-                    </button>
-                    <canvas id="video-canvas" class="d-none"></canvas>
-                </div>
-                <div class="col-5">
-                    <button id="btn-record-audio" class="btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary" onclick="toggleAudioRecording()" style="font-size: 13px;">
-                        <i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)
-                    </button>
                 </div>
             </div>
 
@@ -437,6 +452,7 @@
 
 <script>
     let localStream = null;
+    let isCameraOn = true;
     let currentFacingMode = "environment";
     let currentGpsData = { lat: 0, lng: 0, accuracy: "N/A", text: "0.000000, 0.000000" };
     let db = null;
@@ -459,6 +475,7 @@
     
     let recognition = null;
     let currentSubtitle = "";
+    let subtitleTimeout = null;
     
     let isAudioRecording = false;
     let audioRecorder = null;
@@ -468,7 +485,6 @@
     
     let currentMediaBlobUrl = null;
     let currentMediaFilename = null;
-    let currentMediaType = null;
     let currentMediaType = null;
     let offlineRecognition = null;
     
@@ -480,7 +496,7 @@
     
     let globalExtras = { selfie: null, map: null, compass: null };
 
-    const dbRequest = indexedDB.open("AirGapCameraV31", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV38", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) {
@@ -536,12 +552,34 @@
         }
     }
 
+    function toggleCameraPower() {
+        const btn = document.getElementById("btn-power-camera");
+        const video = document.getElementById("video-preview");
+        if (isCameraOn) {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            video.srcObject = null;
+            isCameraOn = false;
+            btn.classList.replace("btn-outline-success", "btn-outline-danger");
+            btn.innerHTML = '<i class="fa-solid fa-video-slash"></i>';
+        } else {
+            isCameraOn = true;
+            btn.classList.replace("btn-outline-danger", "btn-outline-success");
+            btn.innerHTML = '<i class="fa-solid fa-video"></i>';
+            initCamera();
+        }
+    }
+
     function toggleCamera() {
+        if (!isCameraOn) return alert("Vui lòng bật camera (Nút Xanh) trước khi đổi cam!");
         currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
         initCamera();
     }
 
     function initCamera() {
+        if (!isCameraOn) return;
         if (localStream) { localStream.getTracks().forEach(track => track.stop()); }
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             navigator.mediaDevices.getUserMedia({
@@ -1418,23 +1456,51 @@ ${finalName}`);
         const boxP = document.getElementById("list-process"); 
         const boxA = document.getElementById("list-after");
         
-        let htmlB = repoBefore.length === 0 ? '<div class="small text-muted p-2 text-center">Trống</div>' : '';
-        repoBefore.forEach(item => {
-            const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN");
-            htmlB += `<div class="photo-card mb-2" id="card_${item.id}"><input type="radio" name="radioBefore" value="${item.id}" class="form-check-input photo-radio"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
-        }); boxB.innerHTML = htmlB;
+        const GAP_MS = 15 * 60 * 1000; // 15 phút
+        const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => {
+            if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>';
+            let h = '';
+            repo.forEach((item, index) => {
+                const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' });
+                h += `<div class="photo-card mb-2" id="card_${item.id}">
+                        <input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}">
+                        <img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')">
+                        <div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div>
+                      </div>`;
+                
+                // Mảng sắp xếp giảm dần (mới nhất index 0). item là mới, nextItem là cũ.
+                if (index < repo.length - 1) {
+                    const nextItem = repo[index+1];
+                    let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
+                    
+                    if (!isNewSession) {
+                        if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') {
+                            // Chuyển phiên nếu có một ảnh SAU được chụp xen giữa
+                            isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs);
+                        } else if (typeStr === 'SAU') {
+                            // Chuyển phiên nếu có một ảnh TRƯỚC được chụp xen giữa
+                            isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs);
+                        }
+                    }
+                    
+                    if (isNewSession) {
+                        h += `<div class="w-100 text-center my-2 position-relative" style="height: 20px;">
+                                <div class="position-absolute w-100 border-bottom border-${color}" style="top: 10px; border-style: dashed !important; opacity: 0.4;"></div>
+                                <span class="badge bg-dark text-${color} border border-${color} position-relative" style="font-size:9px;">Chuyển Phiên</span>
+                              </div>`;
+                    }
+                }
+            });
+            return h;
+        };
 
-        let htmlP = repoProcess.length === 0 ? '<div class="small text-muted p-2 text-center">Trống</div>' : '';
-        repoProcess.forEach(item => {
-            const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN");
-            htmlP += `<div class="photo-card mb-2" id="card_${item.id}"><input type="checkbox" name="checkQT" value="${item.id}" class="form-check-input photo-checkbox"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
-        }); boxP.innerHTML = htmlP;
-
-        let htmlA = repoAfter.length === 0 ? '<div class="small text-muted p-2 text-center">Trống</div>' : '';
-        repoAfter.forEach(item => {
-            const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN");
-            htmlA += `<div class="photo-card mb-2" id="card_${item.id}"><input type="radio" name="radioAfter" value="${item.id}" class="form-check-input photo-radio"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
-        }); boxA.innerHTML = htmlA;
+        const boxB = document.getElementById("list-before"); 
+        const boxP = document.getElementById("list-process"); 
+        const boxA = document.getElementById("list-after");
+        
+        boxB.innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
+        boxP.innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
+        boxA.innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
     }
 
     function renderGallery() {
@@ -1599,14 +1665,26 @@ ${finalName}`);
                 
                 recognition.onresult = (event) => {
                     let interimTranscript = '';
+                    let finalTranscript = '';
                     for (let i = event.resultIndex; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
-                            currentSubtitle = event.results[i][0].transcript;
+                            finalTranscript += event.results[i][0].transcript;
                         } else {
                             interimTranscript += event.results[i][0].transcript;
                         }
                     }
-                    if (interimTranscript !== '') currentSubtitle = interimTranscript;
+                    
+                    let combined = (finalTranscript + " " + interimTranscript).trim();
+                    if (combined !== '') {
+                        let words = combined.split(/\s+/);
+                        const CHUNK_SIZE = 12; // Khung phụ đề tối đa 12 từ
+                        let chunkIndex = Math.floor((words.length - 1) / CHUNK_SIZE);
+                        currentSubtitle = words.slice(chunkIndex * CHUNK_SIZE).join(' ');
+                    }
+                    
+                    // Xóa phụ đề sau 3 giây không có tiếng nói
+                    if (subtitleTimeout) clearTimeout(subtitleTimeout);
+                    subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 3000);
                 };
                 
                 recognition.onerror = (e) => console.log("Lỗi nhận diện giọng nói: ", e.error);
@@ -1689,14 +1767,21 @@ ${finalName}`);
 
         // Đóng dấu Phụ đề (Nếu có) trôi dạt lên trên chân trang đen
         if (currentSubtitle) {
+            ctx.font = `bold ${30 * scale}px Arial`;
+            let subText = currentSubtitle.toUpperCase();
+            let subW = ctx.measureText(subText).width + 40 * scale;
+            let maxW = canvas.width - 20 * scale;
+            
+            if (subW > maxW) subW = maxW; // Giới hạn chiều rộng hộp nền
+            
             ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-            let subW = ctx.measureText(currentSubtitle).width + 40*scale;
             ctx.fillRect(canvas.width/2 - subW/2, canvas.height - footerH - 60*scale, subW, 50*scale);
             
             ctx.fillStyle = "#ffc107";
-            ctx.font = `bold ${30 * scale}px Arial`;
             ctx.textAlign = "center";
-            ctx.fillText(currentSubtitle.toUpperCase(), canvas.width/2, canvas.height - footerH - 35*scale);
+            ctx.textBaseline = "middle";
+            // Ép chữ co lại nếu vẫn dài hơn khung (sử dụng tham số thứ 4 của fillText)
+            ctx.fillText(subText, canvas.width/2, canvas.height - footerH - 35*scale, subW - 20*scale);
         }
 
         // --- BẮT ĐẦU VẼ CHÂN TRANG ĐỘNG (Giống ảnh TRƯỚC) ---
@@ -2037,14 +2122,26 @@ ${finalName}`);
                 
                 recognition.onresult = (event) => {
                     let interimTranscript = '';
+                    let finalTranscript = '';
                     for (let i = event.resultIndex; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
-                            currentSubtitle = event.results[i][0].transcript;
+                            finalTranscript += event.results[i][0].transcript;
                         } else {
                             interimTranscript += event.results[i][0].transcript;
                         }
                     }
-                    if (interimTranscript !== '') currentSubtitle = interimTranscript;
+                    
+                    let combined = (finalTranscript + " " + interimTranscript).trim();
+                    if (combined !== '') {
+                        let words = combined.split(/\s+/);
+                        const CHUNK_SIZE = 12; // Khung phụ đề tối đa 12 từ
+                        let chunkIndex = Math.floor((words.length - 1) / CHUNK_SIZE);
+                        currentSubtitle = words.slice(chunkIndex * CHUNK_SIZE).join(' ');
+                    }
+                    
+                    // Xóa phụ đề sau 3 giây không có tiếng nói
+                    if (subtitleTimeout) clearTimeout(subtitleTimeout);
+                    subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 3000);
                 };
                 
                 recognition.onerror = (e) => console.log("Lỗi nhận diện giọng nói: ", e.error);
@@ -2127,14 +2224,21 @@ ${finalName}`);
 
         // Đóng dấu Phụ đề (Nếu có) trôi dạt lên trên chân trang đen
         if (currentSubtitle) {
+            ctx.font = `bold ${30 * scale}px Arial`;
+            let subText = currentSubtitle.toUpperCase();
+            let subW = ctx.measureText(subText).width + 40 * scale;
+            let maxW = canvas.width - 20 * scale;
+            
+            if (subW > maxW) subW = maxW; // Giới hạn chiều rộng hộp nền
+            
             ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-            let subW = ctx.measureText(currentSubtitle).width + 40*scale;
             ctx.fillRect(canvas.width/2 - subW/2, canvas.height - footerH - 60*scale, subW, 50*scale);
             
             ctx.fillStyle = "#ffc107";
-            ctx.font = `bold ${30 * scale}px Arial`;
             ctx.textAlign = "center";
-            ctx.fillText(currentSubtitle.toUpperCase(), canvas.width/2, canvas.height - footerH - 35*scale);
+            ctx.textBaseline = "middle";
+            // Ép chữ co lại nếu vẫn dài hơn khung (sử dụng tham số thứ 4 của fillText)
+            ctx.fillText(subText, canvas.width/2, canvas.height - footerH - 35*scale, subW - 20*scale);
         }
 
         // --- BẮT ĐẦU VẼ CHÂN TRANG ĐỘNG (Giống ảnh TRƯỚC) ---
