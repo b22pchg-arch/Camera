@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V52.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V52.1)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -181,56 +181,65 @@
                 </div>
             </div>
             
-            <button class="btn btn-outline-info w-100 mb-2 py-2 fw-bold text-uppercase d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#media-controls" aria-expanded="false" aria-controls="media-controls" style="font-size: 13px;">
-                <span><i class="fa-solid fa-photo-film me-1"></i> Hiện chức năng Quay Video / Ghi Âm</span>
-                <i class="fa-solid fa-chevron-down"></i>
-            </button>
-            
-            <div class="collapse mb-2" id="media-controls">
-                <div class="card card-body bg-dark border-secondary p-2">
-                    <div class="row g-2">
-                        <div class="col-12">
-                            <div class="form-check form-switch border border-secondary rounded p-2 d-flex align-items-center" style="background-color: #1a1d20;">
-                                <input class="form-check-input ms-1 me-2" type="checkbox" role="switch" id="toggle-subtitle">
-                                <label class="form-check-label text-warning small fw-bold" style="padding-top:2px;" for="toggle-subtitle"><i class="fa-solid fa-closed-captioning me-1"></i>Bật Phụ Đề Video (Tốt nhất trên Máy Tính)</label>
+            <div class="form-check form-switch border border-secondary rounded p-2 mb-3 d-flex align-items-center justify-content-between bg-black bg-opacity-25" style="height: 38px;">
+                <label class="form-check-label text-info small fw-bold ms-1 cursor-pointer" for="toggle-extended-utilities">
+                    <i class="fa-solid fa-toolbox me-1"></i> HIỂN THỊ TIỆN ÍCH MỞ RỘNG (VIDEO / BÓC BĂNG)
+                </label>
+                <input class="form-check-input me-1 cursor-pointer" type="checkbox" role="switch" id="toggle-extended-utilities" onchange="toggleExtendedUtilities(this)">
+            </div>
+
+            <div id="extended-utilities-wrapper" class="d-none">
+                <button class="btn btn-outline-info w-100 mb-2 py-2 fw-bold text-uppercase d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#media-controls" aria-expanded="false" aria-controls="media-controls" style="font-size: 13px;">
+                    <span><i class="fa-solid fa-photo-film me-1"></i> Hiện chức năng Quay Video / Ghi Âm</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                
+                <div class="collapse mb-2" id="media-controls">
+                    <div class="card card-body bg-dark border-secondary p-2">
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <div class="form-check form-switch border border-secondary rounded p-2 d-flex align-items-center" style="background-color: #1a1d20;">
+                                    <input class="form-check-input ms-1 me-2" type="checkbox" role="switch" id="toggle-subtitle">
+                                    <label class="form-check-label text-warning small fw-bold" style="padding-top:2px;" for="toggle-subtitle"><i class="fa-solid fa-closed-captioning me-1"></i>Bật Phụ Đề Video (Tốt nhất trên Máy Tính)</label>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text bg-secondary text-light border-secondary small fw-bold" style="font-size:11px;">Thời gian quay tối đa (giây):</span>
-                                <input type="number" id="max-record-time" class="form-control bg-dark text-info border-secondary text-center fw-bold" value="30" min="5" max="300">
+                            <div class="col-12">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-secondary text-light border-secondary small fw-bold" style="font-size:11px;">Thời gian quay tối đa (giây):</span>
+                                    <input type="number" id="max-record-time" class="form-control bg-dark text-info border-secondary text-center fw-bold" value="30" min="5" max="300">
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-7">
-                            <button id="btn-record-video" class="btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger" onclick="toggleRecording()" style="font-size: 13px;">
-                                <i class="fa-solid fa-video me-1"></i> QUAY VIDEO
-                            </button>
-                            <canvas id="video-canvas" class="d-none"></canvas>
-                        </div>
-                        <div class="col-5">
-                            <button id="btn-record-audio" class="btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary" onclick="toggleAudioRecording()" style="font-size: 13px;">
-                                <i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)
-                            </button>
+                            <div class="col-7">
+                                <button id="btn-record-video" class="btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger" onclick="toggleRecording()" style="font-size: 13px;">
+                                    <i class="fa-solid fa-video me-1"></i> QUAY VIDEO
+                                </button>
+                                <canvas id="video-canvas" class="d-none"></canvas>
+                            </div>
+                            <div class="col-5">
+                                <button id="btn-record-audio" class="btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary" onclick="toggleAudioRecording()" style="font-size: 13px;">
+                                    <i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <button class="btn btn-outline-warning w-100 mb-3 py-2 fw-bold text-uppercase d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#standalone-transcribe" style="font-size: 13px;">
-                <span><i class="fa-solid fa-ear-listen me-1"></i> Bóc Băng Độc Lập (Nguồn Phát Ngoài)</span>
-                <i class="fa-solid fa-chevron-down"></i>
-            </button>
-            
-            <div class="collapse mb-3" id="standalone-transcribe">
-                <div class="card card-body bg-dark border-warning p-2">
-                    <p class="text-secondary small mb-2 text-warning" style="font-size: 11px; line-height: 1.4;"><i class="fa-solid fa-circle-info me-1"></i> <b>Giải pháp phần cứng di động:</b> Khi bật tính năng này, Camera hiện trường sẽ tạm ẩn để giải phóng khóa Microphone độc quyền của iOS/Android. Bạn hãy đưa nguồn phát ngoài (Máy bộ đàm, điện thoại thứ 2) sát cạnh điện thoại để dịch thành văn bản.</p>
-                    <button id="btn-standalone-stt" class="btn btn-warning text-dark w-100 fw-bold mb-2 py-2" onclick="toggleStandaloneTranscribe()">
-                        <i class="fa-solid fa-microphone me-1"></i> <span id="stt-btn-text">BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI</span>
-                    </button>
-                    <textarea id="standalone-stt-result" class="form-control bg-secondary text-white border-secondary small" rows="5" placeholder="Văn bản bóc băng từ nguồn ngoài phát vào mic điện thoại sẽ hiển thị ở đây theo thời gian thực..."></textarea>
-                    <div class="d-flex gap-2 mt-2">
-                        <button class="btn btn-sm btn-outline-light flex-fill" onclick="copyStandaloneSTT()"><i class="fa-solid fa-copy me-1"></i> Sao chép chữ</button>
-                        <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearStandaloneSTT()"><i class="fa-solid fa-trash me-1"></i> Xóa bảng nội dung</button>
+                <button class="btn btn-outline-warning w-100 mb-3 py-2 fw-bold text-uppercase d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#standalone-transcribe" style="font-size: 13px;">
+                    <span><i class="fa-solid fa-ear-listen me-1"></i> Bóc Băng Độc Lập (Nguồn Phát Ngoài)</span>
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                
+                <div class="collapse mb-3" id="standalone-transcribe">
+                    <div class="card card-body bg-dark border-warning p-2">
+                        <p class="text-secondary small mb-2 text-warning" style="font-size: 11px; line-height: 1.4;"><i class="fa-solid fa-circle-info me-1"></i> <b>Giải pháp phần cứng di động:</b> Khi bật tính năng này, Camera hiện trường sẽ tạm ẩn để giải phóng khóa Microphone độc quyền của iOS/Android. Bạn hãy đưa nguồn phát ngoài (Máy bộ đàm, điện thoại thứ 2) sát cạnh điện thoại để dịch thành văn bản.</p>
+                        <button id="btn-standalone-stt" class="btn btn-warning text-dark w-100 fw-bold mb-2 py-2" onclick="toggleStandaloneTranscribe()">
+                            <i class="fa-solid fa-microphone me-1"></i> <span id="stt-btn-text">BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI</span>
+                        </button>
+                        <textarea id="standalone-stt-result" class="form-control bg-secondary text-white border-secondary small" rows="5" placeholder="Văn bản bóc băng từ nguồn ngoài phát vào mic điện thoại sẽ hiển thị ở đây theo thời gian thực..."></textarea>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-sm btn-outline-light flex-fill" onclick="copyStandaloneSTT()"><i class="fa-solid fa-copy me-1"></i> Sao chép chữ</button>
+                            <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearStandaloneSTT()"><i class="fa-solid fa-trash me-1"></i> Xóa bảng nội dung</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -593,6 +602,22 @@
         document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
     }
 
+    // --- 🛠️ THÊM MỚI PWA V52.1: Hàm xử lý hành động gạt công tắc Ẩn/Hiện Tiện ích mở rộng ---
+    function toggleExtendedUtilities(checkbox) {
+        const wrapper = document.getElementById("extended-utilities-wrapper");
+        if (checkbox.checked) {
+            wrapper.classList.remove("d-none");
+        } else {
+            wrapper.classList.add("d-none");
+            // Tự động đóng các menu con đang sổ xuống bên trong
+            document.querySelectorAll("#extended-utilities-wrapper .collapse.show").forEach(el => el.classList.remove("show"));
+            // Tắt các tiến trình media ngầm đang chạy để giải phóng phần cứng
+            if (isStandaloneTranscribing) stopStandaloneTranscribe();
+            if (isRecording) stopRecording();
+            if (isAudioRecording) stopAudioRecording();
+        }
+    }
+
     // --- INDEXEDDB STORAGE ---
     const dbRequest = indexedDB.open("AirGapCameraV52", 1);
     dbRequest.onupgradeneeded = (e) => {
@@ -815,7 +840,6 @@
         if (type === "TRƯỚC") { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}">`; } 
         else if (type === "SAU") { 
             repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`; 
-            // 🛠️ THAY ĐỔI PWA V52.0: Reset bộ đệm ảnh quá trình về 0 ngay khi bấm chụp ảnh SAU để bắt đầu chu kỳ đếm mới
             captureBuffer.QUÁ_TRÌNH = [];
             document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
         } 
@@ -942,7 +966,7 @@
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
         let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
-        let maxT = Math.max(captureBuffer.TRƯBEFORE ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
+        let maxT = Math.max(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
         let allObjs = [captureBuffer.TRƯỚC, ...sessionQts, captureBuffer.SAU];
         await processMultiStitching(allObjs, "FULL", customNote, () => {
@@ -1103,7 +1127,6 @@
         if(confirm(`Xóa ${dels.length} ảnh đã chọn?`)) { dels.forEach(id => deleteFromDB(id)); repoBefore = repoBefore.filter(x => !dels.includes(x.id)); repoProcess = repoProcess.filter(x => !dels.includes(x.id)); repoAfter = repoAfter.filter(x => !dels.includes(x.id)); renderPending(); updateUIState(); }
     }
 
-    // 🛠️ THÊM MỚI PWA V52.0: Hàm xóa sạch toàn bộ 3 kho ảnh chờ ghép tức thì không cần tích chọn
     function clearAllPending() {
         if (repoBefore.length === 0 && repoProcess.length === 0 && repoAfter.length === 0) return alert("Kho ảnh chờ ghép hiện tại đã trống sẵn!");
         if (confirm("Anh có chắc chắn muốn XÓA SẠCH TOÀN BỘ ảnh trong 3 kho chờ ghép (Trước, Quá trình, Sau)?\nHành động này sẽ xóa dữ liệu trên bộ nhớ Offline của máy và không thể khôi phục!")) {
@@ -1521,7 +1544,7 @@
 
     function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản!"); }
     function clearStandaloneSTT() { if(confirm("Xóa bảng nội dung?")) document.getElementById("standalone-stt-result").value = ""; }
-    function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id=\"preview-player\" src=\"${currentMediaBlobUrl}\" controls playsinline style=\"max-width:100%; max-height:400px;\"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id=\"preview-player\" src=\"${currentMediaBlobUrl}\" controls style=\"width:90%; margin:20px 0;\"></audio>`; transcribeBox.classList.remove("d-none"); } openModal('mediaPreviewModal'); }
+    function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width:100%; max-height:400px;"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width:90%; margin:20px 0;"></audio>`; transcribeBox.classList.remove("d-none"); } openModal('mediaPreviewModal'); }
     function discardMedia() { const player = document.getElementById("preview-player"); if(player) { player.pause(); player.src = ""; } if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl); currentMediaBlobUrl = null; closeModal('mediaPreviewModal'); }
     function downloadMedia() { if (!currentMediaBlobUrl) return; const a = document.createElement('a'); a.style.display = 'none'; a.href = currentMediaBlobUrl; a.download = currentMediaFilename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); }, 100); discardMedia(); }
     function startAudioTranscription() {
