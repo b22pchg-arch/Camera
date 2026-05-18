@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V41.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V42.0 - Offline Ready)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -43,6 +43,10 @@
 
         .storage-alarm { animation: pulse-red 1.5s infinite; color: #fff !important; border: none !important; }
         .cursor-pointer { cursor: pointer; }
+        
+        /* Chỉ định CSS fallback ẩn hiện thủ công cho Offline */
+        .collapse { display: none; }
+        .collapse.show { display: block; }
     </style>
 </head>
 <body>
@@ -260,7 +264,7 @@
                 </div>
                 <div class="row g-2">
                     <div class="col-12">
-                        <button id="btn-stitch-fast-ts" class="btn btn-info w-100 fw-bold py-2 text-dark" style="font-size:13px;" disabled onclick="quickStitchTS()"><i class="fa-solid fa-layer-group me-1"></i> HOÀN THÀNH PHIÊN (T/S + QT riêng)</button>
+                        <button id="btn-stitch-fast-ts" class="btn btn-info w-100 fw-bold py-2 text-dark" style="font-size:13px;" disabled onclick="quickStitchTS()">HOÀN THÀNH PHIÊN (T/S + QT riêng)</button>
                     </div>
                 </div>
             </div>
@@ -398,7 +402,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="mediaPreviewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+<div class="modal fade" id="mediaPreviewModal" style="display:none;" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content bg-dark text-light border-secondary">
       <div class="modal-header border-secondary p-2">
@@ -409,7 +413,7 @@
         </div>
         
         <div id="transcribe-container" class="mt-2 d-none text-start">
-            <label class="small text-warning fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>BÓC BĂNG FILE VỪA GHI (Phù hợp máy tính):</label>
+            <label class="small text-warning fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>BÓC BĂNG FILE VỪA GHI:</label>
             <button id="btn-start-transcribe" class="btn btn-sm btn-outline-info w-100 mb-2 fw-bold" onclick="startAudioTranscription()"><i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH</button>
             <textarea id="transcribe-result" class="form-control bg-secondary text-white border-secondary" rows="4" placeholder="Kết quả bóc băng nội bộ..."></textarea>
         </div>
@@ -422,38 +426,38 @@
   </div>
 </div>
 
-<div class="modal fade" id="autoStitchModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+<div class="modal fade" id="autoStitchModal" style="display:none;" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content bg-dark text-light border-secondary">
       <div class="modal-header border-secondary">
         <h5 class="modal-title text-info"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Duyệt Ghép Tự Động</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close btn-close-white" onclick="closeModal('autoStitchModal')"></button>
       </div>
       <div class="modal-body" id="autoStitchModalBody"></div>
       <div class="modal-footer border-secondary">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('autoStitchModal')">Hủy</button>
         <button type="button" class="btn btn-info fw-bold" onclick="confirmAutoStitch()">Tiến Hành Ghép</button>
       </div>
     </div>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
+    // --- KHAI BÁO BIẾN TOÀN CỤC ---
     let localStream = null;
     let isCameraOn = true;
     let currentFacingMode = "environment";
     let currentGpsData = { lat: 0, lng: 0, accuracy: "N/A", text: "0.000000, 0.000000" };
     let db = null;
     let currentHeading = 0;
-    
-    // Khởi tạo trạng thái quyền La bàn iOS mặc định là false
     let isCompassPermissionGranted = false;
     
     let repoBefore = [];
     let repoAfter = [];
     let repoProcess = [];
     let repoStitched = [];
-
     let captureBuffer = { TRƯỚC: null, SAU: null, QUÁ_TRÌNH: [] };
 
     let mediaRecorder = null;
@@ -486,34 +490,93 @@
     let currentStoragePercent = 0;
     let globalExtras = { selfie: null, map: null, compass: null };
 
-    const dbRequest = indexedDB.open("AirGapCameraV41", 1);
+    // --- KHỞI TẠO HỆ THỐNG VANILLA UI FALLBACK CHO AIRGAP/OFFLINE ---
+    document.addEventListener("click", function(e) {
+        // 1. Fallback đóng mở accordion / collapse thủ công không cần internet
+        const toggleCollapse = e.target.closest('[data-bs-toggle="collapse"]');
+        if (toggleCollapse) {
+            e.preventDefault();
+            const targetSelector = toggleCollapse.getAttribute("data-bs-target");
+            const targetEl = document.querySelector(targetSelector);
+            if (targetEl) {
+                const isShown = targetEl.classList.contains("show");
+                if (isShown) {
+                    targetEl.classList.remove("show");
+                    toggleCollapse.setAttribute("aria-expanded", "false");
+                } else {
+                    targetEl.classList.add("show");
+                    toggleCollapse.setAttribute("aria-expanded", "true");
+                }
+            }
+            return;
+        }
+
+        // 2. Fallback chuyển tab thủ công không cần internet
+        const toggleTab = e.target.closest('[data-bs-toggle="tab"]');
+        if (toggleTab) {
+            e.preventDefault();
+            const targetSelector = toggleTab.getAttribute("data-bs-target");
+            const targetEl = document.querySelector(targetSelector);
+            if (targetEl) {
+                const tabList = toggleTab.closest(".nav-tabs");
+                if (tabList) {
+                    tabList.querySelectorAll(".nav-link").forEach(btn => btn.classList.remove("active"));
+                }
+                toggleTab.classList.add("active");
+
+                const contentParent = targetEl.closest(".tab-content");
+                if (contentParent) {
+                    contentParent.querySelectorAll(".tab-pane").forEach(pane => pane.classList.remove("show", "active"));
+                }
+                targetEl.classList.add("show", "active");
+            }
+        }
+    });
+
+    // --- CHỨC NĂNG ĐÓNG MỞ MODAL THỦ CÔNG ---
+    function openModal(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (window.bootstrap && window.bootstrap.Modal) {
+            let modalObj = bootstrap.Modal.getInstance(el);
+            if (!modalObj) modalObj = new bootstrap.Modal(el);
+            modalObj.show();
+        } else {
+            el.style.display = "block"; el.classList.add("show");
+            el.style.backgroundColor = "rgba(0,0,0,0.6)"; document.body.style.overflow = "hidden";
+        }
+    }
+    function closeModal(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (window.bootstrap && window.bootstrap.Modal) {
+            const modalObj = bootstrap.Modal.getInstance(el);
+            if (modalObj) modalObj.hide();
+        } else {
+            el.style.display = "none"; el.classList.remove("show");
+            document.body.style.overflow = "auto";
+        }
+    }
+
+    // --- CƠ SỞ DỮ LIỆU INDEXEDDB ---
+    const dbRequest = indexedDB.open("AirGapCameraV42", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
-        if (!database.objectStoreNames.contains("photos")) {
-            database.createObjectStore("photos", { keyPath: "id" });
-        }
+        if (!database.objectStoreNames.contains("photos")) { database.createObjectStore("photos", { keyPath: "id" }); }
     };
-    dbRequest.onsuccess = (e) => {
-        db = e.target.result;
-        loadDataFromDB();
-    };
+    dbRequest.onsuccess = (e) => { db = e.target.result; loadDataFromDB(); };
 
     document.addEventListener("DOMContentLoaded", () => {
         initCamera();
         initGpsTracking();
-        
-        // Với thiết bị Android hoặc PC không cần xin quyền phức tạp, tự động bật luồng lắng nghe
         if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') {
-            isCompassPermissionGranted = true;
-            initCompassListener();
+            isCompassPermissionGranted = true; initCompassListener();
         }
-        
         window.addEventListener('beforeunload', (e) => {
             if (repoStitched.length > 0 || repoBefore.length > 0 || repoAfter.length > 0) {
                 e.preventDefault(); e.returnValue = 'Dữ liệu chưa tải về!'; return e.returnValue;
             }
         });
-
         document.getElementById('tab1-prefix').addEventListener('input', (e) => document.getElementById('tab2-prefix').value = e.target.value);
         document.getElementById('tab2-prefix').addEventListener('input', (e) => document.getElementById('tab1-prefix').value = e.target.value);
         document.getElementById('tab1-team').addEventListener('input', (e) => document.getElementById('tab2-team').value = e.target.value);
@@ -521,166 +584,60 @@
         document.getElementById('tab1-note').addEventListener('input', (e) => document.getElementById('tab2-note').value = e.target.value);
         document.getElementById('tab2-note').addEventListener('input', (e) => document.getElementById('tab1-note').value = e.target.value);
         document.getElementById('qt-stitch-mode').addEventListener('change', (e) => document.getElementById('qt-stitch-mode-tab2').value = e.target.value);
-        if(document.getElementById('qt-stitch-mode-tab2')) {
-            document.getElementById('qt-stitch-mode-tab2').addEventListener('change', (e) => document.getElementById('qt-stitch-mode').value = e.target.value);
-        }
-        
         setInterval(drawCompassCanvas, 200);
     });
 
-    // SỬA ĐỔI CHÍNH: Hàm xử lý xin quyền cảm biến Orientation thông qua Gesture Click (Bắt buộc cho iOS Safari)
+    // --- CÁC HÀM LA BÀN & GPS ---
     function requestCompassPermission() {
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             DeviceOrientationEvent.requestPermission()
                 .then(permissionState => {
-                    if (permissionState === 'granted') {
-                        isCompassPermissionGranted = true;
-                        initCompassListener();
-                    } else {
-                        alert("Hệ thống từ chối cấp quyền truy cập La bàn!");
-                    }
+                    if (permissionState === 'granted') { isCompassPermissionGranted = true; initCompassListener(); }
+                    else { alert("Hệ thống từ chối cấp quyền truy cập La bàn!"); }
                 })
-                .catch(err => {
-                    console.error("Lỗi cấp quyền cảm biến:", err);
-                    alert("Yêu cầu chạy trang web dưới giao thức bảo mật mã hóa HTTPS để kích hoạt tính năng La bàn hiện trường.");
-                });
-        } else {
-            isCompassPermissionGranted = true;
-            initCompassListener();
-        }
+                .catch(err => { alert("Yêu cầu chạy dưới giao thức bảo mật HTTPS để kích hoạt La bàn."); });
+        } else { isCompassPermissionGranted = true; initCompassListener(); }
     }
-
-    async function calculateStorageQuota() {
-        if (navigator.storage && navigator.storage.estimate) {
-            try {
-                const estimate = await navigator.storage.estimate();
-                const usedMB = (estimate.usage / (1024 * 1024)).toFixed(1);
-                const totalQuotaMB = (estimate.quota / (1024 * 1024)).toFixed(0);
-                currentStoragePercent = parseFloat(((estimate.usage / estimate.quota) * 100).toFixed(1));
-
-                const statusBadge = document.getElementById("storage-status");
-                if (statusBadge) {
-                    statusBadge.innerText = `Bộ nhớ: ${usedMB}MB / ${totalQuotaMB}MB (${currentStoragePercent}%)`;
-                    if (currentStoragePercent > 85) statusBadge.className = "badge storage-alarm px-2 py-1 small ms-1";
-                    else if (currentStoragePercent > 60) statusBadge.className = "badge bg-warning text-dark px-2 py-1 small ms-1";
-                    else statusBadge.className = "badge bg-dark text-info border border-info px-2 py-1 small ms-1";
-                }
-            } catch (err) { console.error("Lỗi Quota:", err); }
-        }
-    }
-
-    function toggleCameraPower() {
-        const btn = document.getElementById("btn-power-camera");
-        const video = document.getElementById("video-preview");
-        if (isCameraOn) {
-            if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; }
-            video.srcObject = null; isCameraOn = false;
-            btn.classList.replace("btn-outline-success", "btn-outline-danger");
-            btn.innerHTML = '<i class="fa-solid fa-video-slash"></i>';
-        } else {
-            isCameraOn = true; btn.classList.replace("btn-outline-danger", "btn-outline-success");
-            btn.innerHTML = '<i class="fa-solid fa-video"></i>'; initCamera();
-        }
-    }
-
-    function toggleCamera() {
-        if (!isCameraOn) return alert("Vui lòng bật camera trước khi đổi cam!");
-        currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
-        initCamera();
-    }
-
-    function initCamera() {
-        if (!isCameraOn) return;
-        if (localStream) { localStream.getTracks().forEach(track => track.stop()); }
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: true
-            })
-            .then(stream => {
-                localStream = stream;
-                document.getElementById("video-preview").srcObject = stream;
-                document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
-            }).catch(err => alert("Không thể mở camera hiện trường. Vui lòng cấp quyền hệ thống!"));
-        }
-    }
-
-    function initCameraZoom(stream) {
-        const track = stream.getVideoTracks()[0];
-        const capabilities = track.getCapabilities();
-        const settings = track.getSettings();
-        if ('zoom' in capabilities) {
-            document.getElementById('zoom-control-container').style.display = 'block';
-            const slider = document.getElementById('camera-zoom-slider');
-            const display = document.getElementById('zoom-value-display');
-            slider.min = capabilities.zoom.min; slider.max = capabilities.zoom.max;
-            slider.step = capabilities.zoom.step || 0.1; slider.value = settings.zoom || capabilities.zoom.min;
-            if (display) display.innerText = parseFloat(slider.value).toFixed(1) + "x";
-            
-            slider.oninput = (e) => {
-                const val = parseFloat(e.target.value);
-                if (display) display.innerText = val.toFixed(1) + "x";
-                track.applyConstraints({ advanced: [{ zoom: val }] }).catch(() => {});
-            };
-        } else {
-            document.getElementById('zoom-control-container').style.display = 'none';
-        }
-    }
-
-    function initGpsTracking() {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.watchPosition(
-                (pos) => {
-                    currentGpsData.lat = pos.coords.latitude;
-                    currentGpsData.lng = pos.coords.longitude;
-                    currentGpsData.text = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-                    document.getElementById("gps-status").className = "badge bg-dark bg-opacity-75 text-info border border-info small";
-                    document.getElementById("gps-status").innerHTML = `<i class="fa-solid fa-location-dot text-success me-1"></i> ${currentGpsData.text}`;
-                    if(!globalExtras.map) updateMapCanvas();
-                }, null, { enableHighAccuracy: true, timeout: 10000 }
-            );
-        }
-    }
-
     function initCompassListener() {
         window.addEventListener('deviceorientationabsolute', handleOrientation, true);
         window.addEventListener('deviceorientation', handleOrientation, true);
     }
-
     function handleOrientation(event) {
-        let alpha = event.alpha;
-        let webkitAlpha = event.webkitCompassHeading;
+        let alpha = event.alpha; let webkitAlpha = event.webkitCompassHeading;
         if (webkitAlpha !== undefined) { currentHeading = webkitAlpha; } 
         else if (alpha !== null) { currentHeading = Math.abs(alpha - 360); }
     }
-
-    // SỬA ĐỔI CHÍNH: Vẽ giao diện nhắc bấm nếu iPhone chưa được người dùng cấp quyền
     function drawCompassCanvas() {
         if(globalExtras.compass) return;
-        const c = document.getElementById('canvas-compass');
-        const ctx = c.getContext('2d');
+        const c = document.getElementById('canvas-compass'); const ctx = c.getContext('2d');
         const cx = c.width / 2; const cy = c.height / 2; const r = cx - 10;
         ctx.clearRect(0, 0, c.width, c.height);
-        
         if (!isCompassPermissionGranted) {
             ctx.fillStyle = "#212529"; ctx.fillRect(0, 0, c.width, c.height);
             ctx.strokeStyle = "#495057"; ctx.lineWidth = 2; ctx.strokeRect(0, 0, c.width, c.height);
             ctx.fillStyle = "#ffc107"; ctx.font = "bold 13px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.fillText("BẤM VÀO ĐÂY", cx, cy - 12); ctx.fillText("ĐỂ BẬT LA BÀN", cx, cy + 12);
-            return;
+            ctx.fillText("BẤM VÀO ĐÂY", cx, cy - 12); ctx.fillText("ĐỂ BẬT LA BÀN", cx, cy + 12); return;
         }
-        
         ctx.save(); ctx.translate(cx, cy); ctx.rotate(-currentHeading * Math.PI / 180);
         ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4; ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, -r + 10); ctx.lineTo(10, 0); ctx.lineTo(-10, 0); ctx.fillStyle = "#dc3545"; ctx.fill();
         ctx.beginPath(); ctx.moveTo(0, r - 10); ctx.lineTo(10, 0); ctx.lineTo(-10, 0); ctx.fillStyle = "#ffffff"; ctx.fill();
         ctx.fillStyle = "#ffffff"; ctx.font = "bold 20px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText("N", 0, -r - 15); ctx.fillText("S", 0, r + 15); ctx.fillText("E", r + 15, 0); ctx.fillText("W", -r - 15, 0);
-        ctx.restore();
-        
+        ctx.fillText("N", 0, -r - 15); ctx.fillText("S", 0, r + 15); ctx.restore();
         ctx.fillStyle = "#ffc107"; ctx.font = "bold 24px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText(`${Math.round(currentHeading)}°`, cx, cy);
     }
-
+    function initGpsTracking() {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition((pos) => {
+                currentGpsData.lat = pos.coords.latitude; currentGpsData.lng = pos.coords.longitude;
+                currentGpsData.text = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+                document.getElementById("gps-status").className = "badge bg-dark bg-opacity-75 text-info border border-info small";
+                document.getElementById("gps-status").innerHTML = `<i class="fa-solid fa-location-dot text-success me-1"></i> ${currentGpsData.text}`;
+                if(!globalExtras.map) updateMapCanvas();
+            }, null, { enableHighAccuracy: true, timeout: 10000 });
+        }
+    }
     function updateMapCanvas() {
         const c = document.getElementById('canvas-map'); const ctx = c.getContext('2d'); const zoom = 16;
         const latRad = currentGpsData.lat * Math.PI / 180; const n = Math.pow(2, zoom);
@@ -692,13 +649,43 @@
             ctx.fillStyle = "#dc3545"; ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 8, 0, 2*Math.PI); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
         };
         img.onerror = () => {
-            ctx.fillStyle = "#2b3035"; ctx.fillRect(0, 0, c.width, c.height); ctx.strokeStyle = "#495057"; ctx.lineWidth = 1;
+            ctx.fillStyle = "#2b3035"; ctx.fillRect(0, 0, c.width, c.height);
             for(let i=0; i<c.width; i+=20) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,c.height); ctx.stroke(); }
-            for(let i=0; i<c.height; i+=20) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(c.width,i); ctx.stroke(); }
             ctx.fillStyle = "#dc3545"; ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 10, 0, 2*Math.PI); ctx.fill();
         };
     }
 
+    // --- ĐIỀU KHIỂN CAMERA ---
+    function initCamera() {
+        if (!isCameraOn) return;
+        if (localStream) { localStream.getTracks().forEach(track => track.stop()); }
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: true })
+            .then(stream => {
+                localStream = stream; document.getElementById("video-preview").srcObject = stream;
+                document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
+            }).catch(err => console.log("Camera offline hoặc chưa cấp quyền."));
+        }
+    }
+    function initCameraZoom(stream) {
+        const track = stream.getVideoTracks()[0]; const capabilities = track.getCapabilities(); const settings = track.getSettings();
+        if ('zoom' in capabilities) {
+            document.getElementById('zoom-control-container').style.display = 'block';
+            const slider = document.getElementById('camera-zoom-slider'); const display = document.getElementById('zoom-value-display');
+            slider.min = capabilities.zoom.min; slider.max = capabilities.zoom.max; slider.step = capabilities.zoom.step || 0.1; slider.value = settings.zoom || capabilities.zoom.min;
+            slider.oninput = (e) => { const val = parseFloat(e.target.value); display.innerText = val.toFixed(1) + "x"; track.applyConstraints({ advanced: [{ zoom: val }] }).catch(() => {}); };
+        } else { document.getElementById('zoom-control-container').style.display = 'none'; }
+    }
+    function toggleCameraPower() {
+        const btn = document.getElementById("btn-power-camera"); const video = document.getElementById("video-preview");
+        if (isCameraOn) {
+            if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; }
+            video.srcObject = null; isCameraOn = false; btn.classList.replace("btn-outline-success", "btn-outline-danger"); btn.innerHTML = '<i class="fa-solid fa-video-slash"></i>';
+        } else { isCameraOn = true; btn.classList.replace("btn-outline-danger", "btn-outline-success"); btn.innerHTML = '<i class="fa-solid fa-video"></i>'; initCamera(); }
+    }
+    function toggleCamera() { if (!isCameraOn) return alert("Vui lòng bật camera!"); currentFacingMode = currentFacingMode === "environment" ? "user" : "environment"; initCamera(); }
+
+    // --- CHỤP ẢNH & XỬ LÝ ẢNH CHÂN TRANG ---
     function captureExtra(key) {
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
         const canvas = document.createElement("canvas"); let size = Math.min(video.videoWidth, video.videoHeight);
@@ -710,9 +697,7 @@
         document.getElementById(`btn-grp-${key}`).classList.add('d-none'); document.getElementById(`clear-${key}`).classList.remove('d-none');
         if(key==='map') document.getElementById('canvas-map').classList.add('d-none');
         if(key==='compass') document.getElementById('canvas-compass').classList.add('d-none');
-        document.body.style.opacity = 0.5; setTimeout(() => document.body.style.opacity = 1, 100);
     }
-
     function uploadExtra(event, key) {
         const file = event.target.files[0]; if (!file) return;
         const reader = new FileReader();
@@ -726,12 +711,9 @@
                 document.getElementById(`img-${key}`).src = dataUrl; document.getElementById(`img-${key}`).classList.remove('d-none');
                 if(key==='selfie') { document.getElementById(`btn-grp-${key}`).classList.add('d-none'); document.getElementById(`clear-${key}`).classList.remove('d-none'); } 
                 else { document.getElementById(`canvas-${key}`).classList.add('d-none'); }
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file); event.target.value = "";
+            }; img.src = e.target.result;
+        }; reader.readAsDataURL(file); event.target.value = "";
     }
-
     function clearExtra(key) {
         globalExtras[key] = null; document.getElementById(`img-${key}`).src = ""; document.getElementById(`img-${key}`).classList.add('d-none');
         document.getElementById(`btn-grp-${key}`).classList.remove('d-none'); document.getElementById(`clear-${key}`).classList.add('d-none');
@@ -740,18 +722,16 @@
     }
 
     async function capturePhoto(type) {
-        if (currentStoragePercent > 95) return alert(`⚠️ Bộ nhớ đầy (${currentStoragePercent}%)!`);
-        if (currentStoragePercent > 80 && !confirm(`⚠️ Bộ nhớ sắp đầy (${currentStoragePercent}%)! Tiếp tục?`)) return;
+        if (currentStoragePercent > 95) return alert(`Bộ nhớ thiết bị đầy!`);
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
         const canvas = document.createElement("canvas"); const ctx = canvas.getContext("2d"); const scale = video.videoWidth / 1000;
         const imgBoxSize = Math.min(280 * scale, video.videoWidth * 0.18); const footerH = imgBoxSize + 40 * scale; 
         canvas.width = video.videoWidth; canvas.height = video.videoHeight + footerH; 
         ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, video.videoHeight); ctx.restore();
         const fY = video.videoHeight; ctx.fillStyle = "#111111"; ctx.fillRect(0, fY, canvas.width, footerH);
-        ctx.strokeStyle = "#343a40"; ctx.lineWidth = 4 * scale; ctx.strokeRect(0, fY, canvas.width, footerH);
-        const now = new Date(); const timeStr = `${now.toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - ${now.toLocaleDateString("vi-VN")}`;
+        const now = new Date(); const timeStr = `${now.toLocaleTimeString("vi-VN")} - ${now.toLocaleDateString("vi-VN")}`;
         const teamText = document.getElementById("tab1-team").value.trim(); const pad = 20 * scale;
-        let maxTextW = canvas.width - (3 * imgBoxSize) - (5 * pad); if (maxTextW < 100) maxTextW = 100;
+        let maxTextW = canvas.width - (3 * imgBoxSize) - (5 * pad);
         let textX, selfieX, mapX, compassX;
         if (type === "SAU") { compassX = pad; mapX = compassX + imgBoxSize + pad; selfieX = mapX + imgBoxSize + pad; textX = canvas.width - pad; } 
         else { textX = pad; selfieX = textX + maxTextW + pad; mapX = selfieX + imgBoxSize + pad; compassX = mapX + imgBoxSize + pad; }
@@ -767,20 +747,13 @@
                 let img = new Image();
                 img.onload = () => {
                     ctx.fillStyle = "#000"; ctx.fillRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize); ctx.drawImage(img, xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
-                    ctx.strokeStyle = "#495057"; ctx.lineWidth = 4 * scale; ctx.strokeRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
                     let labelH = imgBoxSize * 0.18; ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(xPos, fY + 20 * scale + imgBoxSize - labelH, imgBoxSize, labelH);
                     ctx.fillStyle = "#0dcaf0"; ctx.font = `bold ${labelH * 0.6}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
                     ctx.fillText(labelText, xPos + imgBoxSize/2, fY + 20 * scale + imgBoxSize - labelH/2); resolve();
-                };
-                img.onerror = resolve; img.src = sourceToDraw;
+                }; img.onerror = resolve; img.src = sourceToDraw;
             });
         };
-
-        await Promise.all([
-            drawExtraSync(globalExtras.compass, 'canvas-compass', "LA BÀN", compassX),
-            drawExtraSync(globalExtras.map, 'canvas-map', "BẢN ĐỒ", mapX),
-            drawExtraSync(globalExtras.selfie, null, "NGƯỜI CHỤP", selfieX)
-        ]);
+        await Promise.all([ drawExtraSync(globalExtras.compass, 'canvas-compass', "LA BÀN", compassX), drawExtraSync(globalExtras.map, 'canvas-map', "BẢN ĐỒ", mapX), drawExtraSync(globalExtras.selfie, null, "NGƯỜI CHỤP", selfieX) ]);
 
         let startY = fY + 40 * scale; let lineGap = (footerH - 60 * scale) / 3;
         ctx.textAlign = type === "SAU" ? "right" : "left"; ctx.textBaseline = "middle";
@@ -796,167 +769,10 @@
         else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`; }
         saveToDB(photoObj);
         if (captureBuffer.TRƯỚC && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
-        updateUIState(); document.body.style.opacity = 0.5; setTimeout(() => document.body.style.opacity = 1, 100);
+        updateUIState();
     }
 
-    function handleFileUpload(event, type) {
-        const files = event.target.files; if (!files.length) return;
-        Array.from(files).forEach(file => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement("canvas"); let w = img.width; let h = img.height; const maxDim = 1920;
-                    if (w > maxDim || h > maxDim) { const ratio = Math.min(maxDim/w, maxDim/h); w = w * ratio; h = h * ratio; }
-                    canvas.width = w; canvas.height = h; const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
-                    const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
-                    const photoObj = { id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: compressedDataUrl, timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined };
-                    if (type === "TRƯỚC") repoBefore.unshift(photoObj); else if (type === "SAU") repoAfter.unshift(photoObj); else if (type === "QUÁ TRÌNH") repoProcess.unshift(photoObj); else repoStitched.unshift(photoObj);
-                    saveToDB(photoObj); updateUIState(); renderPending(); if (type === "STITCHED") renderGallery();
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-        event.target.value = "";
-    }
-
-    function disableStitchButtons() {
-        if(document.getElementById("btn-stitch-fast-ts")) document.getElementById("btn-stitch-fast-ts").setAttribute("disabled", "true");
-        if(document.getElementById("btn-stitch-ts-only")) document.getElementById("btn-stitch-ts-only").setAttribute("disabled", "true");
-        if(document.getElementById("btn-stitch-full")) document.getElementById("btn-stitch-full").setAttribute("disabled", "true");
-    }
-
-    function deletePendingItems() {
-        let dels = []; document.querySelectorAll('input[name="radioBefore"]:checked').forEach(e => dels.push(e.value)); document.querySelectorAll('input[name="checkQT"]:checked').forEach(e => dels.push(e.value)); document.querySelectorAll('input[name="radioAfter"]:checked').forEach(e => dels.push(e.value));
-        if(dels.length === 0) return alert("Vui lòng chọn ảnh cần xóa!");
-        if(confirm(`Xóa ${dels.length} ảnh khỏi kho chờ?`)) { dels.forEach(id => deleteFromDB(id)); repoBefore = repoBefore.filter(x => !dels.includes(x.id)); repoProcess = repoProcess.filter(x => !dels.includes(x.id)); repoAfter = repoAfter.filter(x => !dels.includes(x.id)); renderPending(); updateUIState(); }
-    }
-
-    async function handleSessionQTStitch(bObj, aObj, customNote) {
-        let minT = Math.min(bObj.timestampMs, aObj.timestampMs); let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
-        let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
-        if (sessionQts.length > 0) {
-            let mode = document.getElementById("qt-stitch-mode").value;
-            if (mode === 'all') { await processMultiStitching(sessionQts, "QT", customNote); } 
-            else { let chunkSize = parseInt(mode); for (let i = 0; i < sessionQts.length; i += chunkSize) { await processMultiStitching(sessionQts.slice(i, i + chunkSize), "QT", customNote); } }
-        }
-    }
-
-    async function quickStitchTSOnly() {
-        if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
-        let customNote = document.getElementById("tab1-note").value.trim();
-        processStitching(captureBuffer.TRƯỚC, captureBuffer.SAU, true, customNote, () => {
-            captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
-            document.getElementById("preview-before").innerHTML = '<span class="text-muted small text-center">TRƯỚC</span>';
-            document.getElementById("preview-after").innerHTML = '<span class="text-muted small text-center">SAU</span>';
-            document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
-            disableStitchButtons();
-        }, false, 0);
-    }
-    
-    async function quickStitchFull() {
-        if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
-        let customNote = document.getElementById("tab1-note").value.trim();
-        // SỬA ĐỔI CHÍNH: Sửa biến rác TRƯBEFORE giúp tính năng ghép toàn bộ chuỗi sự kiện chạy mượt mà
-        let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
-        let maxT = Math.max(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
-        let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
-        let allObjs = [captureBuffer.TRƯỚC, ...sessionQts, captureBuffer.SAU];
-        await processMultiStitching(allObjs, "FULL", customNote, () => {
-            captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
-            document.getElementById("preview-before").innerHTML = '<span class="text-muted small text-center">TRƯỚC</span>';
-            document.getElementById("preview-after").innerHTML = '<span class="text-muted small text-center">SAU</span>';
-            document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
-            disableStitchButtons();
-        });
-    }
-
-    async function quickStitchTS() {
-        if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
-        let customNote = document.getElementById("tab1-note").value.trim();
-        let minT = Math.min(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs); let maxT = Math.max(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
-        let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
-        await handleSessionQTStitch(captureBuffer.TRƯỚC, captureBuffer.SAU, customNote); await new Promise(r => setTimeout(r, 120)); 
-        processStitching(captureBuffer.TRƯỚC, captureBuffer.SAU, true, customNote, () => {
-            captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
-            document.getElementById("preview-before").innerHTML = '<span class="text-muted small text-center">TRƯỚC</span>';
-            document.getElementById("preview-after").innerHTML = '<span class="text-muted small text-center">SAU</span>';
-            document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
-            disableStitchButtons();
-        }, false, qtCount);
-    }
-    
-    async function manualStitchTSOnly() {
-        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked'); const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
-        if (!checkedBefore || !checkedAfter) return alert("Chọn 1 ảnh TRƯỚC và 1 ảnh SAU!");
-        processStitching(repoBefore.find(x => x.id === checkedBefore.value), repoAfter.find(x => x.id === checkedAfter.value), true, document.getElementById("tab2-note").value.trim(), null, false, 0);
-    }
-
-    async function manualStitchFull() {
-        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked'); const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
-        if (!checkedBefore || !checkedAfter) return alert("Chọn đủ ảnh để ghép chốt phiên!");
-        const bObj = repoBefore.find(x => x.id === checkedBefore.value); const aObj = repoAfter.find(x => x.id === checkedAfter.value);
-        let minT = Math.min(bObj.timestampMs, aObj.timestampMs); let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
-        let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
-        await processMultiStitching([bObj, ...sessionQts, aObj], "FULL", document.getElementById("tab2-note").value.trim(), null);
-        alert("Đã hoàn thành!"); renderPending(); renderGallery();
-    }
-
-    async function manualStitchTS() {
-        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked'); const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
-        if (!checkedBefore || !checkedAfter) return alert("Vui lòng chọn ảnh!");
-        const bObj = repoBefore.find(x => x.id === checkedBefore.value); const aObj = repoAfter.find(x => x.id === checkedAfter.value);
-        let minT = Math.min(bObj.timestampMs, aObj.timestampMs); let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
-        let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
-        await handleSessionQTStitch(bObj, aObj, document.getElementById("tab2-note").value.trim()); await new Promise(r => setTimeout(r, 120)); 
-        processStitching(bObj, aObj, true, document.getElementById("tab2-note").value.trim(), null, false, qtCount);
-    }
-    
-    async function manualStitchQT() {
-        const checkedQT = document.querySelectorAll('input[name="checkQT"]:checked'); if (checkedQT.length === 0) return alert("Vui lòng chọn ảnh Quá Trình!");
-        let objs = Array.from(checkedQT).map(cb => repoProcess.find(x => x.id === cb.value)).sort((a,b) => a.timestampMs - b.timestampMs);
-        let mode = document.getElementById("qt-stitch-mode-tab2").value;
-        if (mode === 'all') { await processMultiStitching(objs, "QT", document.getElementById("tab2-note").value.trim()); } 
-        else { let chunkSize = parseInt(mode); for (let i = 0; i < objs.length; i += chunkSize) { await processMultiStitching(objs.slice(i, i + chunkSize), "QT", document.getElementById("tab2-note").value.trim()); } }
-        alert("Xử lý xong ảnh Quá Trình!"); renderPending(); renderGallery();
-    }
-
-    function autoStitch() {
-        if (repoBefore.length === 0 || repoAfter.length === 0) return alert("Không đủ dữ liệu đối khớp!");
-        windowAutoMatches = []; let availableAfters = [...repoAfter]; let sortedBefores = [...repoBefore].sort((a,b) => a.timestampMs - b.timestampMs);
-        for (let b of sortedBefores) {
-            if (availableAfters.length === 0) break;
-            let closestA = availableAfters[0]; let minDiff = Math.abs(b.timestampMs - closestA.timestampMs); let closestIdx = 0;
-            for (let i = 1; i < availableAfters.length; i++) { let diff = Math.abs(b.timestampMs - availableAfters[i].timestampMs); if (diff < minDiff) { minDiff = diff; closestA = availableAfters[i]; closestIdx = i; } }
-            windowAutoMatches.push({ before: b, after: closestA }); availableAfters.splice(closestIdx, 1);
-        }
-        if (windowAutoMatches.length === 0) return alert("Không tìm thấy cặp!");
-        let html = `<p class="small text-info mb-3">Tìm thấy <b>${windowAutoMatches.length}</b> cặp:</p>`;
-        windowAutoMatches.forEach((m, idx) => {
-            html += `<div class="card bg-secondary mb-3 p-2 border-0 shadow-sm">
-                    <div class="d-flex justify-content-between small fw-bold mb-1"><span class="text-warning">Trước: ${new Date(m.before.timestampMs).toLocaleTimeString("vi-VN")}</span><span class="text-success">Sau: ${new Date(m.after.timestampMs).toLocaleTimeString("vi-VN")}</span></div>
-                    <div class="d-flex gap-1 mb-2">
-                        <div style="flex:1; aspect-ratio:4/3; background:#111;"><img src="${m.before.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
-                        <div style="flex:1; aspect-ratio:4/3; background:#111;"><img src="${m.after.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
-                    </div>
-                    <input type="text" id="auto-note-${idx}" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Ghi chú cặp này...">
-                </div>`;
-        });
-        document.getElementById('autoStitchModalBody').innerHTML = html; new bootstrap.Modal(document.getElementById('autoStitchModal')).show();
-    }
-
-    async function confirmAutoStitch() {
-        bootstrap.Modal.getInstance(document.getElementById('autoStitchModal')).hide(); let count = 0;
-        for (let i = 0; i < windowAutoMatches.length; i++) {
-            const match = windowAutoMatches[i]; const customNote = document.getElementById('auto-note-' + i).value.trim();
-            let minT = Math.min(match.before.timestampMs, match.after.timestampMs); let maxT = Math.max(match.before.timestampMs, match.after.timestampMs);
-            await handleSessionQTStitch(match.before, match.after, customNote); await new Promise(r => setTimeout(r, 120)); 
-            await processStitching(match.before, match.after, false, customNote, null, false, repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length); count++;
-        }
-        alert(`Đã ghép tự động ${count} cặp!`); renderPending(); renderGallery();
-    }
-    
+    // --- GHÉP ẢNH CHUYÊN NGHIỆP ---
     function processMultiStitching(imgObjs, itemTypeMarker, customNote, callback) {
         return new Promise((resolve) => {
             if (!imgObjs || imgObjs.length === 0) { if(callback) callback(); resolve(); return; }
@@ -975,7 +791,9 @@
                     const footerH = Math.min(280 * imgScale, singleW * 0.18) + 40 * imgScale; const noteX = stitchCanvas.width / 2, noteY = stitchCanvas.height - footerH;
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
                     ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.fillRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.fill();
-                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale; ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight); ctx.stroke();
+                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
+                    // 🛠️ FIX BIẾN LỖI: Đổi maxTextWidth thành noteWidth giúp hệ thống chạy offline không vấp lỗi compile
+                    ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.stroke();
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillText(noteText, noteX, noteY);
                 }
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
@@ -1008,7 +826,8 @@
                     const noteX = loadedB.width; const noteY = stitchCanvas.height - (Math.min(280 * imgScale, loadedB.width * 0.18) + 40 * imgScale);
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
                     ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.fillRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight); ctx.fill();
-                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale; ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight); ctx.stroke();
+                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
+                    ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight); ctx.stroke();
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
                     if (lineCount === 2) { ctx.fillText(noteText, noteX, noteY - (noteSize / 2) - 2 * imgScale); ctx.fillText(qtText, noteX, noteY + (noteSize / 2) + 8 * imgScale); } else if (noteText) ctx.fillText(noteText, noteX, noteY); else if (showQTLine) ctx.fillText(qtText, noteX, noteY);
                 }
@@ -1023,22 +842,228 @@
         });
     }
 
+    async function handleSessionQTStitch(bObj, aObj, customNote) {
+        let minT = Math.min(bObj.timestampMs, aObj.timestampMs); let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
+        let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
+        if (sessionQts.length > 0) {
+            let mode = document.getElementById("qt-stitch-mode").value;
+            if (mode === 'all') { await processMultiStitching(sessionQts, "QT", customNote); } 
+            else { let chunkSize = parseInt(mode); for (let i = 0; i < sessionQts.length; i += chunkSize) { await processMultiStitching(sessionQts.slice(i, i + chunkSize), "QT", customNote); } }
+        }
+    }
+    async function quickStitchTSOnly() {
+        if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
+        let customNote = document.getElementById("tab1-note").value.trim();
+        processStitching(captureBuffer.TRƯỚC, captureBuffer.SAU, true, customNote, () => {
+            captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
+            document.getElementById("preview-before").innerHTML = '<span class="text-muted small text-center">TRƯỚC</span>';
+            document.getElementById("preview-after").innerHTML = '<span class="text-muted small text-center">SAU</span>';
+            document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>'; disableStitchButtons();
+        }, false, 0);
+    }
+    async function quickStitchFull() {
+        if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
+        let customNote = document.getElementById("tab1-note").value.trim();
+        let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
+        let maxT = Math.max(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
+        let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
+        let allObjs = [captureBuffer.TRƯỚC, ...sessionQts, captureBuffer.SAU];
+        await processMultiStitching(allObjs, "FULL", customNote, () => {
+            captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
+            document.getElementById("preview-before").innerHTML = '<span class="text-muted small text-center">TRƯỚC</span>';
+            document.getElementById("preview-after").innerHTML = '<span class="text-muted small text-center">SAU</span>';
+            document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>'; disableStitchButtons();
+        });
+    }
+    async function quickStitchTS() {
+        if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
+        let customNote = document.getElementById("tab1-note").value.trim();
+        let minT = Math.min(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs); let maxT = Math.max(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
+        let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
+        await handleSessionQTStitch(captureBuffer.TRƯỚC, captureBuffer.SAU, customNote); await new Promise(r => setTimeout(r, 120)); 
+        processStitching(captureBuffer.TRƯỚC, captureBuffer.SAU, true, customNote, () => {
+            captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
+            document.getElementById("preview-before").innerHTML = '<span class="text-muted small text-center">TRƯỚC</span>';
+            document.getElementById("preview-after").innerHTML = '<span class="text-muted small text-center">SAU</span>';
+            document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>'; disableStitchButtons();
+        }, false, qtCount);
+    }
+    function manualStitchTSOnly() {
+        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked'); const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
+        if (!checkedBefore || !checkedAfter) return alert("Chọn 1 ảnh TRƯỚC và 1 ảnh SAU!");
+        processStitching(repoBefore.find(x => x.id === checkedBefore.value), repoAfter.find(x => x.id === checkedAfter.value), true, document.getElementById("tab2-note").value.trim(), null, false, 0);
+    }
+    async function manualStitchFull() {
+        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked'); const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
+        if (!checkedBefore || !checkedAfter) return alert("Chọn đủ ảnh để ghép chốt phiên!");
+        const bObj = repoBefore.find(x => x.id === checkedBefore.value); const aObj = repoAfter.find(x => x.id === checkedAfter.value);
+        let minT = Math.min(bObj.timestampMs, aObj.timestampMs); let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
+        let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
+        await processMultiStitching([bObj, ...sessionQts, aObj], "FULL", document.getElementById("tab2-note").value.trim(), null);
+        alert("Đã hoàn thành!"); renderPending(); renderGallery();
+    }
+    async function manualStitchTS() {
+        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked'); const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
+        if (!checkedBefore || !checkedAfter) return alert("Vui lòng chọn ảnh!");
+        const bObj = repoBefore.find(x => x.id === checkedBefore.value); const aObj = repoAfter.find(x => x.id === checkedAfter.value);
+        let minT = Math.min(bObj.timestampMs, aObj.timestampMs); let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
+        let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
+        await handleSessionQTStitch(bObj, aObj, document.getElementById("tab2-note").value.trim()); await new Promise(r => setTimeout(r, 120)); 
+        processStitching(bObj, aObj, true, document.getElementById("tab2-note").value.trim(), null, false, qtCount);
+    }
+    async function manualStitchQT() {
+        const checkedQT = document.querySelectorAll('input[name="checkQT"]:checked'); if (checkedQT.length === 0) return alert("Vui lòng chọn ảnh Quá Trình!");
+        let objs = Array.from(checkedQT).map(cb => repoProcess.find(x => x.id === cb.value)).sort((a,b) => a.timestampMs - b.timestampMs);
+        let mode = document.getElementById("qt-stitch-mode-tab2").value;
+        if (mode === 'all') { await processMultiStitching(objs, "QT", document.getElementById("tab2-note").value.trim()); } 
+        else { let chunkSize = parseInt(mode); for (let i = 0; i < objs.length; i += chunkSize) { await processMultiStitching(objs.slice(i, i + chunkSize), "QT", document.getElementById("tab2-note").value.trim()); } }
+        alert("Xử lý xong ảnh Quá Trình!"); renderPending(); renderGallery();
+    }
+    function autoStitch() {
+        if (repoBefore.length === 0 || repoAfter.length === 0) return alert("Không đủ dữ liệu đối khớp!");
+        windowAutoMatches = []; let availableAfters = [...repoAfter]; let sortedBefores = [...repoBefore].sort((a,b) => a.timestampMs - b.timestampMs);
+        for (let b of sortedBefores) {
+            if (availableAfters.length === 0) break;
+            let closestA = availableAfters[0]; let minDiff = Math.abs(b.timestampMs - closestA.timestampMs); let closestIdx = 0;
+            for (let i = 1; i < availableAfters.length; i++) { let diff = Math.abs(b.timestampMs - availableAfters[i].timestampMs); if (diff < minDiff) { minDiff = diff; closestA = availableAfters[i]; closestIdx = i; } }
+            windowAutoMatches.push({ before: b, after: closestA }); availableAfters.splice(closestIdx, 1);
+        }
+        if (windowAutoMatches.length === 0) return alert("Không tìm thấy cặp!");
+        let html = `<p class="small text-info mb-3">Tìm thấy <b>${windowAutoMatches.length}</b> cặp:</p>`;
+        windowAutoMatches.forEach((m, idx) => {
+            html += `<div class="card bg-secondary mb-3 p-2 border-0 shadow-sm">
+                    <div class="d-flex justify-content-between small fw-bold mb-1"><span class="text-warning">Trước: ${new Date(m.before.timestampMs).toLocaleTimeString("vi-VN")}</span><span class="text-success">Sau: ${new Date(m.after.timestampMs).toLocaleTimeString("vi-VN")}</span></div>
+                    <div class="d-flex gap-1 mb-2">
+                        <div style="flex:1; aspect-ratio:4/3; background:#111;"><img src="${m.before.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
+                        <div style="flex:1; aspect-ratio:4/3; background:#111;"><img src="${m.after.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
+                    </div>
+                    <input type="text" id="auto-note-${idx}" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Ghi chú cặp này...">
+                </div>`;
+        });
+        document.getElementById('autoStitchModalBody').innerHTML = html; openModal('autoStitchModal');
+    }
+    async function confirmAutoStitch() {
+        closeModal('autoStitchModal'); let count = 0;
+        for (let i = 0; i < windowAutoMatches.length; i++) {
+            const match = windowAutoMatches[i]; const customNote = document.getElementById('auto-note-' + i).value.trim();
+            let minT = Math.min(match.before.timestampMs, match.after.timestampMs); let maxT = Math.max(match.before.timestampMs, match.after.timestampMs);
+            await handleSessionQTStitch(match.before, match.after, customNote); await new Promise(r => setTimeout(r, 120)); 
+            await processStitching(match.before, match.after, false, customNote, null, false, repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length); count++;
+        }
+        alert(`Đã ghép tự động ${count} cặp!`); renderPending(); renderGallery();
+    }
+
+    // --- ĐĂNG KÝ TẢI FILE / QUOTA LƯU TRỮ ---
+    function handleFileUpload(event, type) {
+        const files = event.target.files; if (!files.length) return;
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement("canvas"); let w = img.width; let h = img.height; const maxDim = 1920;
+                    if (w > maxDim || h > maxDim) { const ratio = Math.min(maxDim/w, maxDim/h); w = w * ratio; h = h * ratio; }
+                    canvas.width = w; canvas.height = h; const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
+                    const photoObj = { id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: canvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined };
+                    if (type === "TRƯỚC") repoBefore.unshift(photoObj); else if (type === "SAU") repoAfter.unshift(photoObj); else if (type === "QUÁ TRÌNH") repoProcess.unshift(photoObj); else repoStitched.unshift(photoObj);
+                    saveToDB(photoObj); updateUIState(); renderPending(); if (type === "STITCHED") renderGallery();
+                }; img.src = e.target.result;
+            }; reader.readAsDataURL(file);
+        }); event.target.value = "";
+    }
     function saveToDB(item) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").put(item); calculateStorageQuota(); } }
     function deleteFromDB(id) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").delete(id); calculateStorageQuota(); } }
-    function loadDataFromDB() { if (!db) return; db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => { const allData = e.target.result || []; repoBefore = allData.filter(x => x.type === "TRƯỚC").sort((a,b) => b.id.localeCompare(a.id)); repoAfter = allData.filter(x => x.type === "SAU").sort((a,b) => b.id.localeCompare(a.id)); repoProcess = allData.filter(x => x.type === "QUÁ TRÌNH").sort((a,b) => b.id.localeCompare(a.id)); repoStitched = allData.filter(x => x.type === "STITCHED" || x.type === "STITCHED_QT").sort((a,b) => b.id.localeCompare(a.id)); updateUIState(); }; }
-    function calculateSelection() { document.getElementById("selected-counter").innerText = `Đã chọn: ${document.querySelectorAll(".gallery-item-check:checked").length}`; }
+    function loadDataFromDB() {
+        if (!db) return;
+        db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
+            const allData = e.target.result || [];
+            repoBefore = allData.filter(x => x.type === "TRƯỚC").sort((a,b) => b.id.localeCompare(a.id));
+            repoAfter = allData.filter(x => x.type === "SAU").sort((a,b) => b.id.localeCompare(a.id));
+            repoProcess = allData.filter(x => x.type === "QUÁ TRÌNH").sort((a,b) => b.id.localeCompare(a.id));
+            repoStitched = allData.filter(x => x.type === "STITCHED" || x.type === "STITCHED_QT").sort((a,b) => b.id.localeCompare(a.id));
+            updateUIState();
+        };
+    }
+    async function calculateStorageQuota() {
+        if (navigator.storage && navigator.storage.estimate) {
+            try {
+                const est = await navigator.storage.estimate();
+                const usedMB = (est.usage / (1024 * 1024)).toFixed(1); const totalQuotaMB = (est.quota / (1024 * 1024)).toFixed(0);
+                currentStoragePercent = parseFloat(((est.usage / est.quota) * 100).toFixed(1));
+                const badge = document.getElementById("storage-status");
+                if (badge) { badge.innerText = `Bộ nhớ: ${usedMB}MB / ${totalQuotaMB}MB (${currentStoragePercent}%)`; }
+            } catch (err) {}
+        }
+    }
+    function updateUIState() {
+        document.getElementById("pending-count").innerText = repoBefore.length + repoProcess.length + repoAfter.length;
+        document.getElementById("gallery-count").innerText = repoStitched.length;
+    }
+    function disableStitchButtons() {
+        ['btn-stitch-fast-ts', 'btn-stitch-ts-only', 'btn-stitch-full'].forEach(id => {
+            if(document.getElementById(id)) document.getElementById(id).setAttribute("disabled", "true");
+        });
+    }
+    function deletePendingItems() {
+        let dels = []; document.querySelectorAll('input[name="radioBefore"]:checked').forEach(e => dels.push(e.value)); document.querySelectorAll('input[name="checkQT"]:checked').forEach(e => dels.push(e.value)); document.querySelectorAll('input[name="radioAfter"]:checked').forEach(e => dels.push(e.value));
+        if(dels.length === 0) return alert("Vui lòng chọn ảnh cần xóa!");
+        if(confirm(`Xóa ${dels.length} ảnh?`)) { dels.forEach(id => deleteFromDB(id)); repoBefore = repoBefore.filter(x => !dels.includes(x.id)); repoProcess = repoProcess.filter(x => !dels.includes(x.id)); repoAfter = repoAfter.filter(x => !dels.includes(x.id)); renderPending(); updateUIState(); }
+    }
     function toggleSelectAll(master) { document.querySelectorAll(".gallery-item-check").forEach(cb => cb.checked = master.checked); calculateSelection(); }
-    function deleteSelectedPhotos() { const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked"); if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!"); if (confirm(`Xóa vĩnh viễn ${checkedBoxes.length} ảnh này?`)) { const ids = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id")); ids.forEach(id => deleteFromDB(id)); repoStitched = repoStitched.filter(item => !ids.includes(item.id)); renderGallery(); updateUIState(); } }
-    async function shareSelectedPhotos() { const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked"); if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!"); const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id")); const itemsToShare = repoStitched.filter(item => selectedIds.includes(item.id)); if (navigator.canShare && navigator.share) { try { let filesArray = []; for (let item of itemsToShare) { let arr = item.dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8 = new Uint8Array(n); while(n--) u8[n] = bstr.charCodeAt(n); filesArray.push(new File([new Blob([u8], {type:mime})], item.name, { type: "image/jpeg" })); } await navigator.share({ files: filesArray, title: 'Báo cáo PC Tuyên Quang' }); } catch (err) { if (err.name !== "AbortError") triggerBatchDownloads(itemsToShare); } } else { triggerBatchDownloads(itemsToShare); } }
+    function calculateSelection() { document.getElementById("selected-counter").innerText = `Đã chọn: ${document.querySelectorAll(".gallery-item-check:checked").length}`; }
+    function deleteSelectedPhotos() {
+        const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked"); if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!");
+        if (confirm(`Xóa vĩnh viễn ${checkedBoxes.length} ảnh này?`)) {
+            const ids = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id")); ids.forEach(id => deleteFromDB(id));
+            repoStitched = repoStitched.filter(item => !ids.includes(item.id)); renderGallery(); updateUIState();
+        }
+    }
+    async function shareSelectedPhotos() {
+        const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked"); if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!");
+        const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id")); const itemsToShare = repoStitched.filter(item => selectedIds.includes(item.id));
+        if (navigator.canShare && navigator.share) {
+            try {
+                let filesArray = [];
+                for (let item of itemsToShare) {
+                    let arr = item.dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8 = new Uint8Array(n);
+                    while(n--) u8[n] = bstr.charCodeAt(n); filesArray.push(new File([new Blob([u8], {type:mime})], item.name, { type: "image/jpeg" }));
+                } await navigator.share({ files: filesArray, title: 'Báo cáo PC Tuyên Quang' });
+            } catch (err) { if (err.name !== "AbortError") triggerBatchDownloads(itemsToShare); }
+        } else { triggerBatchDownloads(itemsToShare); }
+    }
     function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
-    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style=\"margin:0; background:#000; display:flex; align-items:center; justify-content:center;\"><img src=\"${url}\" style=\"max-width:100%; max-height:100%;\"></body>`); }
-    function renderPending() { const GAP_MS = 15 * 60 * 1000; const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => { if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>'; let listHtml = ''; repo.forEach((item, index) => { listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}</div></div>`; if (index < repo.length - 1) { const nextItem = repo[index+1]; let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS; if (!isNewSession) { if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs); else if (typeStr === 'SAU') isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs); } if (isNewSession) { listHtml += `<div class="w-100 text-center my-2 position-relative" style="height: 20px;"><div class="position-absolute w-100 border-bottom border-${color}" style="top: 10px; border-style: dashed !important; opacity: 0.4;"></div><span class="badge bg-dark text-${color} border border-${color} position-relative px-1" style="font-size:9px;">Chuyển Phiên</span></div>`; } } }); return listHtml; }; document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC'); document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH'); document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU'); }
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
+    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
+    function renderPending() {
+        const GAP_MS = 15 * 60 * 1000;
+        const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => {
+            if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>';
+            let listHtml = '';
+            repo.forEach((item, index) => {
+                listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}</div></div>`;
+                if (index < repo.length - 1) {
+                    const nextItem = repo[index+1]; let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
+                    if (isNewSession) { listHtml += `<div class="w-100 text-center my-2" style="height: 20px;"><span class="badge bg-dark text-${color} border border-${color}" style="font-size:9px;">Chuyển Phiên</span></div>`; }
+                }
+            }); return listHtml;
+        };
+        document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
+        document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
+        document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
+    }
+    function renderGallery() {
+        const grid = document.getElementById("gallery-grid"); const emptyMsg = document.getElementById("gallery-empty-msg");
+        document.getElementById("select-all-checkbox").checked = false; document.getElementById("selected-counter").innerText = "Đã chọn: 0";
+        const showQT = document.getElementById("toggle-show-qt").checked; const itemsToRender = showQT ? repoStitched : repoStitched.filter(x => x.type !== "STITCHED_QT");
+        if (itemsToRender.length === 0) { grid.innerHTML = ""; emptyMsg.classList.remove("d-none"); return; }
+        emptyMsg.classList.add("d-none"); let html = "";
+        itemsToRender.forEach(item => {
+            const qtBadge = item.type === "STITCHED_QT" ? `<span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2;">QUÁ TRÌNH</span>` : "";
+            html += `<div class="col-12 col-sm-6" id="card_${item.id}"><div class="photo-card stitched shadow-sm">${qtBadge}<input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${item.id}" onchange="calculateSelection()"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-2"><div class="small fw-bold text-info text-break">${item.name}</div><div class="text-secondary" style="font-size:11px;">${item.timestampStr}</div></div></div></div>`;
+        }); grid.innerHTML = html;
+    }
+
+    // --- QUAY VIDEO & BÓC BĂNG ĐỘC LẬP MÁY BÊN NGOÀI ---
     function toggleRecording() { if (isRecording) stopRecording(); else startRecording(); }
-    function getSupportedMimeType() { const types = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm']; for (let t of types) { if (MediaRecorder.isTypeSupported(t)) return t; } return ''; }
-    
     function startRecording() {
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
         const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d"); let scaleFactor = 1; if (video.videoHeight > 720) scaleFactor = 720 / video.videoHeight;
@@ -1059,24 +1084,20 @@
                 const canvasStream = canvas.captureStream(25); const combinedStream = new MediaStream();
                 if (canvasStream.getVideoTracks().length > 0) combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
                 if (localStream && localStream.getAudioTracks().length > 0) { try { combinedStream.addTrack(localStream.getAudioTracks()[0].clone()); } catch (e) { combinedStream.addTrack(localStream.getAudioTracks()[0]); } }
-                let options = {}; if (mimeType) options.mimeType = mimeType; if (!mimeType.includes('mp4')) options.videoBitsPerSecond = 1200000;
-                recordedChunks = [];
-                try { mediaRecorder = new MediaRecorder(combinedStream, options); } catch (eO) { try { mediaRecorder = new MediaRecorder(combinedStream); } catch (eC) { mediaRecorder = new MediaRecorder(new MediaStream([canvasStream.getVideoTracks()[0]])); } }
+                let options = { mimeType: mimeType }; if (!mimeType.includes('mp4')) options.videoBitsPerSecond = 1200000;
+                recordedChunks = []; try { mediaRecorder = new MediaRecorder(combinedStream, options); } catch (eO) { mediaRecorder = new MediaRecorder(combinedStream); }
                 mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = () => {
                     if (recordedChunks.length === 0 || recordingTime < 1) return;
                     const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
                     currentMediaFilename = `VIDEO_${document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT"}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.${mediaRecorder.mimeType.includes('mp4')?'mp4':'webm'}`;
                     currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'video'; showMediaPreview();
-                };
-                mediaRecorder.start(500);
-                btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (0s/${maxTimeVal}s) - BẤM DỪNG`;
-                recordingInterval = setInterval(() => { recordingTime++; let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s) - BẤM DỪNG`; if (recordingTime >= dynamicMax) stopRecording(); }, 1000);
+                }; mediaRecorder.start(500);
+                recordingInterval = setInterval(() => { recordingTime++; let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s)`; if (recordingTime >= dynamicMax) stopRecording(); }, 1000);
                 if (document.getElementById("toggle-subtitle").checked) initLiveSubtitle();
-            } catch (gErr) { stopRecording(); alert("Thiết bị không tương thích mã hóa luồng!"); }
+            } catch (gErr) { stopRecording(); alert("Thiết bị lỗi mã hóa cứng luồng."); }
         }, 300);
     }
-
     function initLiveSubtitle() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -1086,48 +1107,34 @@
                 for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript; else interimTranscript += event.results[i][0].transcript; }
                 let combined = (finalTranscript + " " + interimTranscript).trim();
                 if (combined !== '') { let words = combined.split(/\s+/); currentSubtitle = words.slice(Math.floor((words.length - 1) / 12) * 12).join(' '); }
-                if (subtitleTimeout) clearTimeout(subtitleTimeout); subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 3000);
-            };
-            try { recognition.start(); } catch(e) {}
+            }; try { recognition.start(); } catch(e) {}
         }
     }
-
     function stopRecording() {
         if (!isRecording) return; isRecording = false; clearInterval(recordingInterval); cancelAnimationFrame(animationFrameId);
         try { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); } catch(e) {}
         if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; currentSubtitle = ""; }
         const btn = document.getElementById("btn-record-video"); btn.className = "btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger"; btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> QUAY VIDEO`;
     }
-
     function drawVideoFrame() {
         if (!isRecording) return;
         const video = document.getElementById("video-preview"); const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d");
         const scale = canvas.width / 1000; const imgBoxSize = Math.min(280 * scale, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scale; const videoRenderHeight = canvas.height - footerH;
         ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight); ctx.restore();
-        if (currentSubtitle) {
-            let subFontSize = Math.round(32 * scale); ctx.font = `bold ${subFontSize}px Arial`; let subText = currentSubtitle.toUpperCase(); let subW = ctx.measureText(subText).width + 40 * scale; let maxW = canvas.width - 40 * scale; if (subW > maxW) subW = maxW;
-            ctx.fillStyle = "rgba(0, 0, 0, 0.75)"; ctx.fillRect(canvas.width/2 - subW/2, videoRenderHeight - 65 * scale, subW, 50 * scale); ctx.fillStyle = "#ffc107"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(subText, canvas.width/2, videoRenderHeight - 40 * scale, subW - 20 * scale);
-        }
         ctx.fillStyle = "rgba(0, 0, 0, 0.7)"; ctx.fillRect(0, canvas.height - footerH, canvas.width, footerH);
-        const drawExtra = (cachedImg, x) => { if (cachedImg && cachedImg.complete && cachedImg.naturalWidth > 0) ctx.drawImage(cachedImg, x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); else { ctx.strokeStyle = "#495057"; ctx.lineWidth = 2 * scale; ctx.strokeRect(x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); } };
-        
-        let pad = 20 * scale; let compX = pad; let mpX = compX + imgBoxSize + pad; let slfX = mpX + imgBoxSize + pad; let txtX = slfX + imgBoxSize + pad;
-        drawExtra(cachedVideoExtras.compass, compX); drawExtra(cachedVideoExtras.map, mpX); drawExtra(cachedVideoExtras.selfie, slfX);
-        
+        const drawExtra = (cachedImg, x) => { if (cachedImg && cachedImg.complete) ctx.drawImage(cachedImg, x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); };
+        let pad = 20 * scale; let txtX = (pad + imgBoxSize) * 3 + pad;
+        drawExtra(cachedVideoExtras.compass, pad); drawExtra(cachedVideoExtras.map, pad + imgBoxSize + pad); drawExtra(cachedVideoExtras.selfie, pad + imgBoxSize + pad + imgBoxSize + pad);
         ctx.textAlign = "left"; ctx.textBaseline = "middle"; const lineGap = imgBoxSize / 4; let textY = canvas.height - footerH + 20*scale + lineGap/2;
-        if (Math.floor(Date.now() / 1000) % 2 === 0) { ctx.fillStyle = "#dc3545"; ctx.font = `bold ${lineGap * 0.8}px Arial`; ctx.fillText("● REC (VIDEO)", txtX, textY); }
-        textY += lineGap; ctx.fillStyle = "#ffffff"; ctx.font = `bold ${lineGap * 0.55}px Arial`; ctx.fillText(`GPS: ${currentGpsData.text}`, txtX, textY);
-        textY += lineGap; ctx.fillStyle = "#0dcaf0"; ctx.fillText(`T.GIAN: ${new Date().toLocaleTimeString("vi-VN")}`, txtX, textY);
-        textY += lineGap; ctx.fillStyle = "#ffc107"; ctx.fillText(document.getElementById("tab1-team").value.trim() ? `ĐỘI: ${document.getElementById("tab1-team").value.trim()}` : "", txtX, textY);
+        ctx.fillStyle = "#ffffff"; ctx.font = `bold ${lineGap * 0.55}px Arial`; ctx.fillText(`GPS: ${currentGpsData.text}`, txtX, textY);
         animationFrameId = requestAnimationFrame(drawVideoFrame);
     }
-
     function toggleAudioRecording() { if (isAudioRecording) stopAudioRecording(); else startAudioRecording(); }
     function startAudioRecording() {
-        if (!localStream || localStream.getAudioTracks().length === 0) return alert("Không tìm thấy Microphone!");
+        if (!localStream || localStream.getAudioTracks().length === 0) return alert("Không tìm thấy Mic!");
         const audioStream = new MediaStream(localStream.getAudioTracks()); let mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-        try { audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType }); } catch(e) { return alert("Lỗi ghi âm: " + e.message); }
+        try { audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType }); } catch(e) { return; }
         audioChunks = []; audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
         audioRecorder.onstop = () => { if (audioChunks.length === 0 || audioRecordingTime < 1) return; currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`; currentMediaBlobUrl = URL.createObjectURL(new Blob(audioChunks, { type: mimeType })); currentMediaType = 'audio'; showMediaPreview(); };
         isAudioRecording = true; audioRecordingTime = 0; const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm";
@@ -1135,38 +1142,35 @@
     }
     function stopAudioRecording() { if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval); const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`; }
 
-    // TỐI ƯU ĐỘC QUYỀN CHO MOBILE: Nhường quyền điều khiển Mic để bóc băng ngoài mượt mà
     function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
-    
     function startStandaloneTranscribe() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ dịch thuật giọng nói!");
-        
-        // GIẢI PHÓNG KHOÁ MICROPHONE PHẦN CỨNG CỦA TRÌNH QUAY VIDEO
         if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; document.getElementById("video-preview").srcObject = null; }
         standaloneRecognition = new SpeechRecognition(); standaloneRecognition.lang = 'vi-VN'; standaloneRecognition.continuous = true; standaloneRecognition.interimResults = true;
         const btn = document.getElementById("btn-standalone-stt"); const textArea = document.getElementById("standalone-stt-result"); let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
-        
         standaloneRecognition.onstart = () => { isStandaloneTranscribing = true; btn.classList.replace("btn-warning", "btn-danger"); btn.classList.add("storage-alarm"); document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)"; };
         standaloneRecognition.onresult = (event) => { let interimTranscript = '', finalTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = baseText + finalTranscript + interimTranscript; };
-        standaloneRecognition.onerror = (e) => { if (e.error !== 'no-speech') textArea.value += `\n[⚠️ Lỗi luồng dịch AI: ${e.error}]`; };
         standaloneRecognition.onend = () => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } };
-        try { standaloneRecognition.start(); } catch(e) { alert("Lỗi mở Mic: " + e.message); if (isCameraOn) initCamera(); }
+        try { standaloneRecognition.start(); } catch(e) { if (isCameraOn) initCamera(); }
     }
-
     function stopStandaloneTranscribe() {
         isStandaloneTranscribing = false; if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
         const btn = document.getElementById("btn-standalone-stt"); btn.classList.remove("storage-alarm"); btn.classList.replace("btn-danger", "btn-warning"); document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
-        // KHỞI ĐỘNG LẠI LUỒNG CAMERA CHO PHIÊN LÀM VIỆC TIẾP THEO
         if (isCameraOn) { initCamera(); }
     }
-
-    function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản bóc băng!"); }
-    function clearStandaloneSTT() { if(confirm("Xóa bảng chữ đã bóc băng?")) document.getElementById("standalone-stt-result").value = ""; }
-    function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width:100%; max-height:400px;"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width:90%; margin:20px 0;"></audio>`; transcribeBox.classList.remove("d-none"); } new bootstrap.Modal(document.getElementById('mediaPreviewModal')).show(); }
-    function discardMedia() { const player = document.getElementById("preview-player"); if(player) { player.pause(); player.src = ""; } if(offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} } if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl); currentMediaBlobUrl = null; bootstrap.Modal.getInstance(document.getElementById('mediaPreviewModal')).hide(); }
+    function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản!"); }
+    function clearStandaloneSTT() { if(confirm("Xóa bảng nội dung?")) document.getElementById("standalone-stt-result").value = ""; }
+    function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id=\"preview-player\" src=\"${currentMediaBlobUrl}\" controls playsinline style=\"max-width:100%; max-height:400px;\"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id=\"preview-player\" src=\"${currentMediaBlobUrl}\" controls style=\"width:90%; margin:20px 0;\"></audio>`; transcribeBox.classList.remove("d-none"); } openModal('mediaPreviewModal'); }
+    function discardMedia() { const player = document.getElementById("preview-player"); if(player) { player.pause(); player.src = ""; } if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl); currentMediaBlobUrl = null; closeModal('mediaPreviewModal'); }
     function downloadMedia() { if (!currentMediaBlobUrl) return; const a = document.createElement('a'); a.style.display = 'none'; a.href = currentMediaBlobUrl; a.download = currentMediaFilename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); }, 100); discardMedia(); }
-    function startAudioTranscription() { const player = document.getElementById("preview-player"); if(!player) return; const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ bóc băng."); if (offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} } offlineRecognition = new SpeechRecognition(); offlineRecognition.lang = 'vi-VN'; offlineRecognition.continuous = true; offlineRecognition.interimResults = true; const textArea = document.getElementById("transcribe-result"); textArea.value = "⏳ Đang nhận diện..."; let finalTranscript = ''; offlineRecognition.onresult = (event) => { let interimTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = finalTranscript + interimTranscript; }; offlineRecognition.onstart = () => { player.play(); }; offlineRecognition.onend = () => { document.getElementById("btn-start-transcribe").innerHTML = `<i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info"); }; try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG TRÍCH XUẤT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {} }
-    function renderGallery() { const grid = document.getElementById("gallery-grid"); const emptyMsg = document.getElementById("gallery-empty-msg"); document.getElementById("select-all-checkbox").checked = false; document.getElementById("selected-counter").innerText = "Đã chọn: 0"; const showQT = document.getElementById("toggle-show-qt").checked; const itemsToRender = showQT ? repoStitched : repoStitched.filter(x => x.type !== "STITCHED_QT"); if (itemsToRender.length === 0) { grid.innerHTML = ""; emptyMsg.classList.remove("d-none"); return; } emptyMsg.classList.add("d-none"); let html = ""; itemsToRender.forEach(item => { const qtBadge = item.type === "STITCHED_QT" ? `<span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2;">QUÁ TRÌNH</span>` : ""; html += `<div class="col-12 col-sm-6" id="card_${item.id}"><div class="photo-card stitched shadow-sm">${qtBadge}<input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${item.id}" onchange="calculateSelection()"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-2"><div class="small fw-bold text-info text-break">${item.name}</div><div class="text-secondary" style="font-size:11px;">${item.timestampStr}</div></div></div></div>`; }); grid.innerHTML = html; }
+    function startAudioTranscription() {
+        const player = document.getElementById("preview-player"); if(!player) return; const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) return alert("Không hỗ trợ bóc băng.");
+        offlineRecognition = new SpeechRecognition(); offlineRecognition.lang = 'vi-VN'; offlineRecognition.continuous = true; offlineRecognition.interimResults = true; const textArea = document.getElementById("transcribe-result"); textArea.value = "⏳ Đang trích xuất chữ..."; let finalTranscript = '';
+        offlineRecognition.onresult = (event) => { let interimTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = finalTranscript + interimTranscript; };
+        offlineRecognition.onstart = () => { player.play(); }; offlineRecognition.onend = () => { document.getElementById("btn-start-transcribe").innerHTML = `PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info"); };
+        try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
+    }
+    function getSupportedMimeType() { const types = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm']; for (let t of types) { if (MediaRecorder.isTypeSupported(t)) return t; } return ''; }
 </script>
 <script>
         // Tự động kích hoạt đăng ký bộ nhớ nền PWA
