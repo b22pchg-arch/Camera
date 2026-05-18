@@ -1820,5 +1820,374 @@ ${finalName}`);
         player.onended = () => { if(offline循环) offlineRecognition.stop(); };
     }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
+    function toggleRecording() {
+        if (isRecording) stopRecording();
+        else startRecording();
+    }
+
+    function getSupportedMimeType() {
+        const types = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        for (let t of types) {
+            if (MediaRecorder.isTypeSupported(t)) return t;
+        }
+        return '';
+    }
+
+    function startRecording() {
+        const video = document.getElementById("video-preview");
+        if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
+
+        const canvas = document.getElementById("video-canvas");
+        const ctx = canvas.getContext("2d");
+
+        // Giới hạn độ phân giải để tránh sập RAM điện thoại (Fix ở mức HD 720p)
+        let scaleFactor = 1;
+        if (video.videoHeight > 720) {
+            scaleFactor = 720 / video.videoHeight;
+        }
+        canvas.width = video.videoWidth * scaleFactor;
+        canvas.height = video.videoHeight * scaleFactor;
+
+        const mimeType = getSupportedMimeType();
+        if (!mimeType) return alert("Trình duyệt không hỗ trợ ghi hình!");
+
+        try {
+            // Lấy luồng hình ảnh từ Canvas với tốc độ 24 hình/giây
+            const stream = canvas.captureStream(24);
+            // Gắn thêm âm thanh từ Micro vào video
+            if (localStream && localStream.getAudioTracks().length > 0) {
+                stream.addTrack(localStream.getAudioTracks()[0]);
+            } 
+            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: 2500000 });
+        } catch (e) {
+            return alert("Lỗi khởi tạo bộ ghi hình: " + e.message);
+        }
+
+        recordedChunks = [];
+        mediaRecorder.ondataavailable = e => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: mimeType });
+            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+            
+            let teamVal = document.getElementById("tab1-team").value.trim().replace(/\s+/g, '_');
+            let prefix = document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT";
+            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
+            
+            currentMediaFilename = `VIDEO_${prefix}_${teamVal}_${dateStr}.${ext}`;
+            currentMediaBlobUrl = URL.createObjectURL(blob);
+            currentMediaType = 'video';
+            
+            showMediaPreview();
+        };
+
+        isRecording = true;
+        recordingTime = 0;
+        currentSubtitle = "";
+        
+        // Khởi tạo Phụ đề nếu được bật
+        if (document.getElementById("toggle-subtitle").checked) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.lang = 'vi-VN';
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            currentSubtitle = event.results[i][0].transcript;
+                        } else {
+                            interimTranscript += event.results[i][0].transcript;
+                        }
+                    }
+                    if (interimTranscript !== '') currentSubtitle = interimTranscript;
+                };
+                
+                recognition.onerror = (e) => console.log("Lỗi nhận diện giọng nói: ", e.error);
+                try { recognition.start(); } catch(e) {}
+            } else {
+                alert("Trình duyệt của bạn không hỗ trợ tính năng Phụ đề (Speech to Text)!");
+                document.getElementById("toggle-subtitle").checked = false;
+            }
+        }
+
+        const btn = document.getElementById("btn-record-video");
+        btn.classList.replace("btn-danger", "btn-warning");
+        btn.classList.replace("text-white", "text-dark");
+        btn.classList.add("storage-alarm"); // Hiệu ứng nhấp nháy đỏ
+        btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (0s/30s)`;
+
+        mediaRecorder.start(500); // Lưu chunk mỗi 500ms
+        drawVideoFrame();
+
+        recordingInterval = setInterval(() => {
+            recordingTime++;
+            btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/30s) - BẤM DỪNG`;
+            if (recordingTime >= 30) stopRecording();
+        }, 1000);
+    }
+
+    function stopRecording() {
+        if (!isRecording) return;
+        isRecording = false;
+        mediaRecorder.stop();
+        clearInterval(recordingInterval);
+        cancelAnimationFrame(animationFrameId);
+        
+        if (recognition) {
+            try { recognition.stop(); } catch(e) {}
+            recognition = null;
+            currentSubtitle = "";
+        }
+        
+        const btn = document.getElementById("btn-record-video");
+        btn.classList.replace("btn-warning", "btn-danger");
+        btn.classList.replace("text-dark", "text-white");
+        btn.classList.remove("storage-alarm");
+        btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> BẮT ĐẦU QUAY VIDEO (Có Đóng Dấu - Max 30s)`;
+    }
+
+    function drawVideoFrame() {
+        if (!isRecording) return;
+
+        const video = document.getElementById("video-preview");
+        const canvas = document.getElementById("video-canvas");
+        const ctx = canvas.getContext("2d");
+
+        // Vẽ hình từ Camera
+        ctx.save();
+        if (currentFacingMode === "user") {
+            ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+
+        const scale = canvas.width / 1000;
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')} - ${now.toLocaleDateString("vi-VN")}`;
+        const teamText = document.getElementById("tab1-team").value.trim();
+
+        // Băng rôn đen mờ ở dưới đáy Video
+        const footerH = 110 * scale;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.fillRect(0, canvas.height - footerH, canvas.width, footerH);
+
+        // Đóng dấu Phụ đề (Nếu có)
+        if (currentSubtitle) {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+            let subW = ctx.measureText(currentSubtitle).width + 40*scale;
+            ctx.fillRect(canvas.width/2 - subW/2, canvas.height - footerH - 60*scale, subW, 50*scale);
+            
+            ctx.fillStyle = "#ffc107";
+            ctx.font = `bold ${30 * scale}px Arial`;
+            ctx.textAlign = "center";
+            ctx.fillText(currentSubtitle.toUpperCase(), canvas.width/2, canvas.height - footerH - 35*scale);
+        }
+
+        // Đóng dấu Text
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `bold ${35 * scale}px Arial`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`GPS: ${currentGpsData.text}`, 20 * scale, canvas.height - footerH + 35 * scale);
+        
+        ctx.fillStyle = "#0dcaf0";
+        ctx.fillText(`T.GIAN: ${timeStr}`, 20 * scale, canvas.height - footerH + 75 * scale);
+
+        if (teamText) {
+            ctx.fillStyle = "#ffc107";
+            ctx.textAlign = "right";
+            ctx.fillText(`TỔ ĐỘI: ${teamText}`, canvas.width - 20 * scale, canvas.height - footerH + 55 * scale);
+        }
+
+        // Đệ quy vẽ liên tục 24FPS
+        animationFrameId = requestAnimationFrame(drawVideoFrame);
+    }
+
+    // --- GHI ÂM ĐỘC LẬP ---
+    function toggleAudioRecording() {
+        if (isAudioRecording) stopAudioRecording();
+        else startAudioRecording();
+    }
+
+    function startAudioRecording() {
+        if (!localStream || localStream.getAudioTracks().length === 0) return alert("Không tìm thấy Microphone!");
+        
+        const audioStream = new MediaStream(localStream.getAudioTracks());
+        let mimeType = 'audio/webm';
+        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/mp4'; // fallback iOS
+        
+        try {
+            audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType });
+        } catch(e) {
+            return alert("Lỗi khởi tạo ghi âm: " + e.message);
+        }
+
+        audioChunks = [];
+        audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+        
+        audioRecorder.onstop = () => {
+            const blob = new Blob(audioChunks, { type: mimeType });
+            const ext = mimeType.includes('mp4') ? 'm4a' : 'webm';
+            
+            let teamVal = document.getElementById("tab1-team").value.trim().replace(/\s+/g, '_');
+            let prefix = document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT";
+            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
+            
+            currentMediaFilename = `AUDIO_${prefix}_${teamVal}_${dateStr}.${ext}`;
+            currentMediaBlobUrl = URL.createObjectURL(blob);
+            currentMediaType = 'audio';
+            
+            showMediaPreview();
+        };
+
+        isAudioRecording = true;
+        audioRecordingTime = 0;
+        
+        const btn = document.getElementById("btn-record-audio");
+        btn.classList.replace("btn-secondary", "btn-warning");
+        btn.classList.replace("text-white", "text-dark");
+        btn.classList.add("storage-alarm");
+        btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (0s)`;
+
+        audioRecorder.start();
+        
+        audioInterval = setInterval(() => {
+            audioRecordingTime++;
+            btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`;
+        }, 1000);
+    }
+
+    function stopAudioRecording() {
+        if (!isAudioRecording) return;
+        isAudioRecording = false;
+        audioRecorder.stop();
+        clearInterval(audioInterval);
+        
+        const btn = document.getElementById("btn-record-audio");
+        btn.classList.replace("btn-warning", "btn-secondary");
+        btn.classList.replace("text-dark", "text-white");
+        btn.classList.remove("storage-alarm");
+        btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`;
+    }
+
+    // --- XỬ LÝ TRÌNH PHÁT VÀ BÓC BĂNG (V22) ---
+    function showMediaPreview() {
+        const container = document.getElementById("media-player-container");
+        const transcribeBox = document.getElementById("transcribe-container");
+        document.getElementById("transcribe-result").value = "";
+        
+        if (currentMediaType === 'video') {
+            container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width: 100%; max-height: 400px;"></video>`;
+            transcribeBox.classList.add("d-none");
+            document.getElementById("mediaPreviewTitle").innerHTML = `<i class="fa-solid fa-video me-2"></i>XEM LẠI VIDEO`;
+        } else {
+            container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width: 90%; margin: 20px 0;"></audio>`;
+            transcribeBox.classList.remove("d-none");
+            document.getElementById("mediaPreviewTitle").innerHTML = `<i class="fa-solid fa-microphone-lines me-2"></i>NGHE LẠI GHI ÂM`;
+        }
+        
+        new bootstrap.Modal(document.getElementById('mediaPreviewModal')).show();
+    }
+
+    function discardMedia() {
+        const player = document.getElementById("preview-player");
+        if(player) { player.pause(); player.src = ""; }
+        if(offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} }
+        
+        if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl);
+        currentMediaBlobUrl = null;
+        currentMediaFilename = null;
+        
+        bootstrap.Modal.getInstance(document.getElementById('mediaPreviewModal')).hide();
+    }
+
+    function downloadMedia() {
+        if (!currentMediaBlobUrl) return;
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = currentMediaBlobUrl;
+        a.download = currentMediaFilename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); }, 100);
+        
+        // Nếu có bóc băng, tải thêm file text
+        const textResult = document.getElementById("transcribe-result").value.trim();
+        if (currentMediaType === 'audio' && textResult) {
+            const txtBlob = new Blob([textResult], {type: "text/plain;charset=utf-8"});
+            const txtUrl = URL.createObjectURL(txtBlob);
+            const aTxt = document.createElement('a');
+            aTxt.href = txtUrl;
+            aTxt.download = currentMediaFilename.replace(/\.[^/.]+$/, ".txt");
+            document.body.appendChild(aTxt);
+            setTimeout(() => { aTxt.click(); document.body.removeChild(aTxt); URL.revokeObjectURL(txtUrl); }, 300);
+        }
+        
+        discardMedia(); // Đóng modal và dọn dẹp
+    }
+
+    function startAudioTranscription() {
+        const player = document.getElementById("preview-player");
+        if(!player) return;
+        
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ bóc băng bằng AI!");
+        
+        if (offlineRecognition) {
+            try { offlineRecognition.stop(); } catch(e){}
+        }
+        
+        offlineRecognition = new SpeechRecognition();
+        offlineRecognition.lang = 'vi-VN';
+        offlineRecognition.continuous = true;
+        offlineRecognition.interimResults = true;
+        
+        const textArea = document.getElementById("transcribe-result");
+        let finalTranscript = '';
+        
+        offlineRecognition.onresult = (event) => {
+            let interimTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript + '. ';
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+            textArea.value = finalTranscript + interimTranscript;
+        };
+        
+        offlineRecognition.onerror = (e) => console.log("Lỗi Dịch: ", e.error);
+        
+        offlineRecognition.onend = () => {
+            // Tự động khởi động lại nhận diện nếu audio vẫn đang chạy
+            if (!player.paused && !player.ended) {
+                try { offlineRecognition.start(); } catch(e){}
+            } else {
+                document.getElementById("btn-start-transcribe").innerHTML = `<i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH & BẮT ĐẦU DỊCH`;
+                document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info");
+            }
+        };
+
+        // Bắt đầu phát Audio và bật Mic
+        player.play();
+        try { offlineRecognition.start(); } catch(e){}
+        
+        const btn = document.getElementById("btn-start-transcribe");
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG NGHE & DỊCH (Bật to loa)...`;
+        btn.classList.replace("btn-outline-info", "btn-danger");
+        
+        // Ngắt dịch khi Audio dừng
+        player.onpause = () => { if(offlineRecognition) offlineRecognition.stop(); };
+        player.onended = () => { if(offline循环) offlineRecognition.stop(); };
+    }
+</script>
 </body>
 </html>
