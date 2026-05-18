@@ -377,7 +377,7 @@
                     <li><b>Chuẩn bị:</b> Nhập Tên Tổ Đội và Mã Hiện Trường. Cài đặt các ảnh chân trang (Selfie, Bản đồ, La bàn) ở khung trên cùng.</li>
                     <li><b>Chụp ảnh:</b> Bấm [Chụp TRƯỚC] và [Chụp SAU]. Hệ thống tự động đóng dấu Tọa độ, Thời gian và các ảnh phụ trợ vào chân trang (không đè lên ảnh gốc).</li>
                     <li><b>Ghép ảnh:</b> Nhập "Ghi chú", bấm [GHÉP NGAY] nếu vừa chụp xong 1 cặp. Hoặc vào Tab "Chờ Ghép" để ghép tự động/thủ công nhiều ảnh. Dòng ghi chú sẽ tự động nằm ở tâm giao điểm giữa 2 bức ảnh ghép.</li>
-                    <li><b>Xuất báo cáo:</b> Vào Tab "Đã Ghép", chọn các ảnh hoàn thiện and bấm [CHIA SẺ / TẢI VỀ].</li>
+                    <li><b>Xuất báo cáo:</b> Vào Tab "Đã Ghép", chọn các ảnh hoàn thiện và bấm [CHIA SẺ / TẢI VỀ].</li>
                 </ol>
 
                 <p class="text-danger fw-bold mb-1 mt-3"><i class="fa-solid fa-video me-1"></i> 4. QUAY VIDEO HIỆN TRƯỜNG:</p>
@@ -1592,19 +1592,46 @@
         recordingTime = 0;
         currentSubtitle = "";
 
-        // 🛠️ SỬA LỖI 1: Gọi hàm vẽ khung hình đầu tiên trước để Canvas có dữ liệu, tránh trống luồng gây lỗi trên di động
+        // Chạy vòng lặp kết xuất đồ họa lên Canvas trước để luồng ổn định dữ liệu
         drawVideoFrame();
 
         try {
             const stream = canvas.captureStream(24);
+            
+            // 🛠️ SỬA LỖI 1: Đồng bộ hóa tần số Mic điện thoại qua AudioContext để tránh sập luồng ghi âm vật lý
             if (localStream && localStream.getAudioTracks().length > 0) {
-                stream.addTrack(localStream.getAudioTracks()[0]);
-            } 
-            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: 1500000 });
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    const audioCtx = new AudioContext();
+                    const source = audioCtx.createMediaStreamSource(localStream);
+                    const dest = audioCtx.createMediaStreamDestination();
+                    source.connect(dest);
+                    stream.addTrack(dest.stream.getAudioTracks()[0]);
+                } catch (audioErr) {
+                    stream.addTrack(localStream.getAudioTracks()[0]);
+                }
+            }
+
+            let options = { mimeType: mimeType };
+            // Bỏ ép bitrate cứng với file mp4 trên iOS để tránh quá tải bộ mã hóa
+            if (!mimeType.includes('mp4')) {
+                options.videoBitsPerSecond = 1500000;
+            }
+            
+            mediaRecorder = new MediaRecorder(stream, options);
         } catch (e) {
-            isRecording = false;
-            cancelAnimationFrame(animationFrameId);
-            return alert("Lỗi khởi tạo bộ ghi hình: " + e.message);
+            // Hàng rào phòng thủ cuối cùng: Khởi chạy bộ ghi cấu hình mặc định của thiết bị di động
+            try {
+                const stream = canvas.captureStream(24);
+                if (localStream && localStream.getAudioTracks().length > 0) {
+                    stream.addTrack(localStream.getAudioTracks()[0]);
+                }
+                mediaRecorder = new MediaRecorder(stream);
+            } catch(e2) {
+                isRecording = false;
+                cancelAnimationFrame(animationFrameId);
+                return alert("Thiết bị không hỗ trợ ghi hình: " + e2.message);
+            }
         }
 
         recordedChunks = [];
@@ -1613,13 +1640,13 @@
         };
 
         mediaRecorder.onstop = () => {
-            // 🛠️ SỬA LỖI 2: Ngăn chặn mở trình xem ảo nếu chưa có giây dữ liệu thực tế nào (do crash luồng trên điện thoại)
+            // 🛠️ SỬA LỖI 2: Ngăn chặn triệt để việc mở trình xem video rỗng (ảo) nếu luồng ghi bị tắt đột ngột
             if (recordedChunks.length === 0 || recordingTime < 1) {
-                console.log("Luồng ghi hình bị ngắt do lỗi cấu hình phần cứng thiết bị.");
+                console.log("Dữ liệu luồng trống.");
                 return;
             }
-            const blob = new Blob(recordedChunks, { type: mimeType });
-            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || mimeType });
+            const ext = (mediaRecorder.mimeType || mimeType).includes('mp4') ? 'mp4' : 'webm';
             
             let teamVal = document.getElementById("tab1-team").value.trim().replace(/\s+/g, '_');
             let prefix = document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT";
@@ -1632,7 +1659,6 @@
             showMediaPreview();
         };
 
-        // Thêm bắt lỗi kịch bản của MediaRecorder ngầm
         mediaRecorder.onerror = (err) => {
             console.error("Lỗi MediaRecorder:", err);
             stopRecording();
@@ -1669,11 +1695,7 @@
                     subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 3000);
                 };
                 
-                recognition.onerror = (e) => console.log("Lỗi nhận diện giọng nói: ", e.error);
                 try { recognition.start(); } catch(e) {}
-            } else {
-                alert("Trình duyệt không hỗ trợ tính năng Phụ đề trực tiếp!");
-                document.getElementById("toggle-subtitle").checked = false;
             }
         }
 
@@ -1687,7 +1709,7 @@
             mediaRecorder.start(500);
         } catch(err) {
             stopRecording();
-            alert("Thiết bị di động không hỗ trợ mã hóa trực tiếp Canvas + Audio. Vui lòng quay video thường hoặc dùng Máy tính.");
+            alert("Trình duyệt di động từ chối kết nối luồng đồ họa. Hãy sử dụng máy tính hoặc quay video mặc định.");
             return;
         }
 
@@ -1940,7 +1962,7 @@
         discardMedia();
     }
 
-    // 🛠️ SỬA LỖI 3: Trực quan hóa kết quả/thông báo lỗi bóc băng AI lên màn hình người dùng
+    // 🛠️ SỬA LỖI 3: Thiết lập thứ tự ưu tiên mở Mic trước - Phát âm thanh sau để không bị khóa luồng thiết bị
     function startAudioTranscription() {
         const player = document.getElementById("preview-player");
         if(!player) return;
@@ -1958,7 +1980,7 @@
         offlineRecognition.interimResults = true;
         
         const textArea = document.getElementById("transcribe-result");
-        textArea.value = "⏳ Đang lắng nghe âm thanh và tiến hành bóc băng...";
+        textArea.value = "⏳ Đang kích hoạt Microphone hệ thống...";
         let finalTranscript = '';
         
         offlineRecognition.onresult = (event) => {
@@ -1976,16 +1998,22 @@
         offlineRecognition.onerror = (e) => {
             console.log("Lỗi hệ thống dịch thuật: ", e.error);
             if (e.error === 'network') {
-                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nTính năng bóc băng (Speech-to-Text) của trình duyệt bắt buộc phải có kết nối Internet (4G/Wifi) để xử lý dữ liệu. Trong môi trường ngắt kết nối (Offline), trình duyệt không thể bóc băng.";
+                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nTính năng bóc băng (Speech-to-Text) bắt buộc phải có mạng Internet để gửi gói tin lên máy chủ nhận diện (Google/Apple). Môi trường mất mạng không dùng được.";
             } else if (e.error === 'no-speech') {
-                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nKhông thu được tín hiệu giọng nói. Trên điện thoại di động, khi chạy loa ngoài phát âm thanh, hệ thống sẽ tự động bật bộ lọc triệt tiêu Microphone (Echo Cancellation) để chống hú, khiến Mic bị điếc tạm thời. Bạn nên bật âm lượng loa điện thoại ở mức LỚN NHẤT, đưa Mic gần sát loa hoặc thực hiện bóc băng trên Máy tính để đạt độ chính xác cao.";
+                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nKhông thu được âm thanh giọng nói. Trên ĐIỆN THOẠI, tính năng khử nhiễu phần cứng (Echo Cancellation) sẽ triệt tiêu dải tần số do chính loa điện thoại phát ra để chống hú, dẫn tới Mic bị điếc tạm thời.\n\n👉 Mẹo xử lý trên Di Động:\n1. Bật loa điện thoại ở mức LỚN NHẤT.\n2. Bấm thực hiện bóc băng trên MÁY TÍNH (PC/Laptop), hệ thống sẽ chạy cực kỳ mượt mà and chính xác do không bị xung đột phần cứng di động.";
             } else if (e.error === 'not-allowed') {
-                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nQuyền sử dụng Microphone bị từ chối hoặc đang bị ứng dụng hệ thống khác chiếm dụng.";
+                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nTrình duyệt bị từ chối quyền truy cập Microphone.";
             } else {
-                textArea.value = `⚠️ KHÔNG RA KẾT QUẢ (Lỗi: ${e.error}):\nHãy kiểm tra lại kết nối mạng and đảm bảo loa ngoài đang phát âm thanh đủ lớn để điện thoại nghe lại được.`;
+                textArea.value = `⚠️ KHÔNG RA KẾT QUẢ (Mã phản hồi lỗi: ${e.error}). Vui lòng kiểm tra lại loa ngoài.`;
             }
         };
         
+        // Đợi Microphone di động bật thành công rồi mới kích hoạt phát Audio, tránh xung đột Audio Session của hệ điều hành
+        offlineRecognition.onstart = () => {
+            textArea.value = "⏳ Đang phát âm thanh để tiến hành bóc băng...";
+            player.play().catch(err => console.log("Lỗi lệnh phát:", err));
+        };
+
         offlineRecognition.onend = () => {
             if (!player.paused && !player.ended) {
                 try { offlineRecognition.start(); } catch(e){}
@@ -1995,12 +2023,14 @@
             }
         };
 
-        player.play();
-        try { offlineRecognition.start(); } catch(e){}
-        
-        const btn = document.getElementById("btn-start-transcribe");
-        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG NGHE & DỊCH (Bật to loa)...`;
-        btn.classList.replace("btn-outline-info", "btn-danger");
+        try { 
+            offlineRecognition.start(); 
+            const btn = document.getElementById("btn-start-transcribe");
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG NGHE & DỊCH (Bật to loa)...`;
+            btn.classList.replace("btn-outline-info", "btn-danger");
+        } catch(e) {
+            textArea.value = "❌ Lỗi khởi động AI: " + e.message;
+        }
         
         player.onpause = () => { if(offlineRecognition) offlineRecognition.stop(); };
         player.onended = () => { if(offlineRecognition) offlineRecognition.stop(); };
