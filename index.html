@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V51.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V52.0)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -320,7 +320,7 @@
                         <button class="btn btn-success w-100 fw-bold py-2 px-0" style="font-size:11px;" onclick="manualStitchFull()">GHÉP FULL</button>
                     </div>
                 </div>
-                <div class="row g-2">
+                <div class="row g-2 mb-2">
                     <div class="col-6">
                         <button class="btn btn-info text-dark w-100 fw-bold py-2 shadow px-0" style="font-size:12px;" onclick="manualStitchTS()">PHIÊN (T/S + QT)</button>
                     </div>
@@ -328,7 +328,14 @@
                         <button class="btn btn-outline-info text-info w-100 fw-bold py-2 shadow px-0" style="font-size:12px;" onclick="autoStitch()"><i class="fa-solid fa-wand-magic-sparkles"></i> TỰ ĐỘNG PHIÊN</button>
                     </div>
                 </div>
-                <button class="btn btn-sm btn-outline-danger w-100 mt-2 fw-bold" onclick="deletePendingItems()"><i class="fa-solid fa-trash me-1"></i> XÓA CÁC ẢNH ĐANG CHỌN TRONG KHO</button>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <button class="btn btn-sm btn-outline-danger w-100 fw-bold" style="height:36px; font-size:11px;" onclick="deletePendingItems()"><i class="fa-solid fa-trash me-1"></i> XÓA ĐÃ CHỌN</button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-sm btn-danger w-100 fw-bold shadow border border-2 border-danger" style="height:36px; font-size:11px;" onclick="clearAllPending()"><i class="fa-solid fa-dumpster-fire me-1"></i> XÓA TẤT CẢ KHO</button>
+                    </div>
+                </div>
             </div>
 
             <div class="row g-2">
@@ -408,6 +415,32 @@
                 <p class="text-danger fw-bold mb-1"><i class="fa-solid fa-microphone me-1"></i> BÓC BĂNG ĐỘC LẬP TRÊN ĐIỆN THOẠI:</p>
                 <ul class="text-secondary ps-3 mb-0">
                     <li>Khi mở **Bóc băng độc lập**, màn hình Camera hiện trường sẽ tạm thời đóng luồng để nhường phần cứng thu âm hoàn toàn cho bộ nhận diện chữ AI. Khi bấm **DỪNG**, Camera sẽ tự động mở lại ngay.</li>
+                </ul>
+				<p class="text-warning fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> 1. LƯU Ý QUAN TRỌNG VỀ PWA (BẮT BUỘC):</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li>Để ứng dụng hoạt động <b>Offline (không cần mạng)</b> và full màn hình, bắt buộc phải chọn <b>"Thêm vào màn hình chính" (Add to Home Screen)</b> trên Chrome/Safari.</li>
+                    <li>Khi có bản cập nhật mới, cần xóa biểu tượng app cũ ngoài màn hình, vào phần Cài đặt của trình duyệt xóa "Dữ liệu trang web", sau đó tải lại link và ghim lại ra màn hình.</li>
+                </ul>
+
+                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-hard-drive me-1"></i> 2. GIỚI HẠN DUNG LƯỢNG KHO LƯU TRỮ:</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li>Trình duyệt (Chrome/Safari) cấp một dung lượng bộ nhớ giới hạn cho ứng dụng. Thanh trạng thái ở góc trên bên phải sẽ báo số % đã dùng.</li>
+                    <li>Khi báo <span class="text-danger fw-bold">Màu Đỏ (>80%)</span>, bộ nhớ sắp đầy. Anh em cần tải các ảnh ở tab "Đã Ghép" về máy, sau đó <b>XÓA ẢNH TRÊN APP</b> để giải phóng dung lượng. Nếu đầy 100%, app sẽ không thể lưu thêm ảnh.</li>
+                </ul>
+
+                <p class="text-info fw-bold mb-1"><i class="fa-solid fa-camera me-1"></i> 3. THAO TÁC CHỤP & GHÉP ẢNH:</p>
+                <ol class="text-secondary ps-3 mb-0">
+                    <li><b>Chuẩn bị:</b> Nhập Tên Tổ Đội và Mã Hiện Trường. Cài đặt các ảnh chân trang (Selfie, Bản đồ, La bàn) ở khung trên cùng.</li>
+                    <li><b>Chụp ảnh:</b> Bấm [Chụp TRƯỚC] và [Chụp SAU]. Hệ thống tự động đóng dấu Tọa độ, Thời gian và các ảnh phụ trợ vào chân trang (không đè lên ảnh gốc).</li>
+                    <li><b>Ghép ảnh:</b> Nhập "Ghi chú", bấm [GHÉP NGAY] nếu vừa chụp xong 1 cặp. Hoặc vào Tab "Chờ Ghép" để ghép tự động/thủ công nhiều ảnh. Dòng ghi chú sẽ tự động nằm ở tâm giao điểm giữa 2 bức ảnh ghép.</li>
+                    <li><b>Xuất báo cáo:</b> Vào Tab "Đã Ghép", chọn các ảnh hoàn thiện và bấm [CHIA SẺ / TẢI VỀ].</li>
+                </ol>
+
+                <p class="text-danger fw-bold mb-1 mt-3"><i class="fa-solid fa-video me-1"></i> 4. QUAY VIDEO HIỆN TRƯỜNG:</p>
+                <ul class="text-secondary ps-3 mb-0">
+                    <li><b>Giới hạn 30s:</b> Để tránh treo máy và quá tải bộ nhớ, mỗi video chỉ được quay tối đa 30 giây. Hết giờ hệ thống tự ngắt và tự xuất file.</li>
+                    <li><b>Đóng dấu & Âm thanh:</b> Chức năng sẽ ghi lại toàn bộ <b>âm thanh hiện trường</b> (tiếng người nói, tiếng thiết bị) và tự động đóng dấu Tọa độ, Thời gian, Tổ đội ở một dải băng đen dưới đáy màn hình.</li>
+                    <li><b>Lưu trữ an toàn:</b> Khác với ảnh, video quay xong sẽ <b>KHÔNG</b> nằm trong kho của app mà <b>tự động tải thẳng xuống thư viện thiết bị (thư mục Downloads hoặc Ảnh)</b>. Cơ chế này đảm bảo app không bao giờ bị báo đầy bộ nhớ vì video.</li>
                 </ul>
             </div>
         </div>
@@ -561,7 +594,7 @@
     }
 
     // --- INDEXEDDB STORAGE ---
-    const dbRequest = indexedDB.open("AirGapCameraV51", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV52", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) { database.createObjectStore("photos", { keyPath: "id" }); }
@@ -780,7 +813,12 @@
 
         const photoObj = { id: "img_" + Date.now(), type: type, dataUrl: canvas.toDataURL("image/jpeg", 0.85), timestampMs: now.getTime() };
         if (type === "TRƯỚC") { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}">`; } 
-        else if (type === "SAU") { repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`; } 
+        else if (type === "SAU") { 
+            repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`; 
+            // 🛠️ THAY ĐỔI PWA V52.0: Reset bộ đệm ảnh quá trình về 0 ngay khi bấm chụp ảnh SAU để bắt đầu chu kỳ đếm mới
+            captureBuffer.QUÁ_TRÌNH = [];
+            document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
+        } 
         else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`; }
         saveToDB(photoObj);
         if (captureBuffer.TRƯỚC && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
@@ -814,7 +852,6 @@
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT";
                 if (itemTypeMarker === "QT") filePrefix = "QT_" + filePrefix; else if (itemTypeMarker === "FULL") filePrefix = "FULL_" + filePrefix;
                 
-                // 🛠️ PWA V51.0: Tính toán mốc thời gian thực tế sớm nhất của các ảnh quá trình thành phần để đồng bộ liên kết
                 let earliestTs = Date.now();
                 if (imgObjs && imgObjs.length > 0) { earliestTs = Math.min(...imgObjs.map(o => o.timestampMs || Date.now())); }
 
@@ -825,7 +862,7 @@
                     dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), 
                     timestampMs: Date.now(), 
                     timestampStr: new Date().toLocaleString("vi-VN"),
-                    qtTimeMs: earliestTs // Đánh dấu thời gian hoạt động của nhóm quá trình
+                    qtTimeMs: earliestTs 
                 };
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 let objIds = loaded.map(l => l.obj.id);
@@ -862,7 +899,6 @@
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT"; if (isQT) filePrefix = "QT_" + filePrefix;
                 const formatTime = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; };
                 
-                // 🛠️ PWA V51.0: Đóng băng ranh giới thời gian Start-End của phiên làm việc phục vụ bộ lọc liên kết nhóm
                 let sessionStartMs = Math.min(bObj.timestampMs, aObj.timestampMs);
                 let sessionEndMs = Math.max(bObj.timestampMs, aObj.timestampMs);
 
@@ -906,7 +942,7 @@
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
         let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
-        let maxT = Math.max(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
+        let maxT = Math.max(captureBuffer.TRƯBEFORE ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
         let allObjs = [captureBuffer.TRƯỚC, ...sessionQts, captureBuffer.SAU];
         await processMultiStitching(allObjs, "FULL", customNote, () => {
@@ -1060,11 +1096,30 @@
             if(document.getElementById(id)) document.getElementById(id).setAttribute("disabled", "true");
         });
     }
+    
     function deletePendingItems() {
         let dels = []; document.querySelectorAll('input[name="radioBefore"]:checked').forEach(e => dels.push(e.value)); document.querySelectorAll('input[name="checkQT"]:checked').forEach(e => dels.push(e.value)); document.querySelectorAll('input[name="radioAfter"]:checked').forEach(e => dels.push(e.value));
         if(dels.length === 0) return alert("Vui lòng chọn ảnh cần xóa!");
-        if(confirm(`Xóa ${dels.length} ảnh?`)) { dels.forEach(id => deleteFromDB(id)); repoBefore = repoBefore.filter(x => !dels.includes(x.id)); repoProcess = repoProcess.filter(x => !dels.includes(x.id)); repoAfter = repoAfter.filter(x => !dels.includes(x.id)); renderPending(); updateUIState(); }
+        if(confirm(`Xóa ${dels.length} ảnh đã chọn?`)) { dels.forEach(id => deleteFromDB(id)); repoBefore = repoBefore.filter(x => !dels.includes(x.id)); repoProcess = repoProcess.filter(x => !dels.includes(x.id)); repoAfter = repoAfter.filter(x => !dels.includes(x.id)); renderPending(); updateUIState(); }
     }
+
+    // 🛠️ THÊM MỚI PWA V52.0: Hàm xóa sạch toàn bộ 3 kho ảnh chờ ghép tức thì không cần tích chọn
+    function clearAllPending() {
+        if (repoBefore.length === 0 && repoProcess.length === 0 && repoAfter.length === 0) return alert("Kho ảnh chờ ghép hiện tại đã trống sẵn!");
+        if (confirm("Anh có chắc chắn muốn XÓA SẠCH TOÀN BỘ ảnh trong 3 kho chờ ghép (Trước, Quá trình, Sau)?\nHành động này sẽ xóa dữ liệu trên bộ nhớ Offline của máy và không thể khôi phục!")) {
+            const allPendingItems = [...repoBefore, ...repoProcess, ...repoAfter];
+            allPendingItems.forEach(item => deleteFromDB(item.id));
+            
+            repoBefore = [];
+            repoProcess = [];
+            repoAfter = [];
+            
+            renderPending();
+            updateUIState();
+            alert("Đã giải phóng hoàn toàn các kho ảnh chờ ghép!");
+        }
+    }
+
     function toggleSelectAll(master) { document.querySelectorAll(".gallery-item-check").forEach(cb => cb.checked = master.checked); calculateSelection(); }
     function calculateSelection() { document.getElementById("selected-counter").innerText = `Đã chọn: ${document.querySelectorAll(".gallery-item-check:checked").length}`; }
     function deleteSelectedPhotos() {
@@ -1131,7 +1186,6 @@
         boxA.innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
     }
     
-    // 🛠️ CẬP NHẬT MỚI PWA V51.0: CẤU TRÚC LẠI KHO ẢNH HOÀN THIỆN THEO PHIÊN CÔNG TÁC TIẾN TRÌNH
     function renderGallery() {
         const grid = document.getElementById("gallery-grid"); 
         const emptyMsg = document.getElementById("gallery-empty-msg");
@@ -1147,11 +1201,9 @@
         }
         emptyMsg.classList.add("d-none");
 
-        // Phân nhóm tệp ảnh đã ghép đôi (Trước/Sau) và ảnh ghép Quá Trình (QT)
         const tsSessions = repoStitched.filter(x => x.type === "STITCHED");
         const qtImages = repoStitched.filter(x => x.type === "STITCHED_QT");
 
-        // Sắp xếp các Phiên theo trình tự thời gian từ TRÊN xuống DƯỚI (Cũ nhất lên đầu, mới nhất xuống dưới)
         tsSessions.sort((a, b) => {
             const timeA = a.sessionStartMs || a.timestampMs || 0;
             const timeB = b.sessionStartMs || b.timestampMs || 0;
@@ -1161,22 +1213,18 @@
         let html = "";
         let matchedQtIds = new Set();
 
-        // Duyệt kết xuất từng khối Phiên Làm Việc độc lập
         tsSessions.forEach((session, index) => {
             let startRange = session.sessionStartMs || (session.timestampMs - 1000);
             let endRange = session.sessionEndMs || session.timestampMs;
 
-            // Lọc các ảnh Quá trình thuộc phạm vi thời gian diễn ra của phiên này
             let sessionQts = qtImages.filter(q => {
                 let qTime = q.qtTimeMs || q.timestampMs;
                 return qTime >= startRange && qTime <= endRange;
             });
 
-            // Sắp xếp ảnh Quá Trình nội bộ theo mốc thời gian từ trước đến sau (Tăng dần)
             sessionQts.sort((a, b) => (a.qtTimeMs || a.timestampMs) - (b.qtTimeMs || b.timestampMs));
             sessionQts.forEach(q => matchedQtIds.add(q.id));
 
-            // Khởi tạo Card bọc ngoài cho từng Phiên hoạt động
             html += `<div class="card bg-dark border-info mb-4 p-2 shadow-sm w-100">
                 <div class="card-header bg-black bg-opacity-50 text-info border-0 p-2 d-flex justify-content-between align-items-center rounded-top">
                     <span class="fw-bold small text-uppercase"><i class="fa-solid fa-folder-open me-2"></i>Phiên ${index + 1}: ${session.name.split('_')[0] || 'Hiện trường'}</span>
@@ -1195,7 +1243,6 @@
                             </div>
                         </div>`;
 
-            // 2. Các ảnh ghép diễn tiến quá trình thực hiện theo dòng thời gian
             if (showQT && sessionQts.length > 0) {
                 sessionQts.forEach(q => {
                     html += `<div class="col-12 col-md-6" id="card_${q.id}">
@@ -1217,7 +1264,6 @@
             </div>`;
         });
 
-        // 3. Khối hiển thị các ảnh Quá Trình mồ côi (Chưa được gán vào cặp Trước/Sau nào)
         if (showQT) {
             const orphanQts = qtImages.filter(q => !matchedQtIds.has(q.id));
             if (orphanQts.length > 0) {
