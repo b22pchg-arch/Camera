@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V50.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V51.0)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -548,23 +548,20 @@
         } else { el.style.display = "block"; el.classList.add("show"); el.style.backgroundColor = "rgba(0,0,0,0.6)"; document.body.style.overflow = "hidden"; }
     }
     
-    // 🛠️ SỬA LỖI PWA V50.0: Hàm đóng modal dọn sạch thực thể thừa để không kẹt nền đen mờ
     function closeModal(id) {
         const el = document.getElementById(id); if (!el) return;
         if (window.bootstrap && window.bootstrap.Modal) {
             let modalObj = bootstrap.Modal.getInstance(el);
             if (modalObj) { try { modalObj.hide(); } catch(e) {} }
         }
-        // Áp dụng cả fallback DOM thủ công giúp tắt triệt để trên điện thoại hiện trường
         el.style.display = "none"; 
         el.classList.remove("show"); 
         document.body.style.overflow = "auto";
-        // Quét sạch tất cả màn đen mờ dính lại của Bootstrap
         document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
     }
 
     // --- INDEXEDDB STORAGE ---
-    const dbRequest = indexedDB.open("AirGapCameraV50", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV51", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) { database.createObjectStore("photos", { keyPath: "id" }); }
@@ -816,7 +813,20 @@
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT";
                 if (itemTypeMarker === "QT") filePrefix = "QT_" + filePrefix; else if (itemTypeMarker === "FULL") filePrefix = "FULL_" + filePrefix;
-                const newItem = { id: "stitched_" + Date.now() + Math.floor(Math.random()*100), type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_GRP_${Date.now()}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), timestampStr: new Date().toLocaleString("vi-VN") };
+                
+                // 🛠️ PWA V51.0: Tính toán mốc thời gian thực tế sớm nhất của các ảnh quá trình thành phần để đồng bộ liên kết
+                let earliestTs = Date.now();
+                if (imgObjs && imgObjs.length > 0) { earliestTs = Math.min(...imgObjs.map(o => o.timestampMs || Date.now())); }
+
+                const newItem = { 
+                    id: "stitched_" + Date.now() + Math.floor(Math.random()*100), 
+                    type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", 
+                    name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_GRP_${Date.now()}.jpg`, 
+                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), 
+                    timestampMs: Date.now(), 
+                    timestampStr: new Date().toLocaleString("vi-VN"),
+                    qtTimeMs: earliestTs // Đánh dấu thời gian hoạt động của nhóm quá trình
+                };
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 let objIds = loaded.map(l => l.obj.id);
                 if (itemTypeMarker === "QT") repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
@@ -851,7 +861,21 @@
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT"; if (isQT) filePrefix = "QT_" + filePrefix;
                 const formatTime = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; };
-                const newItem = { id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), type: isQT ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), timestampStr: new Date().toLocaleString("vi-VN") };
+                
+                // 🛠️ PWA V51.0: Đóng băng ranh giới thời gian Start-End của phiên làm việc phục vụ bộ lọc liên kết nhóm
+                let sessionStartMs = Math.min(bObj.timestampMs, aObj.timestampMs);
+                let sessionEndMs = Math.max(bObj.timestampMs, aObj.timestampMs);
+
+                const newItem = { 
+                    id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), 
+                    type: isQT ? "STITCHED_QT" : "STITCHED", 
+                    name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`, 
+                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), 
+                    timestampMs: Date.now(), 
+                    timestampStr: new Date().toLocaleString("vi-VN"),
+                    sessionStartMs: sessionStartMs,
+                    sessionEndMs: sessionEndMs
+                };
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 if (isQT) repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id); else { repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id); }
                 deleteFromDB(bObj.id); deleteFromDB(aObj.id); updateUIState(); if (callback) callback(); if (showAlert) { renderPending(); renderGallery(); alert(`Đã ghép thành công:\n${newItem.name}`); } resolve();
@@ -987,7 +1011,7 @@
                     const canvas = document.createElement("canvas"); let w = img.width; let h = img.height; const maxDim = 1920;
                     if (w > maxDim || h > maxDim) { const ratio = Math.min(maxDim/w, maxDim/h); w = w * ratio; h = h * ratio; }
                     canvas.width = w; canvas.height = h; const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
-                    const photoObj = { id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: canvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined };
+                    const photoObj = { id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: canvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined, sessionStartMs: Date.now() - 2000, sessionEndMs: Date.now(), qtTimeMs: Date.now() };
                     if (type === "TRƯỚC") repoBefore.unshift(photoObj); else if (type === "SAU") repoAfter.unshift(photoObj); else if (type === "QUÁ TRÌNH") repoProcess.unshift(photoObj); else repoStitched.unshift(photoObj);
                     saveToDB(photoObj); updateUIState(); renderPending(); if (type === "STITCHED") renderGallery();
                 }; img.src = e.target.result;
@@ -1107,16 +1131,126 @@
         boxA.innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
     }
     
+    // 🛠️ CẬP NHẬT MỚI PWA V51.0: CẤU TRÚC LẠI KHO ẢNH HOÀN THIỆN THEO PHIÊN CÔNG TÁC TIẾN TRÌNH
     function renderGallery() {
-        const grid = document.getElementById("gallery-grid"); const emptyMsg = document.getElementById("gallery-empty-msg");
-        document.getElementById("select-all-checkbox").checked = false; document.getElementById("selected-counter").innerText = "Đã chọn: 0";
-        const showQT = document.getElementById("toggle-show-qt").checked; const itemsToRender = showQT ? repoStitched : repoStitched.filter(x => x.type !== "STITCHED_QT");
-        if (itemsToRender.length === 0) { grid.innerHTML = ""; emptyMsg.classList.remove("d-none"); return; }
-        emptyMsg.classList.add("d-none"); let html = "";
-        itemsToRender.forEach(item => {
-            const qtBadge = item.type === "STITCHED_QT" ? `<span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2;">QUÁ TRÌNH</span>` : "";
-            html += `<div class="col-12 col-sm-6" id="card_${item.id}"><div class="photo-card stitched shadow-sm">${qtBadge}<input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${item.id}" onchange="calculateSelection()"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-2"><div class="small fw-bold text-info text-break">${item.name}</div><div class="text-secondary" style="font-size:11px;">${item.timestampStr}</div></div></div></div>`;
-        }); grid.innerHTML = html;
+        const grid = document.getElementById("gallery-grid"); 
+        const emptyMsg = document.getElementById("gallery-empty-msg");
+        document.getElementById("select-all-checkbox").checked = false; 
+        document.getElementById("selected-counter").innerText = "Đã chọn: 0";
+        
+        const showQT = document.getElementById("toggle-show-qt").checked; 
+        
+        if (repoStitched.length === 0) {
+            grid.innerHTML = ""; 
+            emptyMsg.classList.remove("d-none"); 
+            return; 
+        }
+        emptyMsg.classList.add("d-none");
+
+        // Phân nhóm tệp ảnh đã ghép đôi (Trước/Sau) và ảnh ghép Quá Trình (QT)
+        const tsSessions = repoStitched.filter(x => x.type === "STITCHED");
+        const qtImages = repoStitched.filter(x => x.type === "STITCHED_QT");
+
+        // Sắp xếp các Phiên theo trình tự thời gian từ TRÊN xuống DƯỚI (Cũ nhất lên đầu, mới nhất xuống dưới)
+        tsSessions.sort((a, b) => {
+            const timeA = a.sessionStartMs || a.timestampMs || 0;
+            const timeB = b.sessionStartMs || b.timestampMs || 0;
+            return timeA - timeB; 
+        });
+
+        let html = "";
+        let matchedQtIds = new Set();
+
+        // Duyệt kết xuất từng khối Phiên Làm Việc độc lập
+        tsSessions.forEach((session, index) => {
+            let startRange = session.sessionStartMs || (session.timestampMs - 1000);
+            let endRange = session.sessionEndMs || session.timestampMs;
+
+            // Lọc các ảnh Quá trình thuộc phạm vi thời gian diễn ra của phiên này
+            let sessionQts = qtImages.filter(q => {
+                let qTime = q.qtTimeMs || q.timestampMs;
+                return qTime >= startRange && qTime <= endRange;
+            });
+
+            // Sắp xếp ảnh Quá Trình nội bộ theo mốc thời gian từ trước đến sau (Tăng dần)
+            sessionQts.sort((a, b) => (a.qtTimeMs || a.timestampMs) - (b.qtTimeMs || b.timestampMs));
+            sessionQts.forEach(q => matchedQtIds.add(q.id));
+
+            // Khởi tạo Card bọc ngoài cho từng Phiên hoạt động
+            html += `<div class="card bg-dark border-info mb-4 p-2 shadow-sm w-100">
+                <div class="card-header bg-black bg-opacity-50 text-info border-0 p-2 d-flex justify-content-between align-items-center rounded-top">
+                    <span class="fw-bold small text-uppercase"><i class="fa-solid fa-folder-open me-2"></i>Phiên ${index + 1}: ${session.name.split('_')[0] || 'Hiện trường'}</span>
+                    <span class="badge bg-secondary text-light px-2 py-1" style="font-size:10px;">${session.timestampStr || ''}</span>
+                </div>
+                <div class="card-body p-2 bg-black bg-opacity-25 rounded-bottom">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6" id="card_${session.id}">
+                            <div class="photo-card stitched shadow-sm position-relative border border-primary">
+                                <input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${session.id}" onchange="calculateSelection()">
+                                <img src="${session.dataUrl}" onclick="viewFullImage('${session.dataUrl}')">
+                                <div class="p-2 bg-dark">
+                                    <div class="small fw-bold text-primary text-break">${session.name}</div>
+                                    <div class="text-secondary" style="font-size:10px;"><i class="fa-solid fa-images me-1"></i> Ảnh Chốt Phiên (Trước/Sau)</div>
+                                </div>
+                            </div>
+                        </div>`;
+
+            // 2. Các ảnh ghép diễn tiến quá trình thực hiện theo dòng thời gian
+            if (showQT && sessionQts.length > 0) {
+                sessionQts.forEach(q => {
+                    html += `<div class="col-12 col-md-6" id="card_${q.id}">
+                        <div class="photo-card stitched shadow-sm position-relative border border-warning">
+                            <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span>
+                            <input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()">
+                            <img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')">
+                            <div class="p-2 bg-dark">
+                                    <div class="small fw-bold text-warning text-break">${q.name}</div>
+                                    <div class="text-secondary" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> Thống kê tiến độ</div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+            }
+
+            html += `   </div>
+                </div>
+            </div>`;
+        });
+
+        // 3. Khối hiển thị các ảnh Quá Trình mồ côi (Chưa được gán vào cặp Trước/Sau nào)
+        if (showQT) {
+            const orphanQts = qtImages.filter(q => !matchedQtIds.has(q.id));
+            if (orphanQts.length > 0) {
+                orphanQts.sort((a, b) => (a.qtTimeMs || a.timestampMs) - (b.qtTimeMs || b.timestampMs));
+                
+                html += `<div class="card bg-dark border-warning mb-4 p-2 shadow-sm w-100">
+                    <div class="card-header bg-black bg-opacity-50 text-warning border-0 p-2 rounded-top">
+                        <span class="fw-bold small text-uppercase"><i class="fa-solid fa-triangle-exclamation me-2"></i>Ảnh Quá Trình Chưa Ghép Cặp Phiên</span>
+                    </div>
+                    <div class="card-body p-2 bg-black bg-opacity-25 rounded-bottom">
+                        <div class="row g-3">`;
+
+                orphanQts.forEach(q => {
+                    html += `<div class="col-12 col-sm-6" id="card_${q.id}">
+                        <div class="photo-card stitched shadow-sm position-relative border border-warning">
+                            <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span>
+                            <input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()">
+                            <img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')">
+                            <div class="p-2 bg-dark">
+                                <div class="small fw-bold text-warning text-break">${q.name}</div>
+                                <div class="text-secondary" style="font-size:11px;">${q.timestampStr}</div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+
+                html += `       </div>
+                    </div>
+                </div>`;
+            }
+        }
+        
+        grid.innerHTML = html;
     }
 
     // --- MODULE QUAY VIDEO CAO CẤP ---
