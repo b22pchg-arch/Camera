@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V52.1)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V52.2)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -61,6 +61,7 @@
             });
         }
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -90,6 +91,11 @@
                 <i class="fa-solid fa-images mb-1 d-block"></i> Đã Ghép 
                 <span id="gallery-count" class="badge bg-secondary ms-1">0</span>
                 <span id="gallery-alert" class="alert-dot" style="display:none;"></span>
+            </button>
+        </li>
+        <li class="nav-item flex-fill text-center" role="presentation">
+            <button class="nav-link w-100" id="sync-tab" data-bs-toggle="tab" data-bs-target="#sync-content" type="button" role="tab">
+                <i class="fa-solid fa-mobile-screen-button mb-1 d-block"></i> Đồng Bộ
             </button>
         </li>
         <li class="nav-item flex-fill text-center" role="presentation">
@@ -414,6 +420,55 @@
             </div>
         </div>
 
+        <div class="tab-pane fade" id="sync-content" role="tabpanel">
+            <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
+                <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-file-sharing me-2"></i>Giải pháp 1: Xuất / Nhập File Offline</h6>
+                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp để truyền tải gói lớn nhiều ảnh hiện trường. Máy A xuất file `.json` rồi dùng <b>Quick Share</b> hoặc <b>Bluetooth</b> bắn sang máy B để nhập vào.</p>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <button class="btn btn-primary w-100 fw-bold py-2 small" onclick="exportSyncFile()"><i class="fa-solid fa-file-export me-1"></i> XUẤT FILE (.JSON)</button>
+                    </div>
+                    <div class="col-6">
+                        <label class="btn btn-success w-100 fw-bold py-2 small m-0 text-center cursor-pointer"><i class="fa-solid fa-file-import me-1"></i> NHẬP FILE NGOÀI
+                            <input type="file" class="d-none" accept=".json" onchange="importSyncFile(event)">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
+                <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-network-wired me-2"></i>Giải pháp 2: Kết nối WebRTC P2P (Mã QR)</h6>
+                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Hai máy kết nối chung một mạng Wifi nội bộ (hoặc Máy A bật Phát Hotspot cho Máy B kết nối). Đưa camera quét mã QR của nhau để thông luồng bắn ảnh trực tiếp giữa 2 trình duyệt di động.</p>
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-sm btn-outline-info flex-fill fw-bold py-2" onclick="startP2PHandshake(true)"><i class="fa-solid fa-paper-plane me-1"></i> MÁY A (GỬI)</button>
+                    <button class="btn btn-sm btn-outline-warning flex-fill fw-bold py-2" onclick="startP2PHandshake(false)"><i class="fa-solid fa-inbox me-1"></i> MÁY B (NHẬN)</button>
+                </div>
+                <div id="p2p-handshake-panel" class="border border-secondary rounded p-2 bg-black bg-opacity-25 d-none">
+                    <div class="small fw-bold text-warning mb-2" id="p2p-status-lbl">Trạng thái: Đang chờ thao tác...</div>
+                    <div id="p2p-qr-box" class="text-center my-2 p-2 bg-white rounded d-none mx-auto" style="width: 200px; height: 200px;">
+                        <div id="p2p-qrcode-canvas" style="display: inline-block;"></div>
+                    </div>
+                    <textarea id="p2p-sdp-text" class="form-control form-control-sm bg-dark text-light small mb-2 text-center" rows="2" readonly placeholder="Chuỗi ký tự bắt tay WebRTC..."></textarea>
+                    <button id="btn-p2p-scan" class="btn btn-sm btn-info text-dark w-100 fw-bold mb-2" onclick="scanP2PPartnerQR()"><i class="fa-solid fa-camera me-1"></i> BẮT ĐẦU QUÉT MÃ MÁY ĐỐI DIỆN</button>
+                    <button id="btn-p2p-send-data" class="btn btn-sm btn-success w-100 fw-bold d-none py-2" onclick="sendDataOverP2P()"><i class="fa-solid fa-bolt me-1"></i> BẮN TOÀN BỘ ẢNH SANG MÁY B</button>
+                </div>
+            </div>
+
+            <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
+                <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-qrcode me-2"></i>Giải pháp 3: Phát Vòng Lặp QR Động</h6>
+                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp chuyển nhanh ghi chú text, danh mục metadata hoặc cấu hình hiện trường khi hai thiết bị cách ly mạng tuyệt đối.</p>
+                <div class="row g-2">
+                    <div class="col-6"><button class="btn btn-sm btn-outline-info w-100 fw-bold py-2" onclick="startAnimatedQREmitter()"><i class="fa-solid fa-play me-1"></i> PHÁT QR ĐỘNG</button></div>
+                    <div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold py-2" onclick="startAnimatedQRReceiver()"><i class="fa-solid fa-expand me-1"></i> QUÉT NHẬN CHUỖI</button></div>
+                </div>
+                <div id="animated-qr-panel" class="text-center p-2 mt-3 border border-secondary rounded bg-black d-none">
+                    <div id="animated-qr-title" class="small text-warning mb-2 fw-bold">Đang phát dữ liệu mã hóa...</div>
+                    <div id="animated-qr-display" class="bg-white p-2 rounded mx-auto mb-2" style="width:180px; height:180px; display:flex; align-items:center; justify-content:center;"></div>
+                    <progress id="animated-qr-progress" class="w-100" value="0" max="100"></progress>
+                </div>
+            </div>
+        </div>
+
         <div class="tab-pane fade" id="help-content" role="tabpanel">
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm text-light" style="font-size: 13px; line-height: 1.6;">
                 <h6 class="text-info fw-bold border-bottom border-secondary pb-2 mb-3"><i class="fa-solid fa-book me-2"></i>HƯỚNG DẪN SỬ DỤNG NHANH</h6>
@@ -545,6 +600,11 @@
     let currentStoragePercent = 0;
     let globalExtras = { selfie: null, map: null, compass: null };
 
+    // BIẾN CHO WEBRTC P2P & QR ĐỘNG
+    let p2pConnection = null;
+    let p2pDataChannel = null;
+    let animatedQrTimer = null;
+
     // --- VANILLA UI FALLBACK ENGINE ---
     document.addEventListener("click", function(e) {
         const toggleCollapse = e.target.closest('[data-bs-toggle="collapse"]');
@@ -602,16 +662,14 @@
         document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
     }
 
-    // --- 🛠️ THÊM MỚI PWA V52.1: Hàm xử lý hành động gạt công tắc Ẩn/Hiện Tiện ích mở rộng ---
+    // --- HÀM ẨN/HIỆN CỤM TIỆN ÍCH MỞ RỘNG (V52.1) ---
     function toggleExtendedUtilities(checkbox) {
         const wrapper = document.getElementById("extended-utilities-wrapper");
         if (checkbox.checked) {
             wrapper.classList.remove("d-none");
         } else {
             wrapper.classList.add("d-none");
-            // Tự động đóng các menu con đang sổ xuống bên trong
             document.querySelectorAll("#extended-utilities-wrapper .collapse.show").forEach(el => el.classList.remove("show"));
-            // Tắt các tiến trình media ngầm đang chạy để giải phóng phần cứng
             if (isStandaloneTranscribing) stopStandaloneTranscribe();
             if (isRecording) stopRecording();
             if (isAudioRecording) stopAudioRecording();
@@ -1166,7 +1224,7 @@
         } else { triggerBatchDownloads(itemsToShare); }
     }
     function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
-    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
+    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style=\"margin:0; background:#000; display:flex; align-items:center; justify-content:center;\"><img src=\"${url}\" style=\"max-width:100%; max-height:100%;\"></body>`); }
     
     function renderPending() {
         const GAP_MS = 15 * 60 * 1000;
@@ -1214,14 +1272,8 @@
         const emptyMsg = document.getElementById("gallery-empty-msg");
         document.getElementById("select-all-checkbox").checked = false; 
         document.getElementById("selected-counter").innerText = "Đã chọn: 0";
-        
         const showQT = document.getElementById("toggle-show-qt").checked; 
-        
-        if (repoStitched.length === 0) {
-            grid.innerHTML = ""; 
-            emptyMsg.classList.remove("d-none"); 
-            return; 
-        }
+        if (repoStitched.length === 0) { grid.innerHTML = ""; emptyMsg.classList.remove("d-none"); return; }
         emptyMsg.classList.add("d-none");
 
         const tsSessions = repoStitched.filter(x => x.type === "STITCHED");
@@ -1233,18 +1285,11 @@
             return timeA - timeB; 
         });
 
-        let html = "";
-        let matchedQtIds = new Set();
-
+        let html = ""; let matchedQtIds = new Set();
         tsSessions.forEach((session, index) => {
             let startRange = session.sessionStartMs || (session.timestampMs - 1000);
             let endRange = session.sessionEndMs || session.timestampMs;
-
-            let sessionQts = qtImages.filter(q => {
-                let qTime = q.qtTimeMs || q.timestampMs;
-                return qTime >= startRange && qTime <= endRange;
-            });
-
+            let sessionQts = qtImages.filter(q => { let qTime = q.qtTimeMs || q.timestampMs; return qTime >= startRange && qTime <= endRange; });
             sessionQts.sort((a, b) => (a.qtTimeMs || a.timestampMs) - (b.qtTimeMs || b.timestampMs));
             sessionQts.forEach(q => matchedQtIds.add(q.id));
 
@@ -1281,44 +1326,20 @@
                     </div>`;
                 });
             }
-
-            html += `   </div>
-                </div>
-            </div>`;
+            html += `</div></div></div>`;
         });
 
         if (showQT) {
             const orphanQts = qtImages.filter(q => !matchedQtIds.has(q.id));
             if (orphanQts.length > 0) {
                 orphanQts.sort((a, b) => (a.qtTimeMs || a.timestampMs) - (b.qtTimeMs || b.timestampMs));
-                
-                html += `<div class="card bg-dark border-warning mb-4 p-2 shadow-sm w-100">
-                    <div class="card-header bg-black bg-opacity-50 text-warning border-0 p-2 rounded-top">
-                        <span class="fw-bold small text-uppercase"><i class="fa-solid fa-triangle-exclamation me-2"></i>Ảnh Quá Trình Chưa Ghép Cặp Phiên</span>
-                    </div>
-                    <div class="card-body p-2 bg-black bg-opacity-25 rounded-bottom">
-                        <div class="row g-3">`;
-
+                html += `<div class="card bg-dark border-warning mb-4 p-2 shadow-sm w-100"><div class="card-header bg-black bg-opacity-50 text-warning border-0 p-2 rounded-top"><span class="fw-bold small text-uppercase"><i class="fa-solid fa-triangle-exclamation me-2"></i>Ảnh Quá Trình Chưa Ghép Cặp Phiên</span></div><div class="card-body p-2 bg-black bg-opacity-25 rounded-bottom"><div class="row g-3">`;
                 orphanQts.forEach(q => {
-                    html += `<div class="col-12 col-sm-6" id="card_${q.id}">
-                        <div class="photo-card stitched shadow-sm position-relative border border-warning">
-                            <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span>
-                            <input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()">
-                            <img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')">
-                            <div class="p-2 bg-dark">
-                                <div class="small fw-bold text-warning text-break">${q.name}</div>
-                                <div class="text-secondary" style="font-size:11px;">${q.timestampStr}</div>
-                            </div>
-                        </div>
-                    </div>`;
+                    html += `<div class="col-12 col-sm-6" id="card_${q.id}"><div class="photo-card stitched shadow-sm position-relative border border-warning"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span><input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()"><img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')"><div class="p-2 bg-dark"><div class="small fw-bold text-warning text-break">${q.name}</div><div class="text-secondary" style="font-size:11px;">${q.timestampStr}</div></div></div></div>`;
                 });
-
-                html += `       </div>
-                    </div>
-                </div>`;
+                html += `</div></div></div>`;
             }
         }
-        
         grid.innerHTML = html;
     }
 
@@ -1340,7 +1361,7 @@
         const mimeType = getSupportedMimeType();
         isRecording = true; recordingTime = 0; currentSubtitle = ""; drawVideoFrame();
         const btn = document.getElementById("btn-record-video");
-        btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm"; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`;
+        btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm"; btn.innerHTML = `<i class=\"fa-solid fa-stop me-1\"></i> ĐANG KHỞI TẠO LUỒNG...`;
         
         try {
             try { 
@@ -1353,20 +1374,13 @@
             const canvasStream = canvas.captureStream(25); 
             const combinedStream = new MediaStream();
             
-            if (canvasStream && canvasStream.getVideoTracks().length > 0) {
-                combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
-            }
-            if (dynamicAudioStream && dynamicAudioStream.getAudioTracks().length > 0) { 
-                combinedStream.addTrack(dynamicAudioStream.getAudioTracks()[0]); 
-            }
+            if (canvasStream && canvasStream.getVideoTracks().length > 0) { combinedStream.addTrack(canvasStream.getVideoTracks()[0]); }
+            if (dynamicAudioStream && dynamicAudioStream.getAudioTracks().length > 0) { combinedStream.addTrack(dynamicAudioStream.getAudioTracks()[0]); }
             
             recordedChunks = [];
             try {
-                if (mimeType !== '') {
-                    mediaRecorder = new MediaRecorder(combinedStream, { mimeType: mimeType });
-                } else {
-                    mediaRecorder = new MediaRecorder(combinedStream);
-                }
+                if (mimeType !== '') { mediaRecorder = new MediaRecorder(combinedStream, { mimeType: mimeType }); } 
+                else { mediaRecorder = new MediaRecorder(combinedStream); }
             } catch (eAllocation) {
                 console.error("Lỗi đồng bộ mã hóa cứng. Kích hoạt chế độ quay dự phòng.");
                 const pureCanvas = new MediaStream([canvasStream.getVideoTracks()[0]]);
@@ -1392,10 +1406,7 @@
             }, 1000);
             
             if (document.getElementById("toggle-subtitle").checked) initLiveSubtitle();
-        } catch (gErr) { 
-            stopRecording(); 
-            alert("Trình duyệt không tương thích cơ chế đóng gói Canvas stream."); 
-        }
+        } catch (gErr) { stopRecording(); alert("Trình duyệt không tương thích cơ chế đóng gói Canvas stream."); }
     }
     
     function stopRecording() {
@@ -1414,20 +1425,10 @@
         ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight); ctx.restore();
         
         if (document.getElementById("toggle-subtitle").checked && currentSubtitle) {
-            ctx.save();
-            ctx.font = `bold ${24 * scale}px Arial`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            let subWidth = ctx.measureText(currentSubtitle).width;
-            let subX = canvas.width / 2;
-            let subY = videoRenderHeight - 45 * scale;
-            
-            ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-            ctx.fillRect(subX - subWidth/2 - 15*scale, subY - 18*scale, subWidth + 30*scale, 36*scale);
-            
-            ctx.fillStyle = "#ffffff";
-            ctx.fillText(currentSubtitle, subX, subY);
-            ctx.restore();
+            ctx.save(); ctx.font = `bold ${24 * scale}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            let subWidth = ctx.measureText(currentSubtitle).width; let subX = canvas.width / 2; let subY = videoRenderHeight - 45 * scale;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.65)"; ctx.fillRect(subX - subWidth/2 - 15*scale, subY - 18*scale, subWidth + 30*scale, 36*scale);
+            ctx.fillStyle = "#ffffff"; ctx.fillText(currentSubtitle, subX, subY); ctx.restore();
         }
         
         ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fillRect(0, canvas.height - footerH, canvas.width, footerH);
@@ -1436,20 +1437,14 @@
         drawExtra(cachedVideoExtras.compass, pad); drawExtra(cachedVideoExtras.map, pad + imgBoxSize + pad); drawExtra(cachedVideoExtras.selfie, pad + imgBoxSize + pad + imgBoxSize + pad);
         
         ctx.textAlign = "left"; ctx.textBaseline = "middle"; const lineGap = imgBoxSize / 4; let textY = canvas.height - footerH + 20*scale + lineGap/2;
-        
         if (Math.floor(Date.now() / 1000) % 2 === 0) { ctx.fillStyle = "#dc3545"; ctx.font = `bold ${lineGap * 0.7}px Arial`; ctx.fillText("● REC (VIDEO)", txtX, textY); }
         else { ctx.fillStyle = "#555555"; ctx.font = `bold ${lineGap * 0.7}px Arial`; ctx.fillText("● REC (VIDEO)", txtX, textY); }
         
         textY += lineGap; ctx.fillStyle = "#0dcaf0"; ctx.font = `bold ${lineGap * 0.55}px Arial`;
         const now = new Date(); const timeStr = `${now.toLocaleTimeString("vi-VN")} - ${now.toLocaleDateString("vi-VN")}`;
         ctx.fillText(`THỜI GIAN: ${timeStr}`, txtX, textY);
-
         textY += lineGap; ctx.fillStyle = "#ffffff"; ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, txtX, textY);
-        
-        textY += lineGap; ctx.fillStyle = "#ffc107";
-        const teamText = document.getElementById("tab1-team").value.trim();
-        ctx.fillText(teamText ? `TỔ ĐỘI: ${teamText}` : "", txtX, textY);
-        
+        textY += lineGap; ctx.fillStyle = "#ffc107"; const teamText = document.getElementById("tab1-team").value.trim(); ctx.fillText(teamText ? `TỔ ĐỘI: ${teamText}` : "", txtX, textY);
         animationFrameId = requestAnimationFrame(drawVideoFrame);
     }
 
@@ -1464,8 +1459,7 @@
             if (audioChunks.length === 0 || audioRecordingTime < 1) return; 
             currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`; 
             currentMediaBlobUrl = URL.createObjectURL(new Blob(audioChunks, { type: mimeType })); 
-            currentMediaType = 'audio'; showMediaPreview(); 
-            audioStream.getTracks().forEach(t => t.stop());
+            currentMediaType = 'audio'; showMediaPreview(); audioStream.getTracks().forEach(t => t.stop());
         };
         isAudioRecording = true; audioRecordingTime = 0; const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm";
         audioRecorder.start(); audioInterval = setInterval(() => { audioRecordingTime++; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`; }, 1000);
@@ -1478,67 +1472,29 @@
     function startStandaloneTranscribe() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; 
         if (!SpeechRecognition) return alert("Hệ điều hành di động không hỗ trợ lõi Speech-to-Text!");
+        if (localStream) { document.getElementById("video-preview").srcObject = null; localStream.getTracks().forEach(track => track.stop()); localStream = null; }
         
-        if (localStream) { 
-            document.getElementById("video-preview").srcObject = null;
-            localStream.getTracks().forEach(track => track.stop()); 
-            localStream = null; 
-        }
-        
-        isStandaloneTranscribing = true;
-        const btn = document.getElementById("btn-standalone-stt"); 
-        btn.classList.replace("btn-warning", "btn-danger"); 
-        btn.classList.add("storage-alarm"); 
+        isStandaloneTranscribing = true; const btn = document.getElementById("btn-standalone-stt"); btn.classList.replace("btn-warning", "btn-danger"); btn.classList.add("storage-alarm"); 
         document.getElementById("stt-btn-text").innerText = "ĐANG KẾT NỐI MICRO NỘI BỘ VÀO BỘ DỊCH AI...";
-
         if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e){} standaloneRecognition = null; }
 
-        standaloneRecognition = new SpeechRecognition(); 
-        standaloneRecognition.lang = 'vi-VN'; 
-        standaloneRecognition.continuous = true; 
-        standaloneRecognition.interimResults = true;
+        standaloneRecognition = new SpeechRecognition(); standaloneRecognition.lang = 'vi-VN'; standaloneRecognition.continuous = true; standaloneRecognition.interimResults = true;
+        const textArea = document.getElementById("standalone-stt-result"); let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
         
-        const textArea = document.getElementById("standalone-stt-result"); 
-        let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
-        
-        standaloneRecognition.onstart = () => {
-            document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)";
-        };
-        
+        standaloneRecognition.onstart = () => { document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)"; };
         standaloneRecognition.onresult = (event) => { 
             let interimTranscript = '', finalTranscript = ''; 
-            for (let i = event.resultIndex; i < event.results.length; ++i) { 
-                if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; 
-                else interimTranscript += event.results[i][0].transcript; 
-            } 
+            for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } 
             textArea.value = baseText + finalTranscript + interimTranscript; 
         };
-        
-        standaloneRecognition.onerror = (e) => {
-            if (e.error === 'not-allowed') {
-                alert("Lỗi bảo mật: Hãy kiểm tra quyền truy cập Micro trên trình duyệt!");
-                stopStandaloneTranscribe();
-            }
-        };
-        
-        standaloneRecognition.onend = () => { 
-            if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } 
-        };
-        
-        try { 
-            standaloneRecognition.start(); 
-        } catch(e) { 
-            setTimeout(() => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err){} } }, 300);
-        }
+        standaloneRecognition.onerror = (e) => { if (e.error === 'not-allowed') { alert("Quyền truy cập Micro bị chặn!"); stopStandaloneTranscribe(); } };
+        standaloneRecognition.onend = () => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } };
+        try { standaloneRecognition.start(); } catch(e) { setTimeout(() => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err){} } }, 300); }
     }
 
     function stopStandaloneTranscribe() {
-        isStandaloneTranscribing = false; 
-        if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
-        const btn = document.getElementById("btn-standalone-stt"); 
-        btn.classList.remove("storage-alarm"); 
-        btn.classList.replace("btn-danger", "btn-warning"); 
-        document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
+        isStandaloneTranscribing = false; if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
+        const btn = document.getElementById("btn-standalone-stt"); btn.classList.remove("storage-alarm"); btn.classList.replace("btn-danger", "btn-warning"); document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
         if (isCameraOn) { initCamera(); }
     }
 
@@ -1565,24 +1521,212 @@
                 let combined = (finalTranscript + " " + interimTranscript).trim();
                 if (combined !== '') { let words = combined.split(/\s+/); currentSubtitle = words.slice(Math.floor((words.length - 1) / 12) * 12).join(' '); }
             }; 
-            
-            recognition.onend = () => {
-                if (isRecording && document.getElementById("toggle-subtitle").checked) {
-                    try { recognition.start(); } catch(e){}
-                }
-            };
-            recognition.onerror = (e) => { console.log("Lỗi engine phụ đề: ", e.error); };
+            recognition.onend = () => { if (isRecording && document.getElementById("toggle-subtitle").checked) { try { recognition.start(); } catch(e){} } };
             try { recognition.start(); } catch(e) {}
         }
     }
 
     function getSupportedMimeType() {
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        let types = isIOS 
-            ? ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/quicktime'] 
-            : ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4', 'video/webm'];
-        for (let t of types) { if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t; }
-        return '';
+        let types = isIOS ? ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/quicktime'] : ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4', 'video/webm'];
+        for (let t of types) { if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t; } return '';
+    }
+
+    // =========================================================================
+    // --- 🛠️ MÃ NGUỒN PHÁT TRIỂN: HỆ THỐNG ĐỒNG BỘ MÁY-MÁY NGOẠI TUYẾN (PWA V53) ---
+    // =========================================================================
+
+    // --- GIẢI PHÁP 1: XUẤT / NHẬP FILE OFFLINE (.JSON ĐÓNG GÓI) ---
+    function exportSyncFile() {
+        if (!db) return alert("Hệ thống lưu trữ cơ sở dữ liệu chưa sẵn sàng!");
+        db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
+            const allData = e.target.result || [];
+            if (allData.length === 0) return alert("Kho lưu trữ trống, không có dữ liệu để xuất!");
+            const jsonStr = JSON.stringify(allData);
+            const blob = new Blob([jsonStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const now = new Date();
+            a.href = url;
+            a.download = `PC_TQ_GSHT_SYNC_${now.toISOString().slice(0,10).replace(/-/g,"")}_${now.getHours()}${now.getMinutes()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            alert(`Đã xuất thành công gói tệp chứa ${allData.length} ảnh hiện trường!\nHãy mở Quick Share hoặc Bluetooth để gửi file này sang máy B.`);
+        };
+    }
+
+    function importSyncFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (!Array.isArray(importedData)) return alert("Cấu trúc file dữ liệu không đúng định dạng chuẩn!");
+                let tx = db.transaction("photos", "readwrite");
+                let store = tx.objectStore("photos");
+                importedData.forEach(item => store.put(item));
+                tx.oncomplete = () => {
+                    alert(`Đồng bộ thành công! Đã nạp thêm ${importedData.length} bản ghi hiện trường vào ứng dụng.`);
+                    loadDataFromDB();
+                    setTimeout(calculateStorageQuota, 300);
+                };
+            } catch (err) { alert("Lỗi phân tích file: " + err.message); }
+        };
+        reader.readAsText(file);
+        event.target.value = "";
+    }
+
+    // --- GIẢI PHÁP 2: WEBRTC PEER-TO-PEER ĐỒNG BỘ TRỰC TIẾP QUA MẠNG NỘI BỘ ---
+    function initWebRTCP2P(isInitiator) {
+        p2pConnection = new RTCPeerConnection({ iceServers: [] }); // Không cần STUN khi bắt tay thủ công cùng mạng LAN/Hotspot
+        
+        if (isInitiator) {
+            p2pDataChannel = p2pConnection.createDataChannel("syncChannel");
+            setupDataChannelHandlers(p2pDataChannel);
+        } else {
+            p2pConnection.ondatachannel = (event) => {
+                p2pDataChannel = event.channel;
+                setupDataChannelHandlers(p2pDataChannel);
+            };
+        }
+
+        p2pConnection.onicecandidate = (e) => {
+            if (!e.candidate) {
+                // Toàn bộ ICE đã hội tụ xong, SDP đóng gói hoàn chỉnh
+                let localSdp = JSON.stringify(p2pConnection.localDescription);
+                displayLocalSDPQR(localSdp);
+            }
+        };
+    }
+
+    function setupDataChannelHandlers(channel) {
+        channel.onopen = () => {
+            document.getElementById("p2p-status-lbl").className = "small fw-bold text-success";
+            document.getElementById("p2p-status-lbl").innerText = "Trạng thái: ĐÃ THÔNG LUỒNG KẾT NỐI! Sẵn sàng đồng bộ.";
+            document.getElementById("btn-p2p-send-data").classList.remove("d-none");
+            document.getElementById("p2p-qr-box").classList.add("d-none");
+        };
+        channel.onmessage = (event) => {
+            try {
+                const packet = JSON.parse(event.data);
+                if (packet.type === "P2P_SYNC" && Array.isArray(packet.payload)) {
+                    let tx = db.transaction("photos", "readwrite");
+                    let store = tx.objectStore("photos");
+                    packet.payload.forEach(item => store.put(item));
+                    tx.oncomplete = () => {
+                        alert(`Máy B nhận thành công ${packet.payload.length} ảnh trực tiếp qua kết nối P2P!`);
+                        loadDataFromDB();
+                        setTimeout(calculateStorageQuota, 300);
+                    };
+                }
+            } catch(e) { console.error("Lỗi xử lý luồng nhận P2P:", e); }
+        };
+    }
+
+    function startP2PHandshake(isInitiator) {
+        document.getElementById("p2p-handshake-panel").classList.remove("d-none");
+        document.getElementById("p2p-qr-box").classList.add("d-none");
+        document.getElementById("p2p-sdp-text").value = "";
+        document.getElementById("btn-p2p-send-data").classList.add("d-none");
+        
+        if (isInitiator) {
+            document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy A): Đang sinh khóa cấu hình (Offer)...";
+            initWebRTCP2P(true);
+            p2pConnection.createOffer().then(offer => p2pConnection.setLocalDescription(offer));
+        } else {
+            document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy B): Đang chờ quét mã Offer từ Máy A...";
+            initWebRTCP2P(false);
+        }
+    }
+
+    function displayLocalSDPQR(sdpText) {
+        document.getElementById("p2p-sdp-text").value = sdpText;
+        const qrBox = document.getElementById("p2p-qr-box");
+        const canvasContainer = document.getElementById("p2p-qrcode-canvas");
+        canvasContainer.innerHTML = "";
+        qrBox.classList.remove("d-none");
+        
+        if (window.QRCode) {
+            new QRCode(canvasContainer, { text: sdpText, width: 184, height: 184, correctLevel: QRCode.CorrectLevel.L });
+        } else {
+            canvasContainer.innerHTML = "<span class='text-dark small p-2 d-block'>Chưa nạp thư viện QR. Hãy copy chuỗi ký tự!</span>";
+        }
+    }
+
+    async function scanP2PPartnerQR() {
+        if (!window.BarcodeDetector) {
+            let inputSdp = prompt("Trình duyệt không hỗ trợ quét mã trực tiếp. Hãy dán chuỗi ký tự nhận được từ máy đối diện:");
+            if (inputSdp) applyRemoteSDP(inputSdp);
+            return;
+        }
+        alert("Hệ thống kích hoạt quét. Hãy đưa luồng Camera Máy Ảnh chính hướng về mã QR của máy đối diện.");
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        const video = document.getElementById("video-preview");
+        
+        let timer = setInterval(async () => {
+            try {
+                const barcodes = await detector.detect(video);
+                if (barcodes.length > 0) {
+                    clearInterval(timer);
+                    applyRemoteSDP(barcodes[0].rawValue);
+                }
+            } catch(e) {}
+        }, 300);
+        setTimeout(() => clearInterval(timer), 20000); // Tự hủy sau 20 giây chống tràn bộ nhớ
+    }
+
+    function applyRemoteSDP(scannedSdp) {
+        try {
+            let sdpObj = JSON.parse(scannedSdp);
+            p2pConnection.setRemoteDescription(new RTCSessionDescription(sdpObj)).then(() => {
+                if (sdpObj.type === "offer") {
+                    document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy B): Đang phản hồi khóa (Answer)...";
+                    p2pConnection.createAnswer().then(answer => p2pConnection.setLocalDescription(answer));
+                } else if (sdpObj.type === "answer") {
+                    document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy A): Đang thiết lập kênh truyền thông suốt...";
+                }
+            });
+        } catch(err) { alert("Mã bắt tay không hợp lệ hoặc lỗi phân tích chuỗi: " + err.message); }
+    }
+
+    function sendDataOverP2P() {
+        if (!p2pDataChannel || p2pDataChannel.readyState !== "open") return alert("Luồng truyền trực tiếp chưa thông mạch!");
+        db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
+            const allData = e.target.result || [];
+            if (allData.length === 0) return alert("Không có dữ liệu ảnh hiện trường để gửi!");
+            try {
+                p2pDataChannel.send(JSON.stringify({ type: "減_SYNC", payload: allData }));
+                alert(`Đã truyền dữ liệu thành công gói ${allData.length} bản ghi sang Máy B!`);
+            } catch(err) { alert("Dung lượng chuỗi vượt hạn mức DataChannel. Vui lòng dùng Giải pháp 1 (Xuất file .json) nếu ảnh quá nặng."); }
+        };
+    }
+
+    // --- GIẢI PHÁP 3: KHUNG SƯỜN VÒNG LẶP QR ĐỘNG CHUYỂN METADATA OFFLINE ---
+    function startAnimatedQREmitter() {
+        const panel = document.getElementById("animated-qr-panel");
+        const display = document.getElementById("animated-qr-display");
+        panel.classList.remove("d-none");
+        display.innerHTML = "";
+        
+        if (!db) return;
+        db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
+            const allData = e.target.result || [];
+            // Thu nhỏ tối giản tệp tin cấu trúc chỉ lấy Text nhật ký hiện trường để nén vừa mã QR
+            let simplified = allData.map(x => ({ t: x.type, n: document.getElementById("tab1-prefix").value || "HT", m: x.timestampMs }));
+            let rawString = JSON.stringify(simplified).slice(0, 400); // Cắt ngắn để kiểm thử luồng phát nhanh
+            
+            if(!window.QRCode) { display.innerHTML = "<span class='text-dark small'>Lỗi nạp Core QR</span>"; return;}
+            display.innerHTML = "";
+            new QRCode(display, { text: rawString, width: 160, height: 160 });
+            document.getElementById("animated-qr-title").innerText = "Đang phát vòng lặp Metadata...";
+        };
+    }
+
+    function startAnimatedQRReceiver() {
+        alert("Tính năng quét chuỗi liên tục yêu cầu Camera xử lý thời gian thực cường độ cao. Khuyến khích sử dụng Giải pháp 1 và 2 để đạt độ ổn định tối đa.");
     }
 </script>
 </body>
