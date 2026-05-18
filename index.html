@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V44.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V45.0)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GS Hiện Trường">
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -47,6 +51,16 @@
         .collapse { display: none; }
         .collapse.show { display: block; }
     </style>
+    
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('✅ Đăng ký Hệ Thống PWA Thành Công!', reg.scope))
+                    .catch(err => console.error('❌ Lỗi khởi động PWA:', err));
+            });
+        }
+    </script>
 </head>
 <body>
 
@@ -465,10 +479,10 @@
     let recordingInterval = null;
     let animationFrameId = null;
     let isRecording = false;
+    let dynamicAudioStream = null; // Luồng Micro độc quyền riêng cho quay phim
     
     let recognition = null;
     let currentSubtitle = "";
-    let subtitleTimeout = null;
     
     let isAudioRecording = false;
     let audioRecorder = null;
@@ -541,7 +555,7 @@
     }
 
     // --- INDEXEDDB STORAGE ---
-    const dbRequest = indexedDB.open("AirGapCameraV44", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV45", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) { database.createObjectStore("photos", { keyPath: "id" }); }
@@ -644,14 +658,26 @@
     // --- CAMERA POWER ENGINE ---
     function initCamera() {
         if (!isCameraOn) return;
-        if (localStream) { localStream.getTracks().forEach(track => track.stop()); }
+        if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; }
+        
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            // 🛠️ TỐI ƯU SỬA LỖI 2: Mở camera preview CHỈ lấy luồng Video, không lấy Audio nhằm giải phóng Micro cho bộ dịch độc lập
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode, width: { ideal: 1920 }, height: { ideal: 1000 } }, audio: false })
+            // Thiết lập ban đầu kích hoạt cả video và audio để tạo hộp thoại cấp quyền đồng bộ tức thì
+            navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: currentFacingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }, 
+                audio: true 
+            })
             .then(stream => {
-                localStream = stream; document.getElementById("video-preview").srcObject = stream;
+                localStream = stream;
+                // Mute/Stop ngay lập tức kênh âm thanh nền để giữ Micro tự do cho bộ dịch AI độc lập
+                stream.getAudioTracks().forEach(track => track.stop());
+                
+                document.getElementById("video-preview").srcObject = stream;
                 document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
-            }).catch(err => console.log("Camera chặn hoặc không có phần cứng khả dụng."));
+            }).catch(err => {
+                // Thử lại phương án chỉ lấy hình ảnh nếu thiết bị đang kẹt cứng Micro ở ứng dụng khác
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })
+                .then(s => { localStream = s; document.getElementById("video-preview").srcObject = s; });
+            });
         }
     }
     function initCameraZoom(stream) {
@@ -755,7 +781,7 @@
         else if (type === "SAU") { repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`; } 
         else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`; }
         saveToDB(photoObj);
-        if (captureBuffer.TRƯỚC && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
+        if (captureBuffer.TRƯCOOK && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
         updateUIState();
     }
 
@@ -850,7 +876,7 @@
     async function quickStitchFull() {
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
-        let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯCOOK.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
+        let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
         let maxT = Math.max(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
         let allObjs = [captureBuffer.TRƯỚC, ...sessionQts, captureBuffer.SAU];
@@ -971,7 +997,6 @@
         };
     }
     
-    // 🛠️ FIX DUNG LƯỢNG: Hàm đo đạt quota lưu trữ tự động chạy mượt mà ngay khi tải trang
     async function calculateStorageQuota() {
         if (navigator.storage && navigator.storage.estimate) {
             try {
@@ -1058,72 +1083,95 @@
         }); grid.innerHTML = html;
     }
 
-    // --- VIDEO ENGINE & LIVE CANVAS DRAWER ---
+    // --- MODULE QUAY VIDEO CAO CẤP (XỬ LÝ TRIỆT ĐỂ LỖI MÃ HÓA CỨNG) ---
     function toggleRecording() { if (isRecording) stopRecording(); else startRecording(); }
     
-    // 🛠️ TỐI ƯU VIDEO: Đăng ký xin cấp Microphone động, ghi âm thực tế khi quay và hủy luồng ngay khi dừng
     async function startRecording() {
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
         const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d"); let scaleFactor = 1; if (video.videoHeight > 720) scaleFactor = 720 / video.videoHeight;
         canvas.width = video.videoWidth * scaleFactor; const imgBoxSize = Math.min(280 * scaleFactor, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scaleFactor; canvas.height = (video.videoHeight * scaleFactor) + footerH;
+        
         cachedVideoExtras = { compass: null, map: null, selfie: null };
         const getSourceDataUrl = (globalSource, canvasId) => { if (globalSource) return globalSource; if (canvasId) { let c = document.getElementById(canvasId); if (c && !c.classList.contains('d-none')) { try { return c.toDataURL("image/jpeg", 0.9); } catch(e) {} } } return null; };
         const mapSrc = getSourceDataUrl(globalExtras.map, 'canvas-map'); const compassSrc = getSourceDataUrl(globalExtras.compass, 'canvas-compass'); const selfieSrc = globalExtras.selfie;
         if (compassSrc && isCompassPermissionGranted) { let i = new Image(); i.src = compassSrc; cachedVideoExtras.compass = i; }
         if (mapSrc) { let i = new Image(); i.src = mapSrc; cachedVideoExtras.map = i; }
         if (selfieSrc) { let i = new Image(); i.src = selfieSrc; cachedVideoExtras.selfie = i; }
-        const mimeType = getSupportedMimeType(); if (!mimeType) return alert("Trình duyệt không hỗ trợ ghi hình!");
         
+        const mimeType = getSupportedMimeType();
         isRecording = true; recordingTime = 0; currentSubtitle = ""; drawVideoFrame();
-        const btn = document.getElementById("btn-record-video"); let maxTimeVal = parseInt(document.getElementById("max-record-time").value) || 30;
+        const btn = document.getElementById("btn-record-video");
         btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm"; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`;
         
         try {
-            // Mở luồng ghi âm Micro động độc quyền phục vụ riêng cho tệp Video ngắn
-            let audioStream = null;
-            try { audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(errMic) { console.log("Không ghép được âm thanh."); }
+            // Cấp phát Micro động riêng lẻ độc quyền cho luồng quay video
+            try { 
+                dynamicAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); 
+            } catch(errMic) { 
+                console.warn("Thiết bị từ chối cấp âm thanh. Chuyển sang quay video không tiếng."); 
+                dynamicAudioStream = null;
+            }
 
-            const canvasStream = canvas.captureStream(25); const combinedStream = new MediaStream();
-            if (canvasStream.getVideoTracks().length > 0) combinedStream.addTrack(canvasStream.captureStream(25).getVideoTracks()[0]);
-            if (audioStream && audioStream.getAudioTracks().length > 0) { combinedStream.addTrack(audioStream.getAudioTracks()[0]); }
+            const canvasStream = canvas.captureStream(25); 
+            const combinedStream = new MediaStream();
             
-            let options = { mimeType: mimeType }; if (!mimeType.includes('mp4')) options.videoBitsPerSecond = 1200000;
-            recordedChunks = []; try { mediaRecorder = new MediaRecorder(combinedStream, options); } catch (eO) { mediaRecorder = new MediaRecorder(combinedStream); }
+            if (canvasStream.getVideoTracks().length > 0) {
+                combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
+            }
+            if (dynamicAudioStream && dynamicAudioStream.getAudioTracks().length > 0) { 
+                combinedStream.addTrack(dynamicAudioStream.getAudioTracks()[0]); 
+            }
+            
+            recordedChunks = [];
+            // 🛠️ BẬT CASCADE FALLBACK: Kiểm tra và bọc lỗi MediaRecorder chống treo mã hóa cứng
+            try {
+                if (mimeType !== '') {
+                    mediaRecorder = new MediaRecorder(combinedStream, { mimeType: mimeType });
+                } else {
+                    mediaRecorder = new MediaRecorder(combinedStream);
+                }
+            } catch (eAllocation) {
+                // Phương án an toàn tuyệt đối: Nếu gộp âm thanh gây lỗi crash, ngắt bỏ Audio lưu thuần túy Canvas
+                console.error("Lỗi đồng bộ mã hóa cứng. Kích hoạt chế độ quay dự phòng.");
+                const pureCanvas = new MediaStream([canvasStream.getVideoTracks()[0]]);
+                mediaRecorder = new MediaRecorder(pureCanvas);
+            }
             
             mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
             mediaRecorder.onstop = () => {
                 if (recordedChunks.length === 0 || recordingTime < 1) return;
                 const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
-                currentMediaFilename = `VIDEO_${document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT"}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.${mediaRecorder.mimeType.includes('mp4')?'mp4':'webm'}`;
+                const ext = (mediaRecorder.mimeType && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
+                currentMediaFilename = `VIDEO_${document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT"}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.${ext}`;
                 currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'video'; showMediaPreview();
-                if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); } // Giải phóng ngay lập tức sau khi dừng quay hình
+                
+                // Giải phóng Micro ngay lập tức khi dừng quay phim
+                if (dynamicAudioStream) { dynamicAudioStream.getTracks().forEach(t => t.stop()); dynamicAudioStream = null; }
             }; 
+            
             mediaRecorder.start(500);
-            recordingInterval = setInterval(() => { recordingTime++; let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s)`; if (recordingTime >= dynamicMax) stopRecording(); }, 1000);
+            recordingInterval = setInterval(() => { 
+                recordingTime++; 
+                let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30; 
+                btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s)`; 
+                if (recordingTime >= dynamicMax) stopRecording(); 
+            }, 1000);
+            
             if (document.getElementById("toggle-subtitle").checked) initLiveSubtitle();
-        } catch (gErr) { stopRecording(); alert("Thiết bị lỗi mã hóa cứng luồng."); }
-    }
-    
-    function initLiveSubtitle() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognition = new SpeechRecognition(); recognition.lang = 'vi-VN'; recognition.continuous = true; recognition.interimResults = true;
-            recognition.onresult = (event) => {
-                let interimTranscript = '', finalTranscript = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript; else interimTranscript += event.results[i][0].transcript; }
-                let combined = (finalTranscript + " " + interimTranscript).trim();
-                if (combined !== '') { let words = combined.split(/\s+/); currentSubtitle = words.slice(Math.floor((words.length - 1) / 12) * 12).join(' '); }
-            }; try { recognition.start(); } catch(e) {}
+        } catch (gErr) { 
+            stopRecording(); 
+            alert("Trình duyệt không tương thích cơ chế đóng gói Canvas stream."); 
         }
     }
+    
     function stopRecording() {
         if (!isRecording) return; isRecording = false; clearInterval(recordingInterval); cancelAnimationFrame(animationFrameId);
         try { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); } catch(e) {}
         if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; currentSubtitle = ""; }
+        if (dynamicAudioStream) { dynamicAudioStream.getTracks().forEach(t => t.stop()); dynamicAudioStream = null; }
         const btn = document.getElementById("btn-record-video"); btn.className = "btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger"; btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> QUAY VIDEO`;
     }
     
-    // 🛠️ SỬA LỖI 1: Trả lại thiết kế khung chân ảnh và đè đầy đủ tham số Thời gian, GPS, Tổ đội lên video
     function drawVideoFrame() {
         if (!isRecording) return;
         const video = document.getElementById("video-preview"); const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d");
@@ -1138,26 +1186,99 @@
         
         ctx.textAlign = "left"; ctx.textBaseline = "middle"; const lineGap = imgBoxSize / 4; let textY = canvas.height - footerH + 20*scale + lineGap/2;
         
-        // 1. Tín hiệu ghi hình nhấp nháy
         if (Math.floor(Date.now() / 1000) % 2 === 0) { ctx.fillStyle = "#dc3545"; ctx.font = `bold ${lineGap * 0.7}px Arial`; ctx.fillText("● REC (VIDEO)", txtX, textY); }
         else { ctx.fillStyle = "#555555"; ctx.font = `bold ${lineGap * 0.7}px Arial`; ctx.fillText("● REC (VIDEO)", txtX, textY); }
         
-        // 2. Thêm dòng THỜI GIAN thực tế (Khắc phục lỗi thiếu thông số thời gian)
         textY += lineGap; ctx.fillStyle = "#0dcaf0"; ctx.font = `bold ${lineGap * 0.55}px Arial`;
         const now = new Date(); const timeStr = `${now.toLocaleTimeString("vi-VN")} - ${now.toLocaleDateString("vi-VN")}`;
         ctx.fillText(`THỜI GIAN: ${timeStr}`, txtX, textY);
 
-        // 3. Dòng TOẠ ĐỘ GPS
         textY += lineGap; ctx.fillStyle = "#ffffff"; ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, txtX, textY);
         
-        // 4. Dòng TỔ ĐỘI
         textY += lineGap; ctx.fillStyle = "#ffc107";
         const teamText = document.getElementById("tab1-team").value.trim();
         ctx.fillText(teamText ? `TỔ ĐỘI: ${teamText}` : "", txtX, textY);
         
         animationFrameId = requestAnimationFrame(drawVideoFrame);
     }
+
+    // --- MODULE BÓC BĂNG ĐỘC LẬP TẬP TRUNG (SỬA LỖI TREO KHOÁN ĐỔI) ---
+    function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
     
+    function startStandaloneTranscribe() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; 
+        if (!SpeechRecognition) return alert("Hệ điều hành di động không hỗ trợ lõi Speech-to-Text!");
+        
+        // Bước 1: Tiêu hủy triệt để luồng preview camera để nhường Mic tuyệt đối cho AI
+        if (localStream) { 
+            document.getElementById("video-preview").srcObject = null;
+            localStream.getTracks().forEach(track => track.stop()); 
+            localStream = null; 
+        }
+        
+        isStandaloneTranscribing = true;
+        const btn = document.getElementById("btn-standalone-stt"); 
+        btn.classList.replace("btn-warning", "btn-danger"); 
+        btn.classList.add("storage-alarm"); 
+        document.getElementById("stt-btn-text").innerText = "ĐANG KẾT NỐI MICRO NỘI BỘ VÀO BỘ DỊCH AI...";
+
+        if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e){} standaloneRecognition = null; }
+
+        standaloneRecognition = new SpeechRecognition(); 
+        standaloneRecognition.lang = 'vi-VN'; 
+        standaloneRecognition.continuous = true; 
+        standaloneRecognition.interimResults = true;
+        
+        const textArea = document.getElementById("standalone-stt-result"); 
+        let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
+        
+        standaloneRecognition.onstart = () => {
+            document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)";
+        };
+        
+        standaloneRecognition.onresult = (event) => { 
+            let interimTranscript = '', finalTranscript = ''; 
+            for (let i = event.resultIndex; i < event.results.length; ++i) { 
+                if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; 
+                else interimTranscript += event.results[i][0].transcript; 
+            } 
+            textArea.value = baseText + finalTranscript + interimTranscript; 
+        };
+        
+        standaloneRecognition.onerror = (e) => {
+            console.error("Speech Error Log: ", e.error);
+            if (e.error === 'not-allowed') {
+                alert("Lỗi bảo mật: Trình duyệt chưa được cấp quyền truy cập Mic. Hãy kiểm tra cài đặt của máy!");
+                stopStandaloneTranscribe();
+            }
+        };
+        
+        standaloneRecognition.onend = () => { 
+            // Tự động kết nối lại nếu gặp khoảng lặng quá lâu ngoài hiện trường gây ngắt quãng
+            if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } 
+        };
+        
+        // Khởi động đồng bộ tức thì chặn đứng cơ chế SandBox của iOS Safari
+        try { 
+            standaloneRecognition.start(); 
+        } catch(e) { 
+            setTimeout(() => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err){} } }, 300);
+        }
+    }
+
+    function stopStandaloneTranscribe() {
+        isStandaloneTranscribing = false; 
+        if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
+        const btn = document.getElementById("btn-standalone-stt"); 
+        btn.classList.remove("storage-alarm"); 
+        btn.classList.replace("btn-danger", "btn-warning"); 
+        document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
+        
+        // Khởi động lại luồng camera bình thường sau khi cổng âm thanh được giải phóng
+        if (isCameraOn) { initCamera(); }
+    }
+
+    // --- CÁC TIỆN ÍCH TRANSCRIBE & AUDIO KHÁC ---
     function toggleAudioRecording() { if (isAudioRecording) stopAudioRecording(); else startAudioRecording(); }
     async function startAudioRecording() {
         let audioStream = null;
@@ -1177,70 +1298,6 @@
     }
     function stopAudioRecording() { if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval); const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`; }
 
-    // 🛠️ SỬA LỖI 2: Tối ưu hóa bộ Bóc băng độc lập - CHẠY ĐỒNG BỘ hoàn toàn không qua hàm trễ để giữ Token cử chỉ của iOS Safari
-    function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
-    
-    function startStandaloneTranscribe() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; 
-        if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ nhận diện giọng nói!");
-        
-        // Ngắt kết nối và đóng hoàn toàn luồng camera xem thử (Xóa srcObject trước để iOS nhả hẳn phần cứng ngay lập tức)
-        if (localStream) { 
-            document.getElementById("video-preview").srcObject = null;
-            localStream.getTracks().forEach(track => track.stop()); 
-            localStream = null; 
-        }
-        
-        isStandaloneTranscribing = true;
-        const btn = document.getElementById("btn-standalone-stt"); 
-        btn.classList.replace("btn-warning", "btn-danger"); 
-        btn.classList.add("storage-alarm"); 
-        document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)";
-
-        if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e){} standaloneRecognition = null; }
-
-        standaloneRecognition = new SpeechRecognition(); 
-        standaloneRecognition.lang = 'vi-VN'; 
-        standaloneRecognition.continuous = true; 
-        standaloneRecognition.interimResults = true;
-        
-        const textArea = document.getElementById("standalone-stt-result"); 
-        let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
-        
-        standaloneRecognition.onresult = (event) => { 
-            let interimTranscript = '', finalTranscript = ''; 
-            for (let i = event.resultIndex; i < event.results.length; ++i) { 
-                if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; 
-                else interimTranscript += event.results[i][0].transcript; 
-            } 
-            textArea.value = baseText + finalTranscript + interimTranscript; 
-        };
-        
-        standaloneRecognition.onend = () => { 
-            if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } 
-        };
-        
-        // Gọi lệnh chạy .start() ĐỒNG BỘ trực tiếp trong macro-task click để vượt tường lửa bảo mật iOS Safari thành công 100%
-        try { 
-            standaloneRecognition.start(); 
-        } catch(e) { 
-            console.log("Khởi động lại bộ dịch..."); 
-            setTimeout(() => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err){} } }, 300);
-        }
-    }
-
-    function stopStandaloneTranscribe() {
-        isStandaloneTranscribing = false; 
-        if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
-        const btn = document.getElementById("btn-standalone-stt"); 
-        btn.classList.remove("storage-alarm"); 
-        btn.classList.replace("btn-danger", "btn-warning"); 
-        document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
-        
-        // Trả lại luồng camera hình ảnh thông thường
-        if (isCameraOn) { initCamera(); }
-    }
-
     function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản!"); }
     function clearStandaloneSTT() { if(confirm("Xóa bảng nội dung?")) document.getElementById("standalone-stt-result").value = ""; }
     function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id=\"preview-player\" src=\"${currentMediaBlobUrl}\" controls playsinline style=\"max-width:100%; max-height:400px;\"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id=\"preview-player\" src=\"${currentMediaBlobUrl}\" controls style=\"width:90%; margin:20px 0;\"></audio>`; transcribeBox.classList.remove("d-none"); } openModal('mediaPreviewModal'); }
@@ -1253,17 +1310,15 @@
         offlineRecognition.onstart = () => { player.play(); }; offlineRecognition.onend = () => { document.getElementById("btn-start-transcribe").innerHTML = `PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info"); };
         try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
     }
-    function getSupportedMimeType() { const types = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm']; for (let t of types) { if (MediaRecorder.isTypeSupported(t)) return t; } return ''; }
+
+    function getSupportedMimeType() {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        let types = isIOS 
+            ? ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/quicktime'] 
+            : ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4', 'video/webm'];
+        for (let t of types) { if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t; }
+        return '';
+    }
 </script>
-<script>
-        // Tự động kích hoạt đăng ký bộ nhớ nền PWA
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('✅ Đăng ký Service Worker thành công:', reg.scope))
-                    .catch(err => console.error('❌ Lỗi đăng ký Service Worker:', err));
-            });
-        }
-    </script>
 </body>
 </html>
