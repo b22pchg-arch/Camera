@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V40.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V40.1)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -111,7 +111,7 @@
                     <div class="col-4">
                         <div class="border border-secondary rounded p-1 text-center bg-black position-relative">
                             <span class="small text-danger d-block mb-1" style="font-size:10px; font-weight:bold;">LA BÀN</span>
-                            <canvas id="canvas-compass" class="w-100 bg-dark" width="200" height="200" style="aspect-ratio: 1; border-radius: 4px; border: 1px solid #495057;"></canvas>
+                            <canvas id="canvas-compass" class="w-100 bg-dark" width="200" height="200" style="aspect-ratio: 1; border-radius: 4px; border: 1px solid #495057; cursor: pointer;" onclick="requestCompassPermission()"></canvas>
                             <img id="img-compass" src="" class="w-100 d-none" style="aspect-ratio: 1; object-fit: cover; border-radius: 4px;">
                             <label class="btn btn-sm btn-outline-info w-100 mt-1 p-0" style="font-size:10px;"><i class="fa-solid fa-upload me-1"></i> Tải đè<input type="file" hidden accept="image/*" onchange="uploadExtra(event, 'compass')"></label>
                         </div>
@@ -206,7 +206,7 @@
             
             <div class="collapse mb-3" id="standalone-transcribe">
                 <div class="card card-body bg-dark border-warning p-2">
-                    <p class="text-secondary small mb-2 text-warning" style="font-size: 11px; line-height: 1.4;"><i class="fa-solid fa-circle-info me-1"></i> <b>Giải pháp cho điện thoại di động:</b> Chức năng này chỉ bật Microphone để nghe trực tiếp từ thiết bị phát bên ngoài (Điện thoại thứ 2, bộ đàm hiện trường) mà không phát loa trong, giúp tránh triệt để lỗi xung đột phần cứng di động.</p>
+                    <p class="text-secondary small mb-2 text-warning" style="font-size: 11px; line-height: 1.4;"><i class="fa-solid fa-circle-info me-1"></i> <b>Giải pháp phần cứng di động:</b> Khi bật tính năng này, Camera hiện trường sẽ tạm ẩn để giải phóng khóa Microphone độc quyền của iOS. Bạn hãy đưa nguồn phát ngoài (Máy bộ đàm, điện thoại thứ 2) sát cạnh điện thoại để dịch thành văn bản.</p>
                     <button id="btn-standalone-stt" class="btn btn-warning text-dark w-100 fw-bold mb-2 py-2" onclick="toggleStandaloneTranscribe()">
                         <i class="fa-solid fa-microphone me-1"></i> <span id="stt-btn-text">BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI</span>
                     </button>
@@ -384,27 +384,9 @@
         <div class="tab-pane fade" id="help-content" role="tabpanel">
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm text-light" style="font-size: 13px; line-height: 1.6;">
                 <h6 class="text-info fw-bold border-bottom border-secondary pb-2 mb-3"><i class="fa-solid fa-book me-2"></i>HƯỚNG DẪN SỬ DỤNG NHANH</h6>
-                
-                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> 1. LƯU Ý QUAN TRỌNG VỀ PWA (BẮT BUỘC):</p>
+                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> BÓC BĂNG ĐỘC LẬP TRÊN ĐIỆN THOẠI:</p>
                 <ul class="text-secondary ps-3 mb-3">
-                    <li>Để ứng dụng hoạt động <b>Offline (không cần mạng)</b> và full màn hình, bắt buộc phải chọn <b>"Thêm vào màn hình chính" (Add to Home Screen)</b> trên Chrome/Safari.</li>
-                </ul>
-
-                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-hard-drive me-1"></i> 2. GIỚI HẠN DUNG LƯỢNG KHO LƯU TRỮ:</p>
-                <ul class="text-secondary ps-3 mb-3">
-                    <li>Trình duyệt cấp một dung lượng bộ nhớ giới hạn. Khi báo <span class="text-danger fw-bold">Màu Đỏ (>80%)</span>, anh em cần tải các ảnh ở tab "Đã Ghép" về máy, sau đó xóa trên ứng dụng để giải phóng dung lượng.</li>
-                </ul>
-
-                <p class="text-info fw-bold mb-1"><i class="fa-solid fa-camera me-1"></i> 3. THAO TÁC CHỤP & GHÉP ẢNH:</p>
-                <ol class="text-secondary ps-3 mb-0">
-                    <li>Nhập Tên Tổ Đội và Mã Hiện Trường trước khi chụp.</li>
-                    <li>Bấm [Chụp TRƯỚC] và [Chụp SAU]. Hệ thống tự động đóng dấu chân ảnh hoàn toàn tự động.</li>
-                </ol>
-
-                <p class="text-danger fw-bold mb-1 mt-3"><i class="fa-solid fa-video me-1"></i> 4. QUAY VIDEO & BÓC BĂNG:</p>
-                <ul class="text-secondary ps-3 mb-0">
-                    <li><b>Thời gian quay tối đa:</b> Có thể thay đổi linh hoạt bằng ô số cấu hình. Hết giờ máy tự ngắt xuất file tải thẳng về mục Downloads thiết bị.</li>
-                    <li><b>Bóc băng độc lập:</b> Khi dùng điện thoại ở hiện trường, hãy dùng mô-đun bóc băng độc lập, bật mic và dùng nguồn phát ngoài (máy khác hoặc bộ đàm) đưa sát vào điện thoại để chữ tự động nhảy ra mà không lo lỗi triệt âm loa trong.</li>
+                    <li>Do cơ chế chặn Microphone chạy song song của điện thoại di động, khi bật **Bóc băng độc lập**, màn hình Camera sẽ tạm thời tắt đi để nhường quyền thu âm hoàn toàn cho AI dịch thuật. Khi bạn bấm **DỪNG**, Camera hiện trường sẽ tự động bật lại bình thường.</li>
                 </ul>
             </div>
         </div>
@@ -460,6 +442,8 @@
     let db = null;
     let currentHeading = 0;
     
+    let isCompassPermissionGranted = false;
+    
     let repoBefore = [];
     let repoAfter = [];
     let repoProcess = [];
@@ -489,7 +473,6 @@
     let currentMediaType = null;
     let offlineRecognition = null;
 
-    // Các biến phục vụ chức năng bóc băng độc lập từ nguồn ngoài
     let standaloneRecognition = null;
     let isStandaloneTranscribing = false;
     
@@ -513,7 +496,11 @@
     document.addEventListener("DOMContentLoaded", () => {
         initCamera();
         initGpsTracking();
-        initCompassListener();
+        
+        if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') {
+            isCompassPermissionGranted = true;
+            initCompassListener();
+        }
         
         window.addEventListener('beforeunload', (e) => {
             if (repoStitched.length > 0 || repoBefore.length > 0 || repoAfter.length > 0) {
@@ -534,6 +521,27 @@
         
         setInterval(drawCompassCanvas, 200);
     });
+
+    function requestCompassPermission() {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+                .then(permissionState => {
+                    if (permissionState === 'granted') {
+                        isCompassPermissionGranted = true;
+                        initCompassListener();
+                    } else {
+                        alert("Hệ thống từ chối quyền truy cập cảm biến La bàn!");
+                    }
+                })
+                .catch(err => {
+                    console.error("Lỗi xin quyền:", err);
+                    alert("Cần chạy trang web dưới giao thức bảo mật HTTPS để kích hoạt la bàn.");
+                });
+        } else {
+            isCompassPermissionGranted = true;
+            initCompassListener();
+        }
+    }
 
     async function calculateStorageQuota() {
         if (navigator.storage && navigator.storage.estimate) {
@@ -591,7 +599,7 @@
                 localStream = stream;
                 document.getElementById("video-preview").srcObject = stream;
                 document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
-            }).catch(err => alert("Không thể mở camera. Vui lòng cấp quyền!"));
+            }).catch(err => alert("Không thể mở camera hiện trường. Vui lòng cấp quyền!"));
         }
     }
 
@@ -640,11 +648,8 @@
     function handleOrientation(event) {
         let alpha = event.alpha;
         let webkitAlpha = event.webkitCompassHeading;
-        if (webkitAlpha !== undefined) {
-            currentHeading = webkitAlpha;
-        } else if (alpha !== null) {
-            currentHeading = Math.abs(alpha - 360);
-        }
+        if (webkitAlpha !== undefined) { currentHeading = webkitAlpha; } 
+        else if (alpha !== null) { currentHeading = Math.abs(alpha - 360); }
     }
 
     function drawCompassCanvas() {
@@ -652,22 +657,22 @@
         const c = document.getElementById('canvas-compass');
         const ctx = c.getContext('2d');
         const cx = c.width / 2; const cy = c.height / 2; const r = cx - 10;
-        
         ctx.clearRect(0, 0, c.width, c.height);
         
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(-currentHeading * Math.PI / 180);
+        if (!isCompassPermissionGranted) {
+            ctx.fillStyle = "#212529"; ctx.fillRect(0, 0, c.width, c.height);
+            ctx.strokeStyle = "#495057"; ctx.lineWidth = 2; ctx.strokeRect(0, 0, c.width, c.height);
+            ctx.fillStyle = "#ffc107"; ctx.font = "bold 13px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillText("BẤM VÀO ĐÂY", cx, cy - 12); ctx.fillText("ĐỂ BẬT LA BÀN", cx, cy + 12);
+            return;
+        }
         
-        ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI);
-        ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4; ctx.stroke();
-        
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(-currentHeading * Math.PI / 180);
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4; ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, -r + 10); ctx.lineTo(10, 0); ctx.lineTo(-10, 0); ctx.fillStyle = "#dc3545"; ctx.fill();
         ctx.beginPath(); ctx.moveTo(0, r - 10); ctx.lineTo(10, 0); ctx.lineTo(-10, 0); ctx.fillStyle = "#ffffff"; ctx.fill();
-        
         ctx.fillStyle = "#ffffff"; ctx.font = "bold 20px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText("N", 0, -r - 15); ctx.fillText("S", 0, r + 15);
-        ctx.fillText("E", r + 15, 0); ctx.fillText("W", -r - 15, 0);
+        ctx.fillText("N", 0, -r - 15); ctx.fillText("S", 0, r + 15); ctx.fillText("E", r + 15, 0); ctx.fillText("W", -r - 15, 0);
         ctx.restore();
         
         ctx.fillStyle = "#ffc107"; ctx.font = "bold 24px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -675,187 +680,95 @@
     }
 
     function updateMapCanvas() {
-        const c = document.getElementById('canvas-map');
-        const ctx = c.getContext('2d');
-        const zoom = 16;
-        const latRad = currentGpsData.lat * Math.PI / 180;
-        const n = Math.pow(2, zoom);
+        const c = document.getElementById('canvas-map'); const ctx = c.getContext('2d'); const zoom = 16;
+        const latRad = currentGpsData.lat * Math.PI / 180; const n = Math.pow(2, zoom);
         const xtile = Math.floor((currentGpsData.lng + 180.0) / 360.0 * n);
         const ytile = Math.floor((1.0 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2.0 * n);
-
-        const img = new Image();
-        img.crossOrigin = "Anonymous";
-        img.src = `https://a.tile.openstreetmap.org/${zoom}/${xtile}/${ytile}.png`;
-        
+        const img = new Image(); img.crossOrigin = "Anonymous"; img.src = `https://a.tile.openstreetmap.org/${zoom}/${xtile}/${ytile}.png`;
         img.onload = () => {
-            ctx.drawImage(img, 0, 0, c.width, c.height);
-            ctx.fillStyle = "rgba(220, 53, 69, 0.4)";
-            ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 20, 0, 2*Math.PI); ctx.fill();
-            ctx.fillStyle = "#dc3545";
-            ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 8, 0, 2*Math.PI); ctx.fill();
-            ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+            ctx.drawImage(img, 0, 0, c.width, c.height); ctx.fillStyle = "rgba(220, 53, 69, 0.4)"; ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 20, 0, 2*Math.PI); ctx.fill();
+            ctx.fillStyle = "#dc3545"; ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 8, 0, 2*Math.PI); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
         };
         img.onerror = () => {
-            ctx.fillStyle = "#2b3035"; ctx.fillRect(0, 0, c.width, c.height);
-            ctx.strokeStyle = "#495057"; ctx.lineWidth = 1;
+            ctx.fillStyle = "#2b3035"; ctx.fillRect(0, 0, c.width, c.height); ctx.strokeStyle = "#495057"; ctx.lineWidth = 1;
             for(let i=0; i<c.width; i+=20) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,c.height); ctx.stroke(); }
             for(let i=0; i<c.height; i+=20) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(c.width,i); ctx.stroke(); }
-            ctx.fillStyle = "#dc3545";
-            ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 10, 0, 2*Math.PI); ctx.fill();
+            ctx.fillStyle = "#dc3545"; ctx.beginPath(); ctx.arc(c.width/2, c.height/2, 10, 0, 2*Math.PI); ctx.fill();
         };
     }
 
     function captureExtra(key) {
-        const video = document.getElementById("video-preview");
-        if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
-        
-        const canvas = document.createElement("canvas");
-        let size = Math.min(video.videoWidth, video.videoHeight);
-        canvas.width = 640; canvas.height = 640;
-        const ctx = canvas.getContext("2d");
-        
-        if (currentFacingMode === "user") {
-            ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
-        }
-        
-        let sx = (video.videoWidth - size) / 2;
-        let sy = (video.videoHeight - size) / 2;
-        ctx.drawImage(video, sx, sy, size, size, 0, 0, 640, 640);
-        
-        let dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-        globalExtras[key] = dataUrl;
-        
-        document.getElementById(`img-${key}`).src = dataUrl;
-        document.getElementById(`img-${key}`).classList.remove('d-none');
-        document.getElementById(`btn-grp-${key}`).classList.add('d-none');
-        document.getElementById(`clear-${key}`).classList.remove('d-none');
+        const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
+        const canvas = document.createElement("canvas"); let size = Math.min(video.videoWidth, video.videoHeight);
+        canvas.width = 640; canvas.height = 640; const ctx = canvas.getContext("2d");
+        if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(video, (video.videoWidth - size) / 2, (video.videoHeight - size) / 2, size, size, 0, 0, 640, 640);
+        let dataUrl = canvas.toDataURL("image/jpeg", 0.85); globalExtras[key] = dataUrl;
+        document.getElementById(`img-${key}`).src = dataUrl; document.getElementById(`img-${key}`).classList.remove('d-none');
+        document.getElementById(`btn-grp-${key}`).classList.add('d-none'); document.getElementById(`clear-${key}`).classList.remove('d-none');
         if(key==='map') document.getElementById('canvas-map').classList.add('d-none');
         if(key==='compass') document.getElementById('canvas-compass').classList.add('d-none');
-        
-        document.body.style.opacity = 0.5;
-        setTimeout(() => document.body.style.opacity = 1, 100);
+        document.body.style.opacity = 0.5; setTimeout(() => document.body.style.opacity = 1, 100);
     }
 
     function uploadExtra(event, key) {
-        const file = event.target.files[0];
-        if (!file) return;
+        const file = event.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
-                const canvas = document.createElement("canvas");
-                let size = Math.min(img.width, img.height);
-                canvas.width = 640; canvas.height = 640;
-                const ctx = canvas.getContext("2d");
-                
-                let sx = (img.width - size) / 2;
-                let sy = (img.height - size) / 2;
-                ctx.drawImage(img, sx, sy, size, size, 0, 0, 640, 640);
-                
-                let dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-                globalExtras[key] = dataUrl;
-                
-                document.getElementById(`img-${key}`).src = dataUrl;
-                document.getElementById(`img-${key}`).classList.remove('d-none');
-                
-                if(key==='selfie') {
-                    document.getElementById(`btn-grp-${key}`).classList.add('d-none');
-                    document.getElementById(`clear-${key}`).classList.remove('d-none');
-                } else {
-                    document.getElementById(`canvas-${key}`).classList.add('d-none');
-                }
+                const canvas = document.createElement("canvas"); let size = Math.min(img.width, img.height);
+                canvas.width = 640; canvas.height = 640; const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, (img.width - size) / 2, (img.height - size) / 2, size, size, 0, 0, 640, 640);
+                let dataUrl = canvas.toDataURL("image/jpeg", 0.85); globalExtras[key] = dataUrl;
+                document.getElementById(`img-${key}`).src = dataUrl; document.getElementById(`img-${key}`).classList.remove('d-none');
+                if(key==='selfie') { document.getElementById(`btn-grp-${key}`).classList.add('d-none'); document.getElementById(`clear-${key}`).classList.remove('d-none'); } 
+                else { document.getElementById(`canvas-${key}`).classList.add('d-none'); }
             };
             img.src = e.target.result;
         };
-        reader.readAsDataURL(file);
-        event.target.value = "";
+        reader.readAsDataURL(file); event.target.value = "";
     }
 
     function clearExtra(key) {
-        globalExtras[key] = null;
-        document.getElementById(`img-${key}`).src = "";
-        document.getElementById(`img-${key}`).classList.add('d-none');
-        document.getElementById(`btn-grp-${key}`).classList.remove('d-none');
-        document.getElementById(`clear-${key}`).classList.add('d-none');
+        globalExtras[key] = null; document.getElementById(`img-${key}`).src = ""; document.getElementById(`img-${key}`).classList.add('d-none');
+        document.getElementById(`btn-grp-${key}`).classList.remove('d-none'); document.getElementById(`clear-${key}`).classList.add('d-none');
+        if(key==='map') document.getElementById('canvas-map').classList.remove('d-none');
+        if(key==='compass') document.getElementById('canvas-compass').classList.remove('d-none');
     }
 
     async function capturePhoto(type) {
         if (currentStoragePercent > 95) return alert(`⚠️ Bộ nhớ đầy (${currentStoragePercent}%)!`);
         if (currentStoragePercent > 80 && !confirm(`⚠️ Bộ nhớ sắp đầy (${currentStoragePercent}%)! Tiếp tục?`)) return;
-
-        const video = document.getElementById("video-preview");
-        if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
-        
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        const scale = video.videoWidth / 1000;
-        const imgBoxSize = Math.min(280 * scale, video.videoWidth * 0.18);
-        const footerH = imgBoxSize + 40 * scale; 
-        
-        canvas.width = video.videoWidth; 
-        canvas.height = video.videoHeight + footerH; 
-        
-        ctx.save();
-        if (currentFacingMode === "user") {
-            ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
-        }
-        ctx.drawImage(video, 0, 0, canvas.width, video.videoHeight);
-        ctx.restore();
-
-        const fY = video.videoHeight;
-        ctx.fillStyle = "#111111";
-        ctx.fillRect(0, fY, canvas.width, footerH);
-        ctx.strokeStyle = "#343a40";
-        ctx.lineWidth = 4 * scale;
-        ctx.strokeRect(0, fY, canvas.width, footerH);
-
-        const now = new Date();
-        const timeStr = `${now.toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - ${now.toLocaleDateString("vi-VN")}`;
-        const teamText = document.getElementById("tab1-team").value.trim();
-        const pad = 20 * scale;
-        let maxTextW = canvas.width - (3 * imgBoxSize) - (5 * pad); 
-        if (maxTextW < 100) maxTextW = 100;
-        
+        const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
+        const canvas = document.createElement("canvas"); const ctx = canvas.getContext("2d"); const scale = video.videoWidth / 1000;
+        const imgBoxSize = Math.min(280 * scale, video.videoWidth * 0.18); const footerH = imgBoxSize + 40 * scale; 
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight + footerH; 
+        ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, video.videoHeight); ctx.restore();
+        const fY = video.videoHeight; ctx.fillStyle = "#111111"; ctx.fillRect(0, fY, canvas.width, footerH);
+        ctx.strokeStyle = "#343a40"; ctx.lineWidth = 4 * scale; ctx.strokeRect(0, fY, canvas.width, footerH);
+        const now = new Date(); const timeStr = `${now.toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - ${now.toLocaleDateString("vi-VN")}`;
+        const teamText = document.getElementById("tab1-team").value.trim(); const pad = 20 * scale;
+        let maxTextW = canvas.width - (3 * imgBoxSize) - (5 * pad); if (maxTextW < 100) maxTextW = 100;
         let textX, selfieX, mapX, compassX;
-        if (type === "SAU") {
-            compassX = pad;
-            mapX = compassX + imgBoxSize + pad;
-            selfieX = mapX + imgBoxSize + pad;
-            textX = canvas.width - pad;
-        } else {
-            textX = pad;
-            selfieX = textX + maxTextW + pad;
-            mapX = selfieX + imgBoxSize + pad;
-            compassX = mapX + imgBoxSize + pad;
-        }
+        if (type === "SAU") { compassX = pad; mapX = compassX + imgBoxSize + pad; selfieX = mapX + imgBoxSize + pad; textX = canvas.width - pad; } 
+        else { textX = pad; selfieX = textX + maxTextW + pad; mapX = selfieX + imgBoxSize + pad; compassX = mapX + imgBoxSize + pad; }
 
         const drawExtraSync = (sourceDataUrl, canvasSourceId, labelText, xPos) => {
             return new Promise((resolve) => {
                 let sourceToDraw = sourceDataUrl;
                 if (!sourceToDraw && canvasSourceId) {
                     let c = document.getElementById(canvasSourceId);
-                    if (c && !c.classList.contains('d-none')) {
-                        try { sourceToDraw = c.toDataURL("image/jpeg", 0.9); } catch(e) {}
-                    }
+                    if (c && !c.classList.contains('d-none') && isCompassPermissionGranted) { try { sourceToDraw = c.toDataURL("image/jpeg", 0.9); } catch(e) {} }
                 }
-                
                 if (!sourceToDraw) { resolve(); return; }
-                
                 let img = new Image();
                 img.onload = () => {
-                    ctx.fillStyle = "#000";
-                    ctx.fillRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
-                    ctx.drawImage(img, xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
-                    ctx.strokeStyle = "#495057"; ctx.lineWidth = 4 * scale;
-                    ctx.strokeRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
-                    
-                    let labelH = imgBoxSize * 0.18;
-                    ctx.fillStyle = "rgba(0,0,0,0.7)";
-                    ctx.fillRect(xPos, fY + 20 * scale + imgBoxSize - labelH, imgBoxSize, labelH);
-                    ctx.fillStyle = "#0dcaf0"; ctx.font = `bold ${labelH * 0.6}px Arial`;
-                    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-                    ctx.fillText(labelText, xPos + imgBoxSize/2, fY + 20 * scale + imgBoxSize - labelH/2);
-                    resolve();
+                    ctx.fillStyle = "#000"; ctx.fillRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize); ctx.drawImage(img, xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
+                    ctx.strokeStyle = "#495057"; ctx.lineWidth = 4 * scale; ctx.strokeRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
+                    let labelH = imgBoxSize * 0.18; ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(xPos, fY + 20 * scale + imgBoxSize - labelH, imgBoxSize, labelH);
+                    ctx.fillStyle = "#0dcaf0"; ctx.font = `bold ${labelH * 0.6}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText(labelText, xPos + imgBoxSize/2, fY + 20 * scale + imgBoxSize - labelH/2); resolve();
                 };
                 img.onerror = resolve; img.src = sourceToDraw;
             });
@@ -867,76 +780,37 @@
             drawExtraSync(globalExtras.selfie, null, "NGƯỜI CHỤP", selfieX)
         ]);
 
-        let startY = fY + 40 * scale;
-        let lineGap = (footerH - 60 * scale) / 3;
+        let startY = fY + 40 * scale; let lineGap = (footerH - 60 * scale) / 3;
         ctx.textAlign = type === "SAU" ? "right" : "left"; ctx.textBaseline = "middle";
         ctx.fillStyle = type === "TRƯỚC" ? "#0d6efd" : (type === "QUÁ TRÌNH" ? "#ffc107" : "#20c997");
         ctx.font = `bold ${lineGap * 0.7}px Arial`; ctx.fillText(`${type}`, textX, startY, maxTextW);
-        
         ctx.fillStyle = "#ffffff"; ctx.font = `bold ${lineGap * 0.55}px Arial`;
-        ctx.fillText(`THỜI GIAN: ${timeStr}`, textX, startY + lineGap, maxTextW);
-        ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, textX, startY + lineGap * 2, maxTextW);
-        
-        if (teamText) {
-            ctx.fillStyle = "#ffc107"; ctx.fillText(`TỔ ĐỘI: ${teamText}`, textX, startY + lineGap * 3, maxTextW);
-        }
+        ctx.fillText(`THỜI GIAN: ${timeStr}`, textX, startY + lineGap, maxTextW); ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, textX, startY + lineGap * 2, maxTextW);
+        if (teamText) { ctx.fillStyle = "#ffc107"; ctx.fillText(`TỔ ĐỘI: ${teamText}`, textX, startY + lineGap * 3, maxTextW); }
 
-        const photoObj = {
-            id: "img_" + Date.now(), type: type,
-            dataUrl: canvas.toDataURL("image/jpeg", 0.85), timestampMs: now.getTime()
-        };
-
-        if (type === "TRƯỚC") {
-            repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj;
-            document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}">`;
-        } else if (type === "SAU") {
-            repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj;
-            document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`;
-        } else if (type === "QUÁ TRÌNH") {
-            repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj);
-            document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`;
-        }
+        const photoObj = { id: "img_" + Date.now(), type: type, dataUrl: canvas.toDataURL("image/jpeg", 0.85), timestampMs: now.getTime() };
+        if (type === "TRƯỚC") { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}">`; } 
+        else if (type === "SAU") { repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`; } 
+        else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`; }
         saveToDB(photoObj);
-        
-        if (captureBuffer.TRƯỚC && captureBuffer.SAU) {
-            document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled");
-            document.getElementById("btn-stitch-ts-only").removeAttribute("disabled");
-            document.getElementById("btn-stitch-full").removeAttribute("disabled");
-        }
-        updateUIState();
-        document.body.style.opacity = 0.5; setTimeout(() => document.body.style.opacity = 1, 100);
+        if (captureBuffer.TRƯỚC && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
+        updateUIState(); document.body.style.opacity = 0.5; setTimeout(() => document.body.style.opacity = 1, 100);
     }
 
     function handleFileUpload(event, type) {
-        const files = event.target.files;
-        if (!files.length) return;
+        const files = event.target.files; if (!files.length) return;
         Array.from(files).forEach(file => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    const canvas = document.createElement("canvas");
-                    let w = img.width; let h = img.height;
-                    const maxDim = 1920;
-                    if (w > maxDim || h > maxDim) {
-                        const ratio = Math.min(maxDim/w, maxDim/h);
-                        w = w * ratio; h = h * ratio;
-                    }
-                    canvas.width = w; canvas.height = h;
-                    const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
+                    const canvas = document.createElement("canvas"); let w = img.width; let h = img.height; const maxDim = 1920;
+                    if (w > maxDim || h > maxDim) { const ratio = Math.min(maxDim/w, maxDim/h); w = w * ratio; h = h * ratio; }
+                    canvas.width = w; canvas.height = h; const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
                     const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
-                    const photoObj = {
-                        id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000),
-                        type: type, dataUrl: compressedDataUrl, timestampMs: Date.now(),
-                        name: type === "STITCHED" ? file.name : undefined
-                    };
-                    if (type === "TRƯỚC") repoBefore.unshift(photoObj);
-                    else if (type === "SAU") repoAfter.unshift(photoObj);
-                    else if (type === "QUÁ TRÌNH") repoProcess.unshift(photoObj);
-                    else repoStitched.unshift(photoObj);
-
-                    saveToDB(photoObj); updateUIState(); renderPending();
-                    if (type === "STITCHED") renderGallery();
+                    const photoObj = { id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: compressedDataUrl, timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined };
+                    if (type === "TRƯỚC") repoBefore.unshift(photoObj); else if (type === "SAU") repoAfter.unshift(photoObj); else if (type === "QUÁ TRÌNH") repoProcess.unshift(photoObj); else repoStitched.unshift(photoObj);
+                    saveToDB(photoObj); updateUIState(); renderPending(); if (type === "STITCHED") renderGallery();
                 };
                 img.src = e.target.result;
             };
@@ -952,35 +826,18 @@
     }
 
     function deletePendingItems() {
-        let dels = [];
-        document.querySelectorAll('input[name="radioBefore"]:checked').forEach(e => dels.push(e.value));
-        document.querySelectorAll('input[name="checkQT"]:checked').forEach(e => dels.push(e.value));
-        document.querySelectorAll('input[name="radioAfter"]:checked').forEach(e => dels.push(e.value));
+        let dels = []; document.querySelectorAll('input[name="radioBefore"]:checked').forEach(e => dels.push(e.value)); document.querySelectorAll('input[name="checkQT"]:checked').forEach(e => dels.push(e.value)); document.querySelectorAll('input[name="radioAfter"]:checked').forEach(e => dels.push(e.value));
         if(dels.length === 0) return alert("Vui lòng chọn ảnh cần xóa!");
-        if(confirm(`Xóa ${dels.length} ảnh khỏi kho chờ?`)) {
-            dels.forEach(id => deleteFromDB(id));
-            repoBefore = repoBefore.filter(x => !dels.includes(x.id));
-            repoProcess = repoProcess.filter(x => !dels.includes(x.id));
-            repoAfter = repoAfter.filter(x => !dels.includes(x.id));
-            renderPending(); updateUIState();
-        }
+        if(confirm(`Xóa ${dels.length} ảnh khỏi kho chờ?`)) { dels.forEach(id => deleteFromDB(id)); repoBefore = repoBefore.filter(x => !dels.includes(x.id)); repoProcess = repoProcess.filter(x => !dels.includes(x.id)); repoAfter = repoAfter.filter(x => !dels.includes(x.id)); renderPending(); updateUIState(); }
     }
 
     async function handleSessionQTStitch(bObj, aObj, customNote) {
-        let minT = Math.min(bObj.timestampMs, aObj.timestampMs);
-        let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
+        let minT = Math.min(bObj.timestampMs, aObj.timestampMs); let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
         if (sessionQts.length > 0) {
             let mode = document.getElementById("qt-stitch-mode").value;
-            if (mode === 'all') {
-                await processMultiStitching(sessionQts, "QT", customNote);
-            } else {
-                let chunkSize = parseInt(mode);
-                for (let i = 0; i < sessionQts.length; i += chunkSize) {
-                    let chunk = sessionQts.slice(i, i + chunkSize);
-                    await processMultiStitching(chunk, "QT", customNote);
-                }
-            }
+            if (mode === 'all') { await processMultiStitching(sessionQts, "QT", customNote); } 
+            else { let chunkSize = parseInt(mode); for (let i = 0; i < sessionQts.length; i += chunkSize) { await processMultiStitching(sessionQts.slice(i, i + chunkSize), "QT", customNote); } }
         }
     }
 
@@ -999,8 +856,9 @@
     async function quickStitchFull() {
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
-        let minT = Math.min(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
-        let maxT = Math.max(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
+        // 🛠️ FIX lỗi cú pháp TRƯBEFORE tồn dư
+        let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
+        let maxT = Math.max(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
         let allObjs = [captureBuffer.TRƯỚC, ...sessionQts, captureBuffer.SAU];
         await processMultiStitching(allObjs, "FULL", customNote, () => {
@@ -1015,12 +873,9 @@
     async function quickStitchTS() {
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
-        let minT = Math.min(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
-        let maxT = Math.max(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
+        let minT = Math.min(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs); let maxT = Math.max(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
         let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
-        
-        await handleSessionQTStitch(captureBuffer.TRƯỚC, captureBuffer.SAU, customNote);
-        await new Promise(r => setTimeout(r, 120)); 
+        await handleSessionQTStitch(captureBuffer.TRƯỚC, captureBuffer.SAU, customNote); await new Promise(r => setTimeout(r, 120)); 
         processStitching(captureBuffer.TRƯỚC, captureBuffer.SAU, true, customNote, () => {
             captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
             document.getElementById("preview-before").innerHTML = '<span class="text-muted small text-center">TRƯỚC</span>';
@@ -1031,114 +886,71 @@
     }
     
     async function manualStitchTSOnly() {
-        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked');
-        const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
+        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked'); const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
         if (!checkedBefore || !checkedAfter) return alert("Chọn 1 ảnh TRƯỚC và 1 ảnh SAU!");
-        const bObj = repoBefore.find(x => x.id === checkedBefore.value);
-        const aObj = repoAfter.find(x => x.id === checkedAfter.value);
-        let customNote = document.getElementById("tab2-note").value.trim();
-        processStitching(bObj, aObj, true, customNote, null, false, 0);
+        processStitching(repoBefore.find(x => x.id === checkedBefore.value), repoAfter.find(x => x.id === checkedAfter.value), true, document.getElementById("tab2-note").value.trim(), null, false, 0);
     }
 
     async function manualStitchFull() {
-        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked');
-        const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
+        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked'); const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
         if (!checkedBefore || !checkedAfter) return alert("Chọn đủ ảnh để ghép chốt phiên!");
-        const bObj = repoBefore.find(x => x.id === checkedBefore.value);
-        const aObj = repoAfter.find(x => x.id === checkedAfter.value);
-        let customNote = document.getElementById("tab2-note").value.trim();
-        let minT = Math.min(bObj.timestampMs, aObj.timestampMs);
-        let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
+        const bObj = repoBefore.find(x => x.id === checkedBefore.value); const aObj = repoAfter.find(x => x.id === checkedAfter.value);
+        let minT = Math.min(bObj.timestampMs, aObj.timestampMs); let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
-        let allObjs = [bObj, ...sessionQts, aObj];
-        await processMultiStitching(allObjs, "FULL", customNote, null);
+        await processMultiStitching([bObj, ...sessionQts, aObj], "FULL", document.getElementById("tab2-note").value.trim(), null);
         alert("Đã hoàn thành!"); renderPending(); renderGallery();
     }
 
     async function manualStitchTS() {
-        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked');
-        const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
+        const checkedBefore = document.querySelector('input[name="radioBefore"]:checked'); const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
         if (!checkedBefore || !checkedAfter) return alert("Vui lòng chọn ảnh!");
-        const bObj = repoBefore.find(x => x.id === checkedBefore.value);
-        const aObj = repoAfter.find(x => x.id === checkedAfter.value);
-        let customNote = document.getElementById("tab2-note").value.trim();
-        let minT = Math.min(bObj.timestampMs, aObj.timestampMs);
-        let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
+        const bObj = repoBefore.find(x => x.id === checkedBefore.value); const aObj = repoAfter.find(x => x.id === checkedAfter.value);
+        let minT = Math.min(bObj.timestampMs, aObj.timestampMs); let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
         let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
-        
-        await handleSessionQTStitch(bObj, aObj, customNote);
-        await new Promise(r => setTimeout(r, 120)); 
-        processStitching(bObj, aObj, true, customNote, null, false, qtCount);
+        await handleSessionQTStitch(bObj, aObj, document.getElementById("tab2-note").value.trim()); await new Promise(r => setTimeout(r, 120)); 
+        processStitching(bObj, aObj, true, document.getElementById("tab2-note").value.trim(), null, false, qtCount);
     }
     
     async function manualStitchQT() {
-        const checkedQT = document.querySelectorAll('input[name="checkQT"]:checked');
-        if (checkedQT.length === 0) return alert("Vui lòng chọn ảnh Quá Trình!");
-        let objs = Array.from(checkedQT).map(cb => repoProcess.find(x => x.id === cb.value));
-        objs.sort((a,b) => a.timestampMs - b.timestampMs);
-        let customNote = document.getElementById("tab2-note").value.trim();
+        const checkedQT = document.querySelectorAll('input[name="checkQT"]:checked'); if (checkedQT.length === 0) return alert("Vui lòng chọn ảnh Quá Trình!");
+        let objs = Array.from(checkedQT).map(cb => repoProcess.find(x => x.id === cb.value)).sort((a,b) => a.timestampMs - b.timestampMs);
         let mode = document.getElementById("qt-stitch-mode-tab2").value;
-        if (mode === 'all') {
-            await processMultiStitching(objs, "QT", customNote);
-        } else {
-            let chunkSize = parseInt(mode);
-            for (let i = 0; i < objs.length; i += chunkSize) {
-                let chunk = objs.slice(i, i + chunkSize);
-                await processMultiStitching(chunk, "QT", customNote);
-            }
-        }
+        if (mode === 'all') { await processMultiStitching(objs, "QT", document.getElementById("tab2-note").value.trim()); } 
+        else { let chunkSize = parseInt(mode); for (let i = 0; i < objs.length; i += chunkSize) { await processMultiStitching(objs.slice(i, i + chunkSize), "QT", document.getElementById("tab2-note").value.trim()); } }
         alert("Xử lý xong ảnh Quá Trình!"); renderPending(); renderGallery();
     }
 
     function autoStitch() {
         if (repoBefore.length === 0 || repoAfter.length === 0) return alert("Không đủ dữ liệu đối khớp!");
-        windowAutoMatches = [];
-        let availableAfters = [...repoAfter];
-        let sortedBefores = [...repoBefore].sort((a,b) => a.timestampMs - b.timestampMs);
+        windowAutoMatches = []; let availableAfters = [...repoAfter]; let sortedBefores = [...repoBefore].sort((a,b) => a.timestampMs - b.timestampMs);
         for (let b of sortedBefores) {
             if (availableAfters.length === 0) break;
-            let closestA = availableAfters[0];
-            let minDiff = Math.abs(b.timestampMs - closestA.timestampMs);
-            let closestIdx = 0;
-            for (let i = 1; i < availableAfters.length; i++) {
-                let diff = Math.abs(b.timestampMs - availableAfters[i].timestampMs);
-                if (diff < minDiff) { minDiff = diff; closestA = availableAfters[i]; closestIdx = i; }
-            }
-            windowAutoMatches.push({ before: b, after: closestA });
-            availableAfters.splice(closestIdx, 1);
+            let closestA = availableAfters[0]; let minDiff = Math.abs(b.timestampMs - closestA.timestampMs); let closestIdx = 0;
+            for (let i = 1; i < availableAfters.length; i++) { let diff = Math.abs(b.timestampMs - availableAfters[i].timestampMs); if (diff < minDiff) { minDiff = diff; closestA = availableAfters[i]; closestIdx = i; } }
+            windowAutoMatches.push({ before: b, after: closestA }); availableAfters.splice(closestIdx, 1);
         }
         if (windowAutoMatches.length === 0) return alert("Không tìm thấy cặp!");
         let html = `<p class="small text-info mb-3">Tìm thấy <b>${windowAutoMatches.length}</b> cặp:</p>`;
         windowAutoMatches.forEach((m, idx) => {
-            const timeB = new Date(m.before.timestampMs).toLocaleTimeString("vi-VN");
-            const timeA = new Date(m.after.timestampMs).toLocaleTimeString("vi-VN");
             html += `<div class="card bg-secondary mb-3 p-2 border-0 shadow-sm">
-                    <div class="d-flex justify-content-between small fw-bold mb-1"><span class="text-warning">Trước: ${timeB}</span><span class="text-success">Sau: ${timeA}</span></div>
+                    <div class="d-flex justify-content-between small fw-bold mb-1"><span class="text-warning">Trước: ${new Date(m.before.timestampMs).toLocaleTimeString("vi-VN")}</span><span class="text-success">Sau: ${new Date(m.after.timestampMs).toLocaleTimeString("vi-VN")}</span></div>
                     <div class="d-flex gap-1 mb-2">
-                        <div style="flex: 1; aspect-ratio: 4/3; background: #111;"><img src="${m.before.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
-                        <div style="flex: 1; aspect-ratio: 4/3; background: #111;"><img src="${m.after.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
+                        <div style="flex:1; aspect-ratio:4/3; background:#111;"><img src="${m.before.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
+                        <div style="flex:1; aspect-ratio:4/3; background:#111;"><img src="${m.after.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
                     </div>
                     <input type="text" id="auto-note-${idx}" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Ghi chú cặp này...">
                 </div>`;
         });
-        document.getElementById('autoStitchModalBody').innerHTML = html;
-        new bootstrap.Modal(document.getElementById('autoStitchModal')).show();
+        document.getElementById('autoStitchModalBody').innerHTML = html; new bootstrap.Modal(document.getElementById('autoStitchModal')).show();
     }
 
     async function confirmAutoStitch() {
-        const modalEl = document.getElementById('autoStitchModal');
-        bootstrap.Modal.getInstance(modalEl).hide();
-        let count = 0;
+        bootstrap.Modal.getInstance(document.getElementById('autoStitchModal')).hide(); let count = 0;
         for (let i = 0; i < windowAutoMatches.length; i++) {
-            const match = windowAutoMatches[i];
-            const customNote = document.getElementById('auto-note-' + i).value.trim();
-            let minT = Math.min(match.before.timestampMs, match.after.timestampMs);
-            let maxT = Math.max(match.before.timestampMs, match.after.timestampMs);
-            let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
-            await handleSessionQTStitch(match.before, match.after, customNote);
-            await new Promise(r => setTimeout(r, 120)); 
-            await processStitching(match.before, match.after, false, customNote, null, false, qtCount);
-            count++;
+            const match = windowAutoMatches[i]; const customNote = document.getElementById('auto-note-' + i).value.trim();
+            let minT = Math.min(match.before.timestampMs, match.after.timestampMs); let maxT = Math.max(match.before.timestampMs, match.after.timestampMs);
+            await handleSessionQTStitch(match.before, match.after, customNote); await new Promise(r => setTimeout(r, 120)); 
+            await processStitching(match.before, match.after, false, customNote, null, false, repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length); count++;
         }
         alert(`Đã ghép tự động ${count} cặp!`); renderPending(); renderGallery();
     }
@@ -1146,68 +958,33 @@
     function processMultiStitching(imgObjs, itemTypeMarker, customNote, callback) {
         return new Promise((resolve) => {
             if (!imgObjs || imgObjs.length === 0) { if(callback) callback(); resolve(); return; }
-            Promise.all(imgObjs.map(obj => new Promise(res => {
-                const i = new Image(); i.src = obj.dataUrl; i.onload = () => res({img: i, obj: obj});
-            }))).then(loaded => {
-                const stitchCanvas = document.createElement("canvas");
-                const ctx = stitchCanvas.getContext("2d");
-                let N = loaded.length;
-                let mode = document.getElementById("qt-stitch-mode").value;
-                let useGrid = (mode === 'all' || itemTypeMarker === "FULL") && N > 2;
-                let cols, rows;
-                if (useGrid) { cols = Math.ceil(Math.sqrt(N)); rows = Math.ceil(N / cols); } 
-                else { cols = N; rows = 1; }
-                let singleW = loaded[0].img.width; let singleH = loaded[0].img.height;
+            Promise.all(imgObjs.map(obj => new Promise(res => { const i = new Image(); i.src = obj.dataUrl; i.onload = () => res({img: i, obj: obj}); }))).then(loaded => {
+                const stitchCanvas = document.createElement("canvas"); const ctx = stitchCanvas.getContext("2d"); let N = loaded.length;
+                let useGrid = (document.getElementById("qt-stitch-mode").value === 'all' || itemTypeMarker === "FULL") && N > 2;
+                let cols = useGrid ? Math.ceil(Math.sqrt(N)) : N, rows = useGrid ? Math.ceil(N / cols) : 1;
+                let singleW = loaded[0].img.width, singleH = loaded[0].img.height;
                 stitchCanvas.width = cols * singleW; stitchCanvas.height = rows * singleH;
-                loaded.forEach((item, index) => {
-                    let c = index % cols; let r = Math.floor(index / cols);
-                    ctx.drawImage(item.img, c * singleW, r * singleH, singleW, singleH);
-                });
+                loaded.forEach((item, index) => { ctx.drawImage(item.img, (index % cols) * singleW, Math.floor(index / cols) * singleH, singleW, singleH); });
                 let rawNote = (customNote !== null) ? customNote : document.getElementById("tab1-note").value.trim();
                 let noteText = rawNote.toUpperCase();
                 if (noteText) {
-                    const imgScale = singleW / 1000; const noteSize = Math.round(45 * imgScale);
-                    ctx.font = `bold ${noteSize}px Arial`; const noteWidth = ctx.measureText(noteText).width;
-                    const paddingY = 40 * imgScale; const noteHeight = noteSize + paddingY;
-                    const singleImgBoxSize = Math.min(280 * imgScale, singleW * 0.18);
-                    const footerH = singleImgBoxSize + 40 * imgScale;
-                    const noteX = stitchCanvas.width / 2; const noteY = stitchCanvas.height - footerH;
+                    const imgScale = singleW / 1000; const noteSize = Math.round(45 * imgScale); ctx.font = `bold ${noteSize}px Arial`;
+                    const noteWidth = ctx.measureText(noteText).width; const noteHeight = noteSize + 40 * imgScale;
+                    const footerH = Math.min(280 * imgScale, singleW * 0.18) + 40 * imgScale; const noteX = stitchCanvas.width / 2, noteY = stitchCanvas.height - footerH;
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
-                    ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) 
-                                  : ctx.fillRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight);
-                    ctx.fill();
-                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
-                    ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) 
-                                  : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight);
-                    ctx.stroke();
-                    ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
-                    ctx.fillText(noteText, noteX, noteY);
+                    ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.fillRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.fill();
+                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale; ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.stroke();
+                    ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillText(noteText, noteX, noteY);
                 }
-                let prefixVal = document.getElementById("tab1-prefix").value.trim();
-                let teamVal = document.getElementById("tab1-team").value.trim();
-                let nameParts = []; if (prefixVal) nameParts.push(prefixVal); if (teamVal) nameParts.push(teamVal); if (rawNote) nameParts.push(rawNote);
-                let combinedPrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_');             
-                let filePrefix = combinedPrefix ? combinedPrefix : "HT";
-                if (itemTypeMarker === "QT") filePrefix = "QT_" + filePrefix;
-                else if (itemTypeMarker === "FULL") filePrefix = "FULL_" + filePrefix;
-                const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
-                let finalName = `${filePrefix}_${dateStr}_GRP_${Date.now()}.jpg`;
-
-                const newItem = { 
-                    id: "stitched_" + Date.now() + Math.floor(Math.random()*100), 
-                    type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", name: finalName, 
-                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampStr: new Date().toLocaleString("vi-VN") 
-                };
+                let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
+                let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT";
+                if (itemTypeMarker === "QT") filePrefix = "QT_" + filePrefix; else if (itemTypeMarker === "FULL") filePrefix = "FULL_" + filePrefix;
+                const newItem = { id: "stitched_" + Date.now() + Math.floor(Math.random()*100), type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_GRP_${Date.now()}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampStr: new Date().toLocaleString("vi-VN") };
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 let objIds = loaded.map(l => l.obj.id);
                 if (itemTypeMarker === "QT") repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
-                else if (itemTypeMarker === "FULL") {
-                    repoBefore = repoBefore.filter(x => !objIds.includes(x.id));
-                    repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
-                    repoAfter = repoAfter.filter(x => !objIds.includes(x.id));
-                }
-                objIds.forEach(id => deleteFromDB(id)); updateUIState();
-                if (callback) callback(); resolve();
+                else if (itemTypeMarker === "FULL") { repoBefore = repoBefore.filter(x => !objIds.includes(x.id)); repoProcess = repoProcess.filter(x => !objIds.includes(x.id)); repoAfter = repoAfter.filter(x => !objIds.includes(x.id)); }
+                objIds.forEach(id => deleteFromDB(id)); updateUIState(); if (callback) callback(); resolve();
             });
         });
     }
@@ -1223,240 +1000,72 @@
                 let rawNote = (customNote !== null) ? customNote : document.getElementById("tab1-note").value.trim();
                 let noteText = rawNote.toUpperCase(); let showQTLine = (qtCount > 0 && !isQT); let qtText = showQTLine ? `QT: ${qtCount}` : "";
                 if (noteText || showQTLine) {
-                    const imgScale = loadedB.width / 1000; const noteSize = Math.round(45 * imgScale);
-                    ctx.font = `bold ${noteSize}px Arial`;
-                    let maxTextWidth = noteText ? ctx.measureText(noteText).width : 0;
-                    if (showQTLine) { let qtWidth = ctx.measureText(qtText).width; if (qtWidth > maxTextWidth) maxTextWidth = qtWidth; }
-                    const paddingY = 40 * imgScale; let lineCount = (noteText && showQTLine) ? 2 : 1;
-                    let noteHeight = noteSize * lineCount + paddingY; if (lineCount === 2) noteHeight += 15 * imgScale;
-                    const singleImgBoxSize = Math.min(280 * imgScale, loadedB.width * 0.18); const footerH = singleImgBoxSize + 40 * imgScale;
-                    const noteX = loadedB.width; const noteY = stitchCanvas.height - footerH;
-                    
+                    const imgScale = loadedB.width / 1000; const noteSize = Math.round(45 * imgScale); ctx.font = `bold ${noteSize}px Arial`;
+                    let maxTextWidth = noteText ? ctx.measureText(noteText).width : 0; if (showQTLine) { let qtWidth = ctx.measureText(qtText).width; if (qtWidth > maxTextWidth) maxTextWidth = qtWidth; }
+                    let lineCount = (noteText && showQTLine) ? 2 : 1; let noteHeight = noteSize * lineCount + 40 * imgScale; if (lineCount === 2) noteHeight += 15 * imgScale;
+                    const noteX = loadedB.width; const noteY = stitchCanvas.height - (Math.min(280 * imgScale, loadedB.width * 0.18) + 40 * imgScale);
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
-                    ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) 
-                                  : ctx.fillRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight);
-                    ctx.fill();
-                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
-                    ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) 
-                                  : ctx.strokeRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight);
-                    ctx.stroke();
+                    ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.fillRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight); ctx.fill();
+                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale; ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight); ctx.stroke();
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
-                    if (lineCount === 2) { ctx.fillText(noteText, noteX, noteY - (noteSize / 2) - 2 * imgScale); ctx.fillText(qtText, noteX, noteY + (noteSize / 2) + 8 * imgScale); } 
-                    else if (noteText) ctx.fillText(noteText, noteX, noteY); else if (showQTLine) ctx.fillText(qtText, noteX, noteY);
+                    if (lineCount === 2) { ctx.fillText(noteText, noteX, noteY - (noteSize / 2) - 2 * imgScale); ctx.fillText(qtText, noteX, noteY + (noteSize / 2) + 8 * imgScale); } else if (noteText) ctx.fillText(noteText, noteX, noteY); else if (showQTLine) ctx.fillText(qtText, noteX, noteY);
                 }
-                let prefixVal = document.getElementById("tab1-prefix").value.trim();
-                let teamVal = document.getElementById("tab1-team").value.trim();
-                let nameParts = []; if (prefixVal) nameParts.push(prefixVal); if (teamVal) nameParts.push(teamVal); if (rawNote) nameParts.push(rawNote);
-                let combinedPrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_');             
-                let filePrefix = combinedPrefix ? combinedPrefix : "HT"; if (isQT) filePrefix = "QT_" + filePrefix;
+                let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
+                let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT"; if (isQT) filePrefix = "QT_" + filePrefix;
                 const formatTime = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; };
-                let finalName = `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`;
-
-                const newItem = { 
-                    id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), 
-                    type: isQT ? "STITCHED_QT" : "STITCHED", name: finalName, 
-                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampStr: new Date().toLocaleString("vi-VN") 
-                };
+                const newItem = { id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), type: isQT ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampStr: new Date().toLocaleString("vi-VN") };
                 repoStitched.unshift(newItem); saveToDB(newItem);
-                if (isQT) repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id);
-                else { repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id); }
-                deleteFromDB(bObj.id); deleteFromDB(aObj.id); updateUIState();
-                if (callback) callback();
-                if (showAlert) { renderPending(); renderGallery(); alert(`Đã ghép thành công:\n${finalName}`); }
-                resolve();
+                if (isQT) repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id); else { repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id); }
+                deleteFromDB(bObj.id); deleteFromDB(aObj.id); updateUIState(); if (callback) callback(); if (showAlert) { renderPending(); renderGallery(); alert(`Đã ghép thành công:\n${newItem.name}`); } resolve();
             });
         });
     }
 
     function saveToDB(item) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").put(item); calculateStorageQuota(); } }
     function deleteFromDB(id) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").delete(id); calculateStorageQuota(); } }
-    
-    function loadDataFromDB() {
-        if (!db) return;
-        let req = db.transaction("photos", "readonly").objectStore("photos").getAll();
-        req.onsuccess = (e) => {
-            const allData = e.target.result || [];
-            repoBefore = allData.filter(x => x.type === "TRƯỚC").sort((a,b) => b.id.localeCompare(a.id));
-            repoAfter = allData.filter(x => x.type === "SAU").sort((a,b) => b.id.localeCompare(a.id));
-            repoProcess = allData.filter(x => x.type === "QUÁ TRÌNH").sort((a,b) => b.id.localeCompare(a.id));
-            repoStitched = allData.filter(x => x.type === "STITCHED" || x.type === "STITCHED_QT").sort((a,b) => b.id.localeCompare(a.id));
-            updateUIState();
-        };
-    }
-
-    function updateUIState() {
-        document.getElementById("pending-count").innerText = repoBefore.length + repoAfter.length + repoProcess.length;
-        document.getElementById("gallery-count").innerText = repoStitched.length;
-        document.getElementById("gallery-alert").style.display = (repoStitched.length > 0 || repoBefore.length > 0 || repoAfter.length > 0) ? "inline-block" : "none";
-        calculateStorageQuota();
-    }
-
-    function renderPending() {
-        const GAP_MS = 15 * 60 * 1000;
-        const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => {
-            if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>';
-            let listHtml = '';
-            repo.forEach((item, index) => {
-                const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' });
-                listHtml += `<div class="photo-card mb-2" id="card_${item.id}">
-                        <input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}">
-                        <img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')">
-                        <div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div>
-                      </div>`;
-                if (index < repo.length - 1) {
-                    const nextItem = repo[index+1]; let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
-                    if (!isNewSession) {
-                        if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs);
-                        else if (typeStr === 'SAU') isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs);
-                    }
-                    if (isNewSession) {
-                        listHtml += `<div class="w-100 text-center my-2 position-relative" style="height: 20px;">
-                                <div class="position-absolute w-100 border-bottom border-${color}" style="top: 10px; border-style: dashed !important; opacity: 0.4;"></div>
-                                <span class="badge bg-dark text-${color} border border-${color} position-relative px-1" style="font-size:9px;">Chuyển Phiên</span>
-                              </div>`;
-                    }
-                }
-            });
-            return listHtml;
-        };
-        document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
-        document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
-        document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
-    }
-
-    function renderGallery() {
-        const grid = document.getElementById("gallery-grid"); const emptyMsg = document.getElementById("gallery-empty-msg");
-        document.getElementById("select-all-checkbox").checked = false; document.getElementById("selected-counter").innerText = "Đã chọn: 0";
-        const showQT = document.getElementById("toggle-show-qt").checked;
-        const itemsToRender = showQT ? repoStitched : repoStitched.filter(x => x.type !== "STITCHED_QT");
-        if (itemsToRender.length === 0) { grid.innerHTML = ""; emptyMsg.classList.remove("d-none"); return; }
-        emptyMsg.classList.add("d-none"); let html = "";
-        itemsToRender.forEach(item => {
-            const qtBadge = item.type === "STITCHED_QT" ? `<span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2;">QUÁ TRÌNH</span>` : "";
-            html += `<div class="col-12 col-sm-6" id="card_${item.id}"><div class="photo-card stitched shadow-sm">${qtBadge}<input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${item.id}" onchange="calculateSelection()"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-2"><div class="small fw-bold text-info text-break">${item.name}</div><div class="text-secondary" style="font-size:11px;">${item.timestampStr}</div></div></div></div>`;
-        }); grid.innerHTML = html;
-    }
-
+    function loadDataFromDB() { if (!db) return; db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => { const allData = e.target.result || []; repoBefore = allData.filter(x => x.type === "TRƯỚC").sort((a,b) => b.id.localeCompare(a.id)); repoAfter = allData.filter(x => x.type === "SAU").sort((a,b) => b.id.localeCompare(a.id)); repoProcess = allData.filter(x => x.type === "QUÁ TRÌNH").sort((a,b) => b.id.localeCompare(a.id)); repoStitched = allData.filter(x => x.type === "STITCHED" || x.type === "STITCHED_QT").sort((a,b) => b.id.localeCompare(a.id)); updateUIState(); }; }
     function calculateSelection() { document.getElementById("selected-counter").innerText = `Đã chọn: ${document.querySelectorAll(".gallery-item-check:checked").length}`; }
     function toggleSelectAll(master) { document.querySelectorAll(".gallery-item-check").forEach(cb => cb.checked = master.checked); calculateSelection(); }
-    
-    function deleteSelectedPhotos() {
-        const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked");
-        if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!");
-        if (confirm(`Xóa vĩnh viễn ${checkedBoxes.length} ảnh này?`)) {
-            const ids = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id"));
-            ids.forEach(id => deleteFromDB(id)); repoStitched = repoStitched.filter(item => !ids.includes(item.id));
-            renderGallery(); updateUIState();
-        }
-    }
-    
-    async function shareSelectedPhotos() {
-        const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked");
-        if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!");
-        const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id"));
-        const itemsToShare = repoStitched.filter(item => selectedIds.includes(item.id));
-        if (navigator.canShare && navigator.share) {
-            try {
-                let filesArray = [];
-                for (let item of itemsToShare) {
-                    let arr = item.dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8 = new Uint8Array(n);
-                    while(n--) u8[n] = bstr.charCodeAt(n);
-                    filesArray.push(new File([new Blob([u8], {type:mime})], item.name, { type: "image/jpeg" }));
-                }
-                await navigator.share({ files: filesArray, title: 'Báo cáo PC Tuyên Quang' });
-            } catch (err) { if (err.name !== "AbortError") triggerBatchDownloads(itemsToShare); }
-        } else { triggerBatchDownloads(itemsToShare); }
-    }
-    
-    function triggerBatchDownloads(items) {
-        items.forEach((item, index) => {
-            setTimeout(() => {
-                const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name;
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            }, index * 300);
-        });
-    }
-    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
+    function deleteSelectedPhotos() { const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked"); if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!"); if (confirm(`Xóa vĩnh viễn ${checkedBoxes.length} ảnh này?`)) { const ids = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id")); ids.forEach(id => deleteFromDB(id)); repoStitched = repoStitched.filter(item => !ids.includes(item.id)); renderGallery(); updateUIState(); } }
+    async function shareSelectedPhotos() { const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked"); if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!"); const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id")); const itemsToShare = repoStitched.filter(item => selectedIds.includes(item.id)); if (navigator.canShare && navigator.share) { try { let filesArray = []; for (let item of itemsToShare) { let arr = item.dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8 = new Uint8Array(n); while(n--) u8[n] = bstr.charCodeAt(n); filesArray.push(new File([new Blob([u8], {type:mime})], item.name, { type: "image/jpeg" })); } await navigator.share({ files: filesArray, title: 'Báo cáo PC Tuyên Quang' }); } catch (err) { if (err.name !== "AbortError") triggerBatchDownloads(itemsToShare); } } else { triggerBatchDownloads(itemsToShare); } }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    function toggleRecording() {
-        if (isRecording) stopRecording();
-        else startRecording();
-    }
-
-    function getSupportedMimeType() {
-        const types = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm'];
-        for (let t of types) { if (MediaRecorder.isTypeSupported(t)) return t; }
-        return '';
-    }
-
+    function toggleRecording() { if (isRecording) stopRecording(); else startRecording(); }
+    function getSupportedMimeType() { const types = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm']; for (let t of types) { if (MediaRecorder.isTypeSupported(t)) return t; } return ''; }
+    
     function startRecording() {
-        const video = document.getElementById("video-preview");
-        if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
-        const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d");
-        let scaleFactor = 1; if (video.videoHeight > 720) scaleFactor = 720 / video.videoHeight;
-        canvas.width = video.videoWidth * scaleFactor;
-        const imgBoxSize = Math.min(280 * scaleFactor, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scaleFactor;
-        canvas.height = (video.videoHeight * scaleFactor) + footerH;
+        const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
+        const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d"); let scaleFactor = 1; if (video.videoHeight > 720) scaleFactor = 720 / video.videoHeight;
+        canvas.width = video.videoWidth * scaleFactor; const imgBoxSize = Math.min(280 * scaleFactor, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scaleFactor; canvas.height = (video.videoHeight * scaleFactor) + footerH;
         cachedVideoExtras = { compass: null, map: null, selfie: null };
-        const getSourceDataUrl = (globalSource, canvasId) => {
-            if (globalSource) return globalSource;
-            if (canvasId) { let c = document.getElementById(canvasId); if (c && !c.classList.contains('d-none')) { try { return c.toDataURL("image/jpeg", 0.9); } catch(e) {} } }
-            return null;
-        };
-        const mapSrc = getSourceDataUrl(globalExtras.map, 'canvas-map');
-        const compassSrc = getSourceDataUrl(globalExtras.compass, 'canvas-compass'); const selfieSrc = globalExtras.selfie;
-        if (compassSrc) { let i = new Image(); i.src = compassSrc; cachedVideoExtras.compass = i; }
+        const getSourceDataUrl = (globalSource, canvasId) => { if (globalSource) return globalSource; if (canvasId) { let c = document.getElementById(canvasId); if (c && !c.classList.contains('d-none')) { try { return c.toDataURL("image/jpeg", 0.9); } catch(e) {} } } return null; };
+        const mapSrc = getSourceDataUrl(globalExtras.map, 'canvas-map'); const compassSrc = getSourceDataUrl(globalExtras.compass, 'canvas-compass'); const selfieSrc = globalExtras.selfie;
+        if (compassSrc && isCompassPermissionGranted) { let i = new Image(); i.src = compassSrc; cachedVideoExtras.compass = i; }
         if (mapSrc) { let i = new Image(); i.src = mapSrc; cachedVideoExtras.map = i; }
         if (selfieSrc) { let i = new Image(); i.src = selfieSrc; cachedVideoExtras.selfie = i; }
-
-        const mimeType = getSupportedMimeType();
-        if (!mimeType) return alert("Trình duyệt không hỗ trợ ghi hình!");
-
-        isRecording = true; recordingTime = 0; currentSubtitle = "";
-        drawVideoFrame();
-
-        const btn = document.getElementById("btn-record-video");
-        let maxTimeVal = parseInt(document.getElementById("max-record-time").value) || 30;
-        btn.classList.replace("btn-danger", "btn-warning"); btn.classList.replace("text-white", "text-dark"); btn.classList.add("storage-alarm");
-        btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`;
-
+        const mimeType = getSupportedMimeType(); if (!mimeType) return alert("Trình duyệt không hỗ trợ ghi hình!");
+        isRecording = true; recordingTime = 0; currentSubtitle = ""; drawVideoFrame();
+        const btn = document.getElementById("btn-record-video"); let maxTimeVal = parseInt(document.getElementById("max-record-time").value) || 30;
+        btn.classList.replace("btn-danger", "btn-warning"); btn.classList.replace("text-white", "text-dark"); btn.classList.add("storage-alarm"); btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`;
         setTimeout(() => {
             if (!isRecording) return;
             try {
                 const canvasStream = canvas.captureStream(25); const combinedStream = new MediaStream();
                 if (canvasStream.getVideoTracks().length > 0) combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
-                if (localStream && localStream.getAudioTracks().length > 0) {
-                    try { combinedStream.addTrack(localStream.getAudioTracks()[0].clone()); } catch (e) { combinedStream.addTrack(localStream.getAudioTracks()[0]); }
-                }
-                let options = {}; if (mimeType) options.mimeType = mimeType;
-                if (!mimeType.includes('mp4')) options.videoBitsPerSecond = 1200000;
-
+                if (localStream && localStream.getAudioTracks().length > 0) { try { combinedStream.addTrack(localStream.getAudioTracks()[0].clone()); } catch (e) { combinedStream.addTrack(localStream.getAudioTracks()[0]); } }
+                let options = {}; if (mimeType) options.mimeType = mimeType; if (!mimeType.includes('mp4')) options.videoBitsPerSecond = 1200000;
                 recordedChunks = [];
-                try { mediaRecorder = new MediaRecorder(combinedStream, options); } catch (eO) {
-                    try { mediaRecorder = new MediaRecorder(combinedStream); } catch (eC) {
-                        mediaRecorder = new MediaRecorder(new MediaStream([canvasStream.getVideoTracks()[0]]));
-                    }
-                }
+                try { mediaRecorder = new MediaRecorder(combinedStream, options); } catch (eO) { try { mediaRecorder = new MediaRecorder(combinedStream); } catch (eC) { mediaRecorder = new MediaRecorder(new MediaStream([canvasStream.getVideoTracks()[0]])); } }
                 mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = () => {
                     if (recordedChunks.length === 0 || recordingTime < 1) return;
                     const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
                     currentMediaFilename = `VIDEO_${document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT"}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.${mediaRecorder.mimeType.includes('mp4')?'mp4':'webm'}`;
-                    currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'video';
-                    showMediaPreview();
+                    currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'video'; showMediaPreview();
                 };
                 mediaRecorder.start(500);
-
                 btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (0s/${maxTimeVal}s) - BẤM DỪNG`;
-                recordingInterval = setInterval(() => {
-                    recordingTime++;
-                    let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30;
-                    btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s) - BẤM DỪNG`;
-                    if (recordingTime >= dynamicMax) stopRecording();
-                }, 1000);
-
+                recordingInterval = setInterval(() => { recordingTime++; let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s) - BẤM DỪNG`; if (recordingTime >= dynamicMax) stopRecording(); }, 1000);
                 if (document.getElementById("toggle-subtitle").checked) initLiveSubtitle();
             } catch (gErr) { stopRecording(); alert("Thiết bị không tương thích mã hóa luồng!"); }
         }, 300);
@@ -1468,17 +1077,10 @@
             recognition = new SpeechRecognition(); recognition.lang = 'vi-VN'; recognition.continuous = true; recognition.interimResults = true;
             recognition.onresult = (event) => {
                 let interimTranscript = '', finalTranscript = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
-                    else interimTranscript += event.results[i][0].transcript;
-                }
+                for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript; else interimTranscript += event.results[i][0].transcript; }
                 let combined = (finalTranscript + " " + interimTranscript).trim();
-                if (combined !== '') {
-                    let words = combined.split(/\s+/); const CHUNK_SIZE = 12;
-                    currentSubtitle = words.slice(Math.floor((words.length - 1) / CHUNK_SIZE) * CHUNK_SIZE).join(' ');
-                }
-                if (subtitleTimeout) clearTimeout(subtitleTimeout);
-                subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 3000);
+                if (combined !== '') { let words = combined.split(/\s+/); currentSubtitle = words.slice(Math.floor((words.length - 1) / 12) * 12).join(' '); }
+                if (subtitleTimeout) clearTimeout(subtitleTimeout); subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 3000);
             };
             try { recognition.start(); } catch(e) {}
         }
@@ -1488,43 +1090,38 @@
         if (!isRecording) return; isRecording = false; clearInterval(recordingInterval); cancelAnimationFrame(animationFrameId);
         try { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); } catch(e) {}
         if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; currentSubtitle = ""; }
-        const btn = document.getElementById("btn-record-video");
-        btn.className = "btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger"; btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> QUAY VIDEO`;
+        const btn = document.getElementById("btn-record-video"); btn.className = "btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger"; btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> QUAY VIDEO`;
     }
 
     function drawVideoFrame() {
         if (!isRecording) return;
         const video = document.getElementById("video-preview"); const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d");
-        const scale = canvas.width / 1000; const imgBoxSize = Math.min(280 * scale, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scale;
-        const videoRenderHeight = canvas.height - footerH;
-
+        const scale = canvas.width / 1000; const imgBoxSize = Math.min(280 * scale, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scale; const videoRenderHeight = canvas.height - footerH;
         ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
-        ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight); ctx.restore();
-
-        // Vẽ Phụ Đề trực tiếp lên vùng video an toàn
+        ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight); ctx.restore();
+        
         if (currentSubtitle) {
-            let subFontSize = Math.round(32 * scale); ctx.font = `bold ${subFontSize}px Arial`;
-            let subText = currentSubtitle.toUpperCase(); let subW = ctx.measureText(subText).width + 40 * scale;
-            let maxW = canvas.width - 40 * scale; if (subW > maxW) subW = maxW;
-            ctx.fillStyle = "rgba(0, 0, 0, 0.75)"; ctx.fillRect(canvas.width/2 - subW/2, videoRenderHeight - 65 * scale, subW, 50 * scale);
-            ctx.fillStyle = "#ffc107"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.fillText(subText, canvas.width/2, videoRenderHeight - 40 * scale, subW - 20 * scale);
+            let subFontSize = Math.round(32 * scale); ctx.font = `bold ${subFontSize}px Arial`; let subText = currentSubtitle.toUpperCase(); let subW = ctx.measureText(subText).width + 40 * scale; let maxW = canvas.width - 40 * scale; if (subW > maxW) subW = maxW;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.75)"; ctx.fillRect(canvas.width/2 - subW/2, videoRenderHeight - 65 * scale, subW, 50 * scale); ctx.fillStyle = "#ffc107"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(subText, canvas.width/2, videoRenderHeight - 40 * scale, subW - 20 * scale);
         }
-
         ctx.fillStyle = "rgba(0, 0, 0, 0.7)"; ctx.fillRect(0, canvas.height - footerH, canvas.width, footerH);
-        const drawExtra = (cachedImg, x) => {
-            if (cachedImg && cachedImg.complete && cachedImg.naturalWidth > 0) ctx.drawImage(cachedImg, x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize);
-            else { ctx.strokeStyle = "#495057"; ctx.lineWidth = 2 * scale; ctx.strokeRect(x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); }
-        };
-        drawExtra(cachedVideoExtras.compass, pad = 20 * scale); drawExtra(cachedVideoExtras.map, pad + imgBoxSize + pad); drawExtra(cachedVideoExtras.selfie, pad + imgBoxSize + pad + imgBoxSize + pad);
-
+        const drawExtra = (cachedImg, x) => { if (cachedImg && cachedImg.complete && cachedImg.naturalWidth > 0) ctx.drawImage(cachedImg, x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); else { ctx.strokeStyle = "#495057"; ctx.lineWidth = 2 * scale; ctx.strokeRect(x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); } };
+        
+        let pad = 20 * scale;
+        let compX = pad;
+        let mpX = compX + imgBoxSize + pad;
+        let slfX = mpX + imgBoxSize + pad;
+        let txtX = slfX + imgBoxSize + pad;
+        
+        drawExtra(cachedVideoExtras.compass, compX); 
+        drawExtra(cachedVideoExtras.map, mpX); 
+        drawExtra(cachedVideoExtras.selfie, slfX);
+        
         ctx.textAlign = "left"; ctx.textBaseline = "middle"; const lineGap = imgBoxSize / 4; let textY = canvas.height - footerH + 20*scale + lineGap/2;
-        if (Math.floor(Date.now() / 1000) % 2 === 0) { ctx.fillStyle = "#dc3545"; ctx.font = `bold ${lineGap * 0.8}px Arial`; ctx.fillText("● REC (VIDEO)", pad + imgBoxSize + pad + imgBoxSize + pad + imgBoxSize + pad, textY); }
-        textY += lineGap; ctx.fillStyle = "#ffffff"; ctx.font = `bold ${lineGap * 0.55}px Arial`; ctx.fillText(`GPS: ${currentGpsData.text}`, pad + imgBoxSize + pad + imgBoxSize + pad + imgBoxSize + pad, textY);
-        textY += lineGap; ctx.fillStyle = "#0dcaf0"; ctx.fillText(`T.GIAN: ${new Date().toLocaleTimeString("vi-VN")}`, pad + imgBoxSize + pad + imgBoxSize + pad + imgBoxSize + pad, textY);
-        textY += lineGap; ctx.fillStyle = "#ffc107"; ctx.fillText(document.getElementById("tab1-team").value.trim() ? `ĐỘI: ${document.getElementById("tab1-team").value.trim()}` : "", pad + imgBoxSize + pad + imgBoxSize + pad + imgBoxSize + pad, textY);
-
+        if (Math.floor(Date.now() / 1000) % 2 === 0) { ctx.fillStyle = "#dc3545"; ctx.font = `bold ${lineGap * 0.8}px Arial`; ctx.fillText("● REC (VIDEO)", txtX, textY); }
+        textY += lineGap; ctx.fillStyle = "#ffffff"; ctx.font = `bold ${lineGap * 0.55}px Arial`; ctx.fillText(`GPS: ${currentGpsData.text}`, txtX, textY);
+        textY += lineGap; ctx.fillStyle = "#0dcaf0"; ctx.fillText(`T.GIAN: ${new Date().toLocaleTimeString("vi-VN")}`, txtX, textY);
+        textY += lineGap; ctx.fillStyle = "#ffc107"; ctx.fillText(document.getElementById("tab1-team").value.trim() ? `ĐỘI: ${document.getElementById("tab1-team").value.trim()}` : "", txtX, textY);
         animationFrameId = requestAnimationFrame(drawVideoFrame);
     }
 
@@ -1534,46 +1131,38 @@
         const audioStream = new MediaStream(localStream.getAudioTracks()); let mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
         try { audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType }); } catch(e) { return alert("Lỗi ghi âm: " + e.message); }
         audioChunks = []; audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-        audioRecorder.onstop = () => {
-            if (audioChunks.length === 0 || audioRecordingTime < 1) return;
-            const blob = new Blob(audioChunks, { type: mimeType });
-            currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`;
-            currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'audio'; showMediaPreview();
-        };
-        isAudioRecording = true; audioRecordingTime = 0;
-        const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm";
-        audioRecorder.start();
-        audioInterval = setInterval(() => { audioRecordingTime++; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`; }, 1000);
+        audioRecorder.onstop = () => { if (audioChunks.length === 0 || audioRecordingTime < 1) return; currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`; currentMediaBlobUrl = URL.createObjectURL(new Blob(audioChunks, { type: mimeType })); currentMediaType = 'audio'; showMediaPreview(); };
+        isAudioRecording = true; audioRecordingTime = 0; const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm";
+        audioRecorder.start(); audioInterval = setInterval(() => { audioRecordingTime++; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`; }, 1000);
     }
-    function stopAudioRecording() {
-        if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval);
-        const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`;
-    }
+    function stopAudioRecording() { if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval); const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`; }
 
-    // 🛠️ PHÁT TRIỂN MỚI: CHỨC NĂNG BÓC BĂNG ĐỘC LẬP (KHÔNG XUNG ĐỘT AUDIO SESSION MOBILE)
-    function toggleStandaloneTranscribe() {
-        if (isStandaloneTranscribing) { stopStandaloneTranscribe(); } 
-        else { startStandaloneTranscribe(); }
-    }
-
+    // 🛠️ TỐI ƯU ĐỘC QUYỀN CHO MOBILE: Tắt hẳn Camera để thu âm bóc băng không tiếng vọng
+    function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
+    
     function startStandaloneTranscribe() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; 
         if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ dịch thuật giọng nói!");
         
-        standaloneRecognition = new SpeechRecognition();
-        standaloneRecognition.lang = 'vi-VN';
-        standaloneRecognition.continuous = true;
+        // 1. GIẢI PHÓNG PHẦN CỨNG LOCK ĐỂ BIẾN IPHONE THÀNH THIẾT BỊ NGHE THUẦN TÚY
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+            document.getElementById("video-preview").srcObject = null;
+        }
+
+        standaloneRecognition = new SpeechRecognition(); 
+        standaloneRecognition.lang = 'vi-VN'; 
+        standaloneRecognition.continuous = true; 
         standaloneRecognition.interimResults = true;
 
-        const btn = document.getElementById("btn-standalone-stt");
-        const textArea = document.getElementById("standalone-stt-result");
-        let baseText = textArea.value.trim();
-        if (baseText) baseText += "\n";
+        const btn = document.getElementById("btn-standalone-stt"); 
+        const textArea = document.getElementById("standalone-stt-result"); 
+        let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
 
         standaloneRecognition.onstart = () => {
             isStandaloneTranscribing = true;
-            btn.classList.replace("btn-warning", "btn-danger");
-            btn.classList.add("storage-alarm");
+            btn.classList.replace("btn-warning", "btn-danger"); btn.classList.add("storage-alarm");
             document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)";
         };
 
@@ -1587,17 +1176,21 @@
         };
 
         standaloneRecognition.onerror = (e) => {
-            console.error("Lỗi STT độc lập: ", e.error);
-            if (e.error === 'network') {
-                textArea.value += "\n[⚠️ Không có mạng Internet để gửi gói nhận diện AI]";
-            }
+            console.error("Lỗi hệ thống dịch:", e.error);
+            if (e.error === 'no-speech') return; // Bỏ qua thông báo khi lặng tiếng
+            textArea.value += `\n[⚠️ Lỗi luồng dịch AI: ${e.error}]`;
         };
 
         standaloneRecognition.onend = () => {
             if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} }
         };
 
-        try { standaloneRecognition.start(); } catch(e) { alert("Lỗi mở Mic: " + e.message); }
+        try { 
+            standaloneRecognition.start(); 
+        } catch(e) { 
+            alert("Lỗi mở Mic: " + e.message); 
+            if (isCameraOn) initCamera();
+        }
     }
 
     function stopStandaloneTranscribe() {
@@ -1606,71 +1199,19 @@
         const btn = document.getElementById("btn-standalone-stt");
         btn.classList.remove("storage-alarm"); btn.classList.replace("btn-danger", "btn-warning");
         document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
+
+        // 2. KHỞI ĐỘNG LẠI CAMERA SAU KHI HOÀN THÀNH PHIÊN BÓC BĂNG NGOÀI
+        if (isCameraOn) { initCamera(); }
     }
 
-    function copyStandaloneSTT() {
-        const txt = document.getElementById("standalone-stt-result"); txt.select();
-        document.execCommand("copy"); alert("Đã sao chép văn bản bóc băng vào bộ nhớ tạm!");
-    }
+    function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản bóc băng!"); }
+    function clearStandaloneSTT() { if(confirm("Xóa bảng chữ đã bóc băng?")) document.getElementById("standalone-stt-result").value = ""; }
 
-    function clearStandaloneSTT() {
-        if(confirm("Xóa bảng chữ đã bóc băng?")) document.getElementById("standalone-stt-result").value = "";
-    }
-
-    function showMediaPreview() {
-        const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container");
-        document.getElementById("transcribe-result").value = "";
-        if (currentMediaType === 'video') {
-            container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width: 100%; max-height: 400px;"></video>`;
-            transcribeBox.classList.add("d-none");
-        } else {
-            container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width: 90%; margin: 20px 0;"></audio>`;
-            transcribeBox.classList.remove("d-none");
-        }
-        new bootstrap.Modal(document.getElementById('mediaPreviewModal')).show();
-    }
-
-    function discardMedia() {
-        const player = document.getElementById("preview-player"); if(player) { player.pause(); player.src = ""; }
-        if(offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} }
-        if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl); currentMediaBlobUrl = null;
-        bootstrap.Modal.getInstance(document.getElementById('mediaPreviewModal')).hide();
-    }
-
-    function downloadMedia() {
-        if (!currentMediaBlobUrl) return;
-        const a = document.createElement('a'); a.style.display = 'none'; a.href = currentMediaBlobUrl; a.download = currentMediaFilename;
-        document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); }, 100);
-        discardMedia();
-    }
-
-    function startAudioTranscription() {
-        const player = document.getElementById("preview-player"); if(!player) return;
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ bóc băng.");
-        if (offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} }
-        offlineRecognition = new SpeechRecognition(); offlineRecognition.lang = 'vi-VN'; offlineRecognition.continuous = true; offlineRecognition.interimResults = true;
-        const textArea = document.getElementById("transcribe-result"); textArea.value = "⏳ Đang nhận diện...";
-        let finalTranscript = '';
-        offlineRecognition.onresult = (event) => {
-            let interimTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. ';
-                else interimTranscript += event.results[i][0].transcript;
-            }
-            textArea.value = finalTranscript + interimTranscript;
-        };
-        offlineRecognition.onstart = () => { player.play(); };
-        offlineRecognition.onend = () => {
-            document.getElementById("btn-start-transcribe").innerHTML = `<i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`;
-            document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info");
-        };
-        try { 
-            offlineRecognition.start();
-            const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG TRÍCH XUẤT CHỮ...`;
-            btn.classList.replace("btn-outline-info", "btn-danger");
-        } catch(e) {}
-    }
+    function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width:100%; max-height:400px;"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width:90%; margin:20px 0;"></audio>`; transcribeBox.classList.remove("d-none"); } new bootstrap.Modal(document.getElementById('mediaPreviewModal')).show(); }
+    function discardMedia() { const player = document.getElementById("preview-player"); if(player) { player.pause(); player.src = ""; } if(offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} } if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl); currentMediaBlobUrl = null; bootstrap.Modal.getInstance(document.getElementById('mediaPreviewModal')).hide(); }
+    function downloadMedia() { if (!currentMediaBlobUrl) return; const a = document.createElement('a'); a.style.display = 'none'; a.href = currentMediaBlobUrl; a.download = currentMediaFilename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); }, 100); discardMedia(); }
+    function startAudioTranscription() { const player = document.getElementById("preview-player"); if(!player) return; const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ bóc băng."); if (offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} } offlineRecognition = new SpeechRecognition(); offlineRecognition.lang = 'vi-VN'; offlineRecognition.continuous = true; offlineRecognition.interimResults = true; const textArea = document.getElementById("transcribe-result"); textArea.value = "⏳ Đang nhận diện..."; let finalTranscript = ''; offlineRecognition.onresult = (event) => { let interimTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = finalTranscript + interimTranscript; }; offlineRecognition.onstart = () => { player.play(); }; offlineRecognition.onend = () => { document.getElementById("btn-start-transcribe").innerHTML = `<i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info"); }; try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG TRÍCH XUẤT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {} }
+    function renderGallery() { const grid = document.getElementById("gallery-grid"); const emptyMsg = document.getElementById("gallery-empty-msg"); document.getElementById("select-all-checkbox").checked = false; document.getElementById("selected-counter").innerText = "Đã chọn: 0"; const showQT = document.getElementById("toggle-show-qt").checked; const itemsToRender = showQT ? repoStitched : repoStitched.filter(x => x.type !== "STITCHED_QT"); if (itemsToRender.length === 0) { grid.innerHTML = ""; emptyMsg.classList.remove("d-none"); return; } emptyMsg.classList.add("d-none"); let html = ""; itemsToRender.forEach(item => { const qtBadge = item.type === "STITCHED_QT" ? `<span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2;">QUÁ TRÌNH</span>` : ""; html += `<div class="col-12 col-sm-6" id="card_${item.id}"><div class="photo-card stitched shadow-sm">${qtBadge}<input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${item.id}" onchange="calculateSelection()"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-2"><div class="small fw-bold text-info text-break">${item.name}</div><div class="text-secondary" style="font-size:11px;">${item.timestampStr}</div></div></div></div>`; }); grid.innerHTML = html; }
 </script>
 <script>
         // Tự động kích hoạt đăng ký bộ nhớ nền PWA
