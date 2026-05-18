@@ -496,7 +496,7 @@
     
     let globalExtras = { selfie: null, map: null, compass: null };
 
-    const dbRequest = indexedDB.open("AirGapCameraV38", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV40", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) {
@@ -1452,46 +1452,39 @@ ${finalName}`);
     }
 
     function renderPending() {
-        const boxB = document.getElementById("list-before"); 
-        const boxP = document.getElementById("list-process"); 
-        const boxA = document.getElementById("list-after");
-        
-        const GAP_MS = 15 * 60 * 1000; // 15 phút
+        const GAP_MS = 15 * 60 * 1000;
         const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => {
             if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>';
-            let h = '';
+            let listHtml = '';
             repo.forEach((item, index) => {
                 const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' });
-                h += `<div class="photo-card mb-2" id="card_${item.id}">
+                listHtml += `<div class="photo-card mb-2" id="card_${item.id}">
                         <input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}">
                         <img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')">
                         <div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div>
                       </div>`;
                 
-                // Mảng sắp xếp giảm dần (mới nhất index 0). item là mới, nextItem là cũ.
                 if (index < repo.length - 1) {
                     const nextItem = repo[index+1];
                     let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
                     
                     if (!isNewSession) {
                         if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') {
-                            // Chuyển phiên nếu có một ảnh SAU được chụp xen giữa
                             isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs);
                         } else if (typeStr === 'SAU') {
-                            // Chuyển phiên nếu có một ảnh TRƯỚC được chụp xen giữa
                             isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs);
                         }
                     }
                     
                     if (isNewSession) {
-                        h += `<div class="w-100 text-center my-2 position-relative" style="height: 20px;">
+                        listHtml += `<div class="w-100 text-center my-2 position-relative" style="height: 20px;">
                                 <div class="position-absolute w-100 border-bottom border-${color}" style="top: 10px; border-style: dashed !important; opacity: 0.4;"></div>
-                                <span class="badge bg-dark text-${color} border border-${color} position-relative" style="font-size:9px;">Chuyển Phiên</span>
+                                <span class="badge bg-dark text-${color} border border-${color} position-relative px-1" style="font-size:9px;">Chuyển Phiên</span>
                               </div>`;
                     }
                 }
             });
-            return h;
+            return listHtml;
         };
 
         const boxB = document.getElementById("list-before"); 
