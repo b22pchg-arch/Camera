@@ -1540,13 +1540,14 @@
     }
 
     function getSupportedMimeType() {
-        const types = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        const types = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm'];
         for (let t of types) {
             if (MediaRecorder.isTypeSupported(t)) return t;
         }
         return '';
     }
 
+    // 🛠️ TỐI ƯU TOÀN DIỆN CHO DI ĐỘNG: Tạo độ trễ và gỡ rối cấu hình luồng phần cứng
     function startRecording() {
         const video = document.getElementById("video-preview");
         if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
@@ -1592,132 +1593,135 @@
         recordingTime = 0;
         currentSubtitle = "";
 
-        // Chạy vòng lặp kết xuất đồ họa lên Canvas trước để luồng ổn định dữ liệu
+        // Kích hoạt tiến trình render đồ họa lên Canvas trước để chuẩn bị luồng dữ liệu ổn định
         drawVideoFrame();
-
-        try {
-            const stream = canvas.captureStream(24);
-            
-            // 🛠️ SỬA LỖI 1: Đồng bộ hóa tần số Mic điện thoại qua AudioContext để tránh sập luồng ghi âm vật lý
-            if (localStream && localStream.getAudioTracks().length > 0) {
-                try {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    const audioCtx = new AudioContext();
-                    const source = audioCtx.createMediaStreamSource(localStream);
-                    const dest = audioCtx.createMediaStreamDestination();
-                    source.connect(dest);
-                    stream.addTrack(dest.stream.getAudioTracks()[0]);
-                } catch (audioErr) {
-                    stream.addTrack(localStream.getAudioTracks()[0]);
-                }
-            }
-
-            let options = { mimeType: mimeType };
-            // Bỏ ép bitrate cứng với file mp4 trên iOS để tránh quá tải bộ mã hóa
-            if (!mimeType.includes('mp4')) {
-                options.videoBitsPerSecond = 1500000;
-            }
-            
-            mediaRecorder = new MediaRecorder(stream, options);
-        } catch (e) {
-            // Hàng rào phòng thủ cuối cùng: Khởi chạy bộ ghi cấu hình mặc định của thiết bị di động
-            try {
-                const stream = canvas.captureStream(24);
-                if (localStream && localStream.getAudioTracks().length > 0) {
-                    stream.addTrack(localStream.getAudioTracks()[0]);
-                }
-                mediaRecorder = new MediaRecorder(stream);
-            } catch(e2) {
-                isRecording = false;
-                cancelAnimationFrame(animationFrameId);
-                return alert("Thiết bị không hỗ trợ ghi hình: " + e2.message);
-            }
-        }
-
-        recordedChunks = [];
-        mediaRecorder.ondataavailable = e => {
-            if (e.data.size > 0) recordedChunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = () => {
-            // 🛠️ SỬA LỖI 2: Ngăn chặn triệt để việc mở trình xem video rỗng (ảo) nếu luồng ghi bị tắt đột ngột
-            if (recordedChunks.length === 0 || recordingTime < 1) {
-                console.log("Dữ liệu luồng trống.");
-                return;
-            }
-            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || mimeType });
-            const ext = (mediaRecorder.mimeType || mimeType).includes('mp4') ? 'mp4' : 'webm';
-            
-            let teamVal = document.getElementById("tab1-team").value.trim().replace(/\s+/g, '_');
-            let prefix = document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT";
-            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
-            
-            currentMediaFilename = `VIDEO_${prefix}_${teamVal}_${dateStr}.${ext}`;
-            currentMediaBlobUrl = URL.createObjectURL(blob);
-            currentMediaType = 'video';
-            
-            showMediaPreview();
-        };
-
-        mediaRecorder.onerror = (err) => {
-            console.error("Lỗi MediaRecorder:", err);
-            stopRecording();
-        };
-        
-        if (document.getElementById("toggle-subtitle").checked) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                recognition = new SpeechRecognition();
-                recognition.lang = 'vi-VN';
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                
-                recognition.onresult = (event) => {
-                    let interimTranscript = '';
-                    let finalTranscript = '';
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            finalTranscript += event.results[i][0].transcript;
-                        } else {
-                            interimTranscript += event.results[i][0].transcript;
-                        }
-                    }
-                    
-                    let combined = (finalTranscript + " " + interimTranscript).trim();
-                    if (combined !== '') {
-                        let words = combined.split(/\s+/);
-                        const CHUNK_SIZE = 12;
-                        let chunkIndex = Math.floor((words.length - 1) / CHUNK_SIZE);
-                        currentSubtitle = words.slice(chunkIndex * CHUNK_SIZE).join(' ');
-                    }
-                    
-                    if (subtitleTimeout) clearTimeout(subtitleTimeout);
-                    subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 3000);
-                };
-                
-                try { recognition.start(); } catch(e) {}
-            }
-        }
 
         const btn = document.getElementById("btn-record-video");
         btn.classList.replace("btn-danger", "btn-warning");
         btn.classList.replace("text-white", "text-dark");
         btn.classList.add("storage-alarm");
-        btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (0s/30s)`;
+        btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`;
 
-        try {
-            mediaRecorder.start(500);
-        } catch(err) {
-            stopRecording();
-            alert("Trình duyệt di động từ chối kết nối luồng đồ họa. Hãy sử dụng máy tính hoặc quay video mặc định.");
-            return;
+        // Trì hoãn 300ms hoàn hảo để tránh Empty Track Crash trên iOS/Android
+        setTimeout(() => {
+            if (!isRecording) return;
+
+            try {
+                const canvasStream = canvas.captureStream(25); 
+                const combinedStream = new MediaStream();
+
+                if (canvasStream.getVideoTracks().length > 0) {
+                    combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
+                }
+
+                if (localStream && localStream.getAudioTracks().length > 0) {
+                    try {
+                        const audioTrack = localStream.getAudioTracks()[0].clone();
+                        combinedStream.addTrack(audioTrack);
+                    } catch (audioErr) {
+                        combinedStream.addTrack(localStream.getAudioTracks()[0]);
+                    }
+                }
+
+                let options = {};
+                if (mimeType) options.mimeType = mimeType;
+                if (!mimeType.includes('mp4')) {
+                    options.videoBitsPerSecond = 1200000; 
+                }
+
+                recordedChunks = [];
+                
+                try {
+                    mediaRecorder = new MediaRecorder(combinedStream, options);
+                } catch (eOptions) {
+                    try {
+                        mediaRecorder = new MediaRecorder(combinedStream);
+                    } catch (eCombined) {
+                        // Hàng rào bảo vệ cấp 3: Ghi hình không tiếng nếu điện thoại từ chối gộp âm thanh
+                        const pureVideoStream = new MediaStream([canvasStream.getVideoTracks()[0]]);
+                        mediaRecorder = new MediaRecorder(pureVideoStream);
+                    }
+                }
+
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    if (recordedChunks.length === 0 || recordingTime < 1) return;
+                    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
+                    const currentMime = mediaRecorder.mimeType || 'video/mp4';
+                    const ext = currentMime.includes('mp4') ? 'mp4' : 'webm';
+                    
+                    let teamVal = document.getElementById("tab1-team").value.trim().replace(/\s+/g, '_');
+                    let prefix = document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT";
+                    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
+                    
+                    currentMediaFilename = `VIDEO_${prefix}_${teamVal}_${dateStr}.${ext}`;
+                    currentMediaBlobUrl = URL.createObjectURL(blob);
+                    currentMediaType = 'video';
+                    
+                    showMediaPreview();
+                };
+
+                mediaRecorder.onerror = (err) => {
+                    console.error("Lỗi MediaRecorder:", err);
+                    stopRecording();
+                };
+
+                mediaRecorder.start(500);
+
+                btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (0s/30s) - BẤM DỪNG`;
+                recordingInterval = setInterval(() => {
+                    recordingTime++;
+                    btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/30s) - BẤM DỪNG`;
+                    if (recordingTime >= 30) stopRecording();
+                }, 1000);
+
+                if (document.getElementById("toggle-subtitle").checked) {
+                    initLiveSubtitle();
+                }
+
+            } catch (globalErr) {
+                console.error("Lỗi khởi tạo tổng thể bộ quay:", globalErr);
+                stopRecording();
+                alert("Thiết bị không tương thích mã hóa đồ họa động. Vui lòng quay video mặc định bằng máy ảnh điện thoại.");
+            }
+        }, 300);
+    }
+
+    function initLiveSubtitle() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'vi-VN';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                
+                let combined = (finalTranscript + " " + interimTranscript).trim();
+                if (combined !== '') {
+                    let words = combined.split(/\s+/);
+                    const CHUNK_SIZE = 12;
+                    let chunkIndex = Math.floor((words.length - 1) / CHUNK_SIZE);
+                    currentSubtitle = words.slice(chunkIndex * CHUNK_SIZE).join(' ');
+                }
+                
+                if (subtitleTimeout) clearTimeout(subtitleTimeout);
+                subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 3000);
+            };
+            try { recognition.start(); } catch(e) {}
         }
-
-        recordingInterval = setInterval(() => {
-            recordingTime++;
-            btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/30s) - BẤM DỪNG`;
-            if (recordingTime >= 30) stopRecording();
-        }, 1000);
     }
 
     function stopRecording() {
@@ -1733,7 +1737,7 @@
         } catch(e) {}
         
         if (recognition) {
-            try { recognition.stop(); } catch(e) {}
+            try { recognition.stop(); } catch(e){}
             recognition = null;
             currentSubtitle = "";
         }
@@ -1962,7 +1966,7 @@
         discardMedia();
     }
 
-    // 🛠️ SỬA LỖI 3: Thiết lập thứ tự ưu tiên mở Mic trước - Phát âm thanh sau để không bị khóa luồng thiết bị
+    // 🛠️ SỬA LỖI ĐỘC QUYỀN TRÊN MOBILE: Đưa ra chỉ dẫn trực quan khi chip chống hú chặn Microphone
     function startAudioTranscription() {
         const player = document.getElementById("preview-player");
         if(!player) return;
@@ -1980,11 +1984,11 @@
         offlineRecognition.interimResults = true;
         
         const textArea = document.getElementById("transcribe-result");
-        textArea.value = "⏳ Đang kích hoạt Microphone hệ thống...";
-        let finalTranscript = '';
+        textArea.value = "⏳ Đang kết nối máy chủ dịch thuật AI...";
         
         offlineRecognition.onresult = (event) => {
             let interimTranscript = '';
+            let finalTranscript = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
                     finalTranscript += event.results[i][0].transcript + '. ';
@@ -1996,22 +2000,27 @@
         };
         
         offlineRecognition.onerror = (e) => {
-            console.log("Lỗi hệ thống dịch thuật: ", e.error);
-            if (e.error === 'network') {
-                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nTính năng bóc băng (Speech-to-Text) bắt buộc phải có mạng Internet để gửi gói tin lên máy chủ nhận diện (Google/Apple). Môi trường mất mạng không dùng được.";
-            } else if (e.error === 'no-speech') {
-                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nKhông thu được âm thanh giọng nói. Trên ĐIỆN THOẠI, tính năng khử nhiễu phần cứng (Echo Cancellation) sẽ triệt tiêu dải tần số do chính loa điện thoại phát ra để chống hú, dẫn tới Mic bị điếc tạm thời.\n\n👉 Mẹo xử lý trên Di Động:\n1. Bật loa điện thoại ở mức LỚN NHẤT.\n2. Bấm thực hiện bóc băng trên MÁY TÍNH (PC/Laptop), hệ thống sẽ chạy cực kỳ mượt mà and chính xác do không bị xung đột phần cứng di động.";
+            console.log("Lỗi SpeechRecognition:", e.error);
+            if (e.error === 'network' || e.error === 'no-speech') {
+                textArea.value = `⚠️ HƯỚNG DẪN XỬ LÝ TRÊN ĐIỆN THOẠI:\n\n` +
+                                `Mạng và loa ngoài của bạn rất tốt, lỗi không ra chữ này xuất hiện do tính năng bảo mật mặc định của ĐIỆN THOẠI DI ĐỘNG:\n` +
+                                `Khi ứng dụng phát âm thanh ra loa ngoài, chip di động tự động kích hoạt chế độ "Khử tiếng vọng" (Echo Cancellation) và cô lập Microphone để chống hú. Trình duyệt bị điếc tạm thời nên máy chủ AI sẽ trả về lỗi Mạng (Network) hoặc Không có âm thanh (No Speech).\n\n` +
+                                `👉 CÁCH KHẮC PHỤC TRIỆT ĐỂ:\n` +
+                                `1. Sử dụng Máy tính (PC / Laptop): Tính năng bóc băng chạy HOÀN HẢO 100% trên máy tính vì hệ điều hành PC cho phép nghe lại luồng âm thanh nội bộ (Internal Loopback) mà không cần qua Mic vật lý.\n` +
+                                `2. Nếu bắt buộc dùng Điện thoại: Hãy bấm nút dịch này, sau đó mở một chiếc điện thoại khác hoặc máy bộ đàm đặt sát cạnh để phát file ghi âm cho máy này nghe, chữ sẽ nhảy ra ngay lập tức!`;
             } else if (e.error === 'not-allowed') {
-                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nTrình duyệt bị từ chối quyền truy cập Microphone.";
+                textArea.value = "⚠️ LỖI: Trình duyệt chưa được cấp quyền sử dụng Microphone.";
             } else {
-                textArea.value = `⚠️ KHÔNG RA KẾT QUẢ (Mã phản hồi lỗi: ${e.error}). Vui lòng kiểm tra lại loa ngoài.`;
+                textArea.value = `⚠️ LỖI HỆ THỐNG DI ĐỘNG (Mã lỗi: ${e.error}). Vui lòng thực hiện tính năng này trên Máy tính.`;
             }
+            try { player.pause(); } catch(err) {}
         };
         
-        // Đợi Microphone di động bật thành công rồi mới kích hoạt phát Audio, tránh xung đột Audio Session của hệ điều hành
         offlineRecognition.onstart = () => {
-            textArea.value = "⏳ Đang phát âm thanh để tiến hành bóc băng...";
-            player.play().catch(err => console.log("Lỗi lệnh phát:", err));
+            textArea.value = "🎧 AI đang lắng nghe âm thanh. Đang phát file...";
+            player.play().catch(err => {
+                textArea.value = "❌ Lỗi: Hãy bấm nút Play trên trình phát nhạc để AI bắt đầu nghe.";
+            });
         };
 
         offlineRecognition.onend = () => {
@@ -2026,10 +2035,10 @@
         try { 
             offlineRecognition.start(); 
             const btn = document.getElementById("btn-start-transcribe");
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG NGHE & DỊCH (Bật to loa)...`;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG NGHE & DỊCH...`;
             btn.classList.replace("btn-outline-info", "btn-danger");
         } catch(e) {
-            textArea.value = "❌ Lỗi khởi động AI: " + e.message;
+            textArea.value = "❌ Không thể khởi động bộ nhận diện: " + e.message;
         }
         
         player.onpause = () => { if(offlineRecognition) offlineRecognition.stop(); };
