@@ -484,14 +484,20 @@ function showUpdateNotification() {
                     <button class="btn btn-sm btn-outline-warning flex-fill fw-bold py-2" onclick="startP2PHandshake(false)"><i class="fa-solid fa-inbox me-1"></i> MÁY B (NHẬN)</button>
                 </div>
                 <div id="p2p-handshake-panel" class="border border-secondary rounded p-2 bg-black bg-opacity-25 d-none">
-                    <div class="small fw-bold text-warning mb-2" id="p2p-status-lbl">Trạng thái: Đang chờ thao tác...</div>
-                    <div id="p2p-qr-box" class="text-center my-2 p-2 bg-white rounded d-none mx-auto" style="width: 200px; height: 200px;">
-                        <div id="p2p-qrcode-canvas" style="display: inline-block;"></div>
-                    </div>
-                    <textarea id="p2p-sdp-text" class="form-control form-control-sm bg-dark text-light small mb-2 text-center" rows="2" readonly placeholder="Chuỗi ký tự bắt tay WebRTC..."></textarea>
-                    <button id="btn-p2p-scan" class="btn btn-sm btn-info text-dark w-100 fw-bold mb-2" onclick="scanP2PPartnerQR()"><i class="fa-solid fa-camera me-1"></i> BẮT ĐẦU QUÉT MÃ MÁY ĐỐI DIỆN</button>
-                    <button id="btn-p2p-send-data" class="btn btn-sm btn-success w-100 fw-bold d-none py-2" onclick="sendDataOverP2P()"><i class="fa-solid fa-bolt me-1"></i> BẮN TOÀN BỘ ẢNH SANG MÁY B</button>
-                </div>
+    <div class="small fw-bold text-warning mb-2" id="p2p-status-lbl">Trạng thái: Đang chờ thao tác...</div>
+    
+    <div id="p2p-video-scan-container" class="d-none my-2 border border-info rounded overflow-hidden position-relative mx-auto" style="max-width: 320px; aspect-ratio: 4/3; background: #000;">
+        <video id="p2p-scanner-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 65%; height: 65%; border: 2px dashed #0dcaf0; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
+    </div>
+
+    <div id="p2p-qr-box" class="text-center my-2 p-2 bg-white rounded d-none mx-auto" style="width: 200px; height: 200px;">
+        <div id="p2p-qrcode-canvas" style="display: inline-block;"></div>
+    </div>
+    <textarea id="p2p-sdp-text" class="form-control form-control-sm bg-dark text-light small mb-2 text-center" rows="2" readonly placeholder="Chuỗi ký tự bắt tay WebRTC..."></textarea>
+    <button id="btn-p2p-scan" class="btn btn-sm btn-info text-dark w-100 fw-bold mb-2" onclick="scanP2PPartnerQR()"><i class="fa-solid fa-camera me-1"></i> BẮT ĐẦU QUÉT MÃ MÁY ĐỐI DIỆN</button>
+    <button id="btn-p2p-send-data" class="btn btn-sm btn-success w-100 fw-bold d-none py-2" onclick="sendDataOverP2P()"><i class="fa-solid fa-bolt me-1"></i> BẮN TOÀN BỘ ẢNH SANG MÁY B</button>
+</div>
             </div>
 
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
@@ -1697,26 +1703,75 @@ function showUpdateNotification() {
     }
 
     async function scanP2PPartnerQR() {
-        if (!window.BarcodeDetector) {
-            let inputSdp = prompt("Trình duyệt không hỗ trợ quét mã trực tiếp. Hãy dán chuỗi ký tự nhận được từ máy đối diện:");
-            if (inputSdp) applyRemoteSDP(inputSdp);
+    const scanContainer = document.getElementById("p2p-video-scan-container");
+    const scanVideo = document.getElementById("p2p-scanner-video");
+    
+    // Nếu trình duyệt hoặc WebView (như Zalo) bị cắt lõi nhận diện mã
+    if (!window.BarcodeDetector) {
+        let inputSdp = prompt("Trình duyệt không hỗ trợ camera quét trực tiếp.\nAnh hãy sao chép 'Chuỗi ký tự bắt tay' từ máy đối diện và dán vào ô dưới đây:");
+        if (inputSdp) applyRemoteSDP(inputSdp);
+        return;
+    }
+
+    // Mở khung ngắm phụ tại Tab đồng bộ và ẩn mã QR của mình đi để lấy chỗ hiển thị
+    scanContainer.classList.remove("d-none");
+    document.getElementById("p2p-qr-box").classList.add("d-none");
+    
+    // Gắn trực tiếp luồng camera đang chạy ngầm vào kính ngắm phụ này
+    if (localStream) {
+        scanVideo.srcObject = localStream;
+    } else {
+        try {
+            // Nếu camera chưa được bật ở Tab 1, xin cấp luồng mới tại đây
+            let s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            localStream = s;
+            scanVideo.srcObject = s;
+        } catch(err) {
+            alert("Không thể kết nối phần cứng Camera: " + err.message);
+            scanContainer.classList.add("d-none");
             return;
         }
-        alert("Hệ thống kích hoạt quét. Hãy đưa luồng Camera Máy Ảnh chính hướng về mã QR của máy đối diện.");
-        const detector = new BarcodeDetector({ formats: ['qr_code'] });
-        const video = document.getElementById("video-preview");
-        
-        let timer = setInterval(async () => {
-            try {
-                const barcodes = await detector.detect(video);
+    }
+
+    const detector = new BarcodeDetector({ formats: ['qr_code'] });
+    document.getElementById("p2p-status-lbl").className = "small fw-bold text-info animate-pulse";
+    document.getElementById("p2p-status-lbl").innerText = "Trạng thái: 📷 HÃY NGẮM CAMERA VÀO MÃ QR CỦA MÁY ĐỐI DIỆN...";
+
+    // Khởi động bộ quét chuỗi lặp lại tốc độ cao (250ms/lần)
+    let timer = setInterval(async () => {
+        try {
+            // Chỉ quét khi camera đã có luồng hình ảnh thực tế truyền về
+            if (scanVideo.readyState === scanVideo.HAVE_CURRENT_DATA || scanVideo.readyState === scanVideo.HAVE_ENOUGH_DATA) {
+                const barcodes = await detector.detect(scanVideo);
                 if (barcodes.length > 0) {
                     clearInterval(timer);
+                    
+                    // Quét trúng đích -> Ngắt camera phụ và đóng khung kính ngắm
+                    scanVideo.srcObject = null;
+                    scanContainer.classList.add("d-none");
+                    
+                    // Nạp chuỗi cấu hình bắt tay mạng
                     applyRemoteSDP(barcodes[0].rawValue);
                 }
-            } catch(e) {}
-        }, 300);
-        setTimeout(() => clearInterval(timer), 20000); // Tự hủy sau 20 giây chống tràn bộ nhớ
-    }
+            }
+        } catch(e) { console.error("Lỗi phân tích frame quét:", e); }
+    }, 250);
+
+    // Chế độ tự động hủy (Timeout) sau 30 giây nếu anh em không đưa mã vào ngắm để tránh nóng máy
+    setTimeout(() => {
+        clearInterval(timer);
+        if (!scanContainer.classList.contains("d-none")) {
+            scanVideo.srcObject = null;
+            scanContainer.classList.add("d-none");
+            document.getElementById("p2p-status-lbl").className = "small fw-bold text-danger";
+            document.getElementById("p2p-status-lbl").innerText = "Trạng thái: Đã hết thời gian chờ quét mã QR.";
+            
+            // Kích hoạt giải pháp dự phòng cuối cùng: Cho phép nhập chuỗi chữ bằng tay
+            let inputSdp = prompt("Không quét được mã QR tự động. Anh có thể sao chép chuỗi mã hóa bắt tay từ máy đối diện và dán vào đây:");
+            if (inputSdp) applyRemoteSDP(inputSdp);
+        }
+    }, 30000);
+}
 
     function applyRemoteSDP(scannedSdp) {
         try {
