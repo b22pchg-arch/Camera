@@ -53,13 +53,53 @@
     </style>
     
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('✅ Đăng ký Hệ Thống PWA Thành Công:', reg.scope))
-                    .catch(err => console.error('❌ Lỗi khởi động PWA:', err));
+       const APP_VERSION = '52.2'; // <--- Khi có bản mới, anh CHỈ CẦN đổi số này ở đây!
+let newWorker;
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        // Truyền biến version vào URL của sw.js
+        navigator.serviceWorker.register(`sw.js?v=${APP_VERSION}`)
+            .then(reg => {
+                console.log(`✅ Hệ thống PWA chạy phiên bản: ${APP_VERSION}`);
+
+                if (reg.waiting) {
+                    newWorker = reg.waiting;
+                    showUpdateNotification();
+                }
+
+                reg.addEventListener('updatefound', () => {
+                    const installingWorker = reg.installing;
+                    installingWorker.addEventListener('statechange', () => {
+                        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            newWorker = installingWorker;
+                            showUpdateNotification();
+                        }
+                    });
+                });
             });
-        }
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            window.location.reload();
+        });
+    });
+}
+
+function showUpdateNotification() {
+    // Giao diện Banner thông báo (giữ nguyên như hướng dẫn trước)
+    const banner = document.createElement('div');
+    banner.innerHTML = `<div style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#ffc107;color:#111;padding:12px;border-radius:8px;z-index:9999;display:flex;gap:15px;align-items:center;font-weight:bold;font-size:13px;border:2px solid #fff;box-shadow:0 4px 15px rgba(0,0,0,0.5);">
+        <span><i class="fa-solid fa-bell fa-bounce me-1"></i> CÓ PHIÊN BẢN MỚI (${APP_VERSION})!</span>
+        <button id="pwa-update-btn" style="background:#dc3545;color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;">CẬP NHẬT</button>
+    </div>`;
+    document.body.appendChild(banner);
+    document.getElementById('pwa-update-btn').addEventListener('click', () => {
+        if (newWorker) newWorker.postMessage({ action: 'skipWaiting' });
+    });
+}
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
