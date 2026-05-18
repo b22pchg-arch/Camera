@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V42.0 - Offline Ready)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V43.0)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -44,7 +44,6 @@
         .storage-alarm { animation: pulse-red 1.5s infinite; color: #fff !important; border: none !important; }
         .cursor-pointer { cursor: pointer; }
         
-        /* Chỉ định CSS fallback ẩn hiện thủ công cho Offline */
         .collapse { display: none; }
         .collapse.show { display: block; }
     </style>
@@ -56,7 +55,7 @@
         <h5 class="text-info m-0 fw-bold"><i class="fa-solid fa-bolt me-2"></i>GIÁM SÁT HIỆN TRƯỜNG</h5>
         <div class="d-flex align-items-center">
             <span class="badge bg-dark text-info border border-info px-2 py-1 small">PC TQ</span>
-            <span id="storage-status" class="badge bg-dark text-secondary border border-secondary px-2 py-1 small ms-1">Dung lượng: --</span>
+            <span id="storage-status" class="badge bg-dark text-secondary border border-secondary px-2 py-1 small ms-1">Bộ nhớ: Đang tính...</span>
         </div>
     </div>
 
@@ -492,7 +491,6 @@
 
     // --- KHỞI TẠO HỆ THỐNG VANILLA UI FALLBACK CHO AIRGAP/OFFLINE ---
     document.addEventListener("click", function(e) {
-        // 1. Fallback đóng mở accordion / collapse thủ công không cần internet
         const toggleCollapse = e.target.closest('[data-bs-toggle="collapse"]');
         if (toggleCollapse) {
             e.preventDefault();
@@ -511,7 +509,6 @@
             return;
         }
 
-        // 2. Fallback chuyển tab thủ công không cần internet
         const toggleTab = e.target.closest('[data-bs-toggle="tab"]');
         if (toggleTab) {
             e.preventDefault();
@@ -519,52 +516,42 @@
             const targetEl = document.querySelector(targetSelector);
             if (targetEl) {
                 const tabList = toggleTab.closest(".nav-tabs");
-                if (tabList) {
-                    tabList.querySelectorAll(".nav-link").forEach(btn => btn.classList.remove("active"));
-                }
+                if (tabList) { tabList.querySelectorAll(".nav-link").forEach(btn => btn.classList.remove("active")); }
                 toggleTab.classList.add("active");
 
                 const contentParent = targetEl.closest(".tab-content");
-                if (contentParent) {
-                    contentParent.querySelectorAll(".tab-pane").forEach(pane => pane.classList.remove("show", "active"));
-                }
+                if (contentParent) { contentParent.querySelectorAll(".tab-pane").forEach(pane => pane.classList.remove("show", "active")); }
                 targetEl.classList.add("show", "active");
             }
         }
     });
 
-    // --- CHỨC NĂNG ĐÓNG MỞ MODAL THỦ CÔNG ---
     function openModal(id) {
-        const el = document.getElementById(id);
-        if (!el) return;
+        const el = document.getElementById(id); if (!el) return;
         if (window.bootstrap && window.bootstrap.Modal) {
-            let modalObj = bootstrap.Modal.getInstance(el);
-            if (!modalObj) modalObj = new bootstrap.Modal(el);
+            let modalObj = bootstrap.Modal.getInstance(el); if (!modalObj) modalObj = new bootstrap.Modal(el);
             modalObj.show();
-        } else {
-            el.style.display = "block"; el.classList.add("show");
-            el.style.backgroundColor = "rgba(0,0,0,0.6)"; document.body.style.overflow = "hidden";
-        }
+        } else { el.style.display = "block"; el.classList.add("show"); el.style.backgroundColor = "rgba(0,0,0,0.6)"; document.body.style.overflow = "hidden"; }
     }
     function closeModal(id) {
-        const el = document.getElementById(id);
-        if (!el) return;
+        const el = document.getElementById(id); if (!el) return;
         if (window.bootstrap && window.bootstrap.Modal) {
-            const modalObj = bootstrap.Modal.getInstance(el);
-            if (modalObj) modalObj.hide();
-        } else {
-            el.style.display = "none"; el.classList.remove("show");
-            document.body.style.overflow = "auto";
-        }
+            const modalObj = bootstrap.Modal.getInstance(el); if (modalObj) modalObj.hide();
+        } else { el.style.display = "none"; el.classList.remove("show"); document.body.style.overflow = "auto"; }
     }
 
     // --- CƠ SỞ DỮ LIỆU INDEXEDDB ---
-    const dbRequest = indexedDB.open("AirGapCameraV42", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV43", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) { database.createObjectStore("photos", { keyPath: "id" }); }
     };
-    dbRequest.onsuccess = (e) => { db = e.target.result; loadDataFromDB(); };
+    dbRequest.onsuccess = (e) => { 
+        db = e.target.result; 
+        loadDataFromDB(); 
+        // 🛠️ SỬA LỖI 1: Gọi tính toán dung lượng ngay khi app load lên để tránh hiển thị ký tự trống "--"
+        setTimeout(calculateStorageQuota, 400); 
+    };
 
     document.addEventListener("DOMContentLoaded", () => {
         initCamera();
@@ -587,7 +574,7 @@
         setInterval(drawCompassCanvas, 200);
     });
 
-    // --- CÁC HÀM LA BÀN & GPS ---
+    // --- LA BÀN & GPS ---
     function requestCompassPermission() {
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             DeviceOrientationEvent.requestPermission()
@@ -655,7 +642,7 @@
         };
     }
 
-    // --- ĐIỀU KHIỂN CAMERA ---
+    // --- CAMERA ENGINE ---
     function initCamera() {
         if (!isCameraOn) return;
         if (localStream) { localStream.getTracks().forEach(track => track.stop()); }
@@ -664,7 +651,7 @@
             .then(stream => {
                 localStream = stream; document.getElementById("video-preview").srcObject = stream;
                 document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
-            }).catch(err => console.log("Camera offline hoặc chưa cấp quyền."));
+            }).catch(err => console.log("Hệ thống đang chạy offline hoặc đợi bàn giao Mic."));
         }
     }
     function initCameraZoom(stream) {
@@ -685,7 +672,7 @@
     }
     function toggleCamera() { if (!isCameraOn) return alert("Vui lòng bật camera!"); currentFacingMode = currentFacingMode === "environment" ? "user" : "environment"; initCamera(); }
 
-    // --- CHỤP ẢNH & XỬ LÝ ẢNH CHÂN TRANG ---
+    // --- CHỤP ẢNH & CHÂN TRANG ---
     function captureExtra(key) {
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
         const canvas = document.createElement("canvas"); let size = Math.min(video.videoWidth, video.videoHeight);
@@ -772,7 +759,7 @@
         updateUIState();
     }
 
-    // --- GHÉP ẢNH CHUYÊN NGHIỆP ---
+    // --- XỬ LÝ GHÉP ẢNH ---
     function processMultiStitching(imgObjs, itemTypeMarker, customNote, callback) {
         return new Promise((resolve) => {
             if (!imgObjs || imgObjs.length === 0) { if(callback) callback(); resolve(); return; }
@@ -792,7 +779,6 @@
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
                     ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.fillRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.fill();
                     ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
-                    // 🛠️ FIX BIẾN LỖI: Đổi maxTextWidth thành noteWidth giúp hệ thống chạy offline không vấp lỗi compile
                     ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.stroke();
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillText(noteText, noteX, noteY);
                 }
@@ -953,7 +939,7 @@
         alert(`Đã ghép tự động ${count} cặp!`); renderPending(); renderGallery();
     }
 
-    // --- ĐĂNG KÝ TẢI FILE / QUOTA LƯU TRỮ ---
+    // --- UPLOAD / LƯU TRỮ QUOTA ---
     function handleFileUpload(event, type) {
         const files = event.target.files; if (!files.length) return;
         Array.from(files).forEach(file => {
@@ -984,17 +970,26 @@
             updateUIState();
         };
     }
+    
+    // 🛠️ SỬA LỖI 1: Cập nhật hàm tính dung lượng có gán màu sắc trực quan (Xanh/Vàng/Đỏ) chuẩn PWA
     async function calculateStorageQuota() {
         if (navigator.storage && navigator.storage.estimate) {
             try {
                 const est = await navigator.storage.estimate();
-                const usedMB = (est.usage / (1024 * 1024)).toFixed(1); const totalQuotaMB = (est.quota / (1024 * 1024)).toFixed(0);
+                const usedMB = (est.usage / (1024 * 1024)).toFixed(1); 
+                const totalQuotaMB = (est.quota / (1024 * 1024)).toFixed(0);
                 currentStoragePercent = parseFloat(((est.usage / est.quota) * 100).toFixed(1));
                 const badge = document.getElementById("storage-status");
-                if (badge) { badge.innerText = `Bộ nhớ: ${usedMB}MB / ${totalQuotaMB}MB (${currentStoragePercent}%)`; }
+                if (badge) {
+                    badge.innerText = `Bộ nhớ: ${usedMB}MB / ${totalQuotaMB}MB (${currentStoragePercent}%)`;
+                    if (currentStoragePercent > 85) badge.className = "badge bg-danger storage-alarm px-2 py-1 small ms-1";
+                    else if (currentStoragePercent > 60) badge.className = "badge bg-warning text-dark px-2 py-1 small ms-1";
+                    else badge.className = "badge bg-dark text-info border border-info px-2 py-1 small ms-1";
+                }
             } catch (err) {}
         }
     }
+    
     function updateUIState() {
         document.getElementById("pending-count").innerText = repoBefore.length + repoProcess.length + repoAfter.length;
         document.getElementById("gallery-count").innerText = repoStitched.length;
@@ -1034,10 +1029,9 @@
     function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
     function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
     function renderPending() {
-        const GAP_MS = 15 * 60 * 1000;
-        const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => {
+        const renderListWithSeparators = (repo, inputName, inputType, color) => {
             if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>';
-            let listHtml = '';
+            let listHtml = ''; const GAP_MS = 15 * 60 * 1000;
             repo.forEach((item, index) => {
                 listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}</div></div>`;
                 if (index < repo.length - 1) {
@@ -1046,9 +1040,9 @@
                 }
             }); return listHtml;
         };
-        document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
-        document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
-        document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
+        document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary');
+        document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning');
+        document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success');
     }
     function renderGallery() {
         const grid = document.getElementById("gallery-grid"); const emptyMsg = document.getElementById("gallery-empty-msg");
@@ -1062,7 +1056,7 @@
         }); grid.innerHTML = html;
     }
 
-    // --- QUAY VIDEO & BÓC BĂNG ĐỘC LẬP MÁY BÊN NGOÀI ---
+    // --- QUAY VIDEO / AUDIO / BÓC BĂNG ĐỘC LẬP ---
     function toggleRecording() { if (isRecording) stopRecording(); else startRecording(); }
     function startRecording() {
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
@@ -1142,22 +1136,87 @@
     }
     function stopAudioRecording() { if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval); const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`; }
 
+    // 🛠️ SỬA LỖI 2: Tối ưu hóa bộ bóc băng độc lập với cơ chế Trễ Bàn Giao Thiết Bị (350ms)
     function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
+    
     function startStandaloneTranscribe() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ dịch thuật giọng nói!");
-        if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; document.getElementById("video-preview").srcObject = null; }
-        standaloneRecognition = new SpeechRecognition(); standaloneRecognition.lang = 'vi-VN'; standaloneRecognition.continuous = true; standaloneRecognition.interimResults = true;
-        const btn = document.getElementById("btn-standalone-stt"); const textArea = document.getElementById("standalone-stt-result"); let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
-        standaloneRecognition.onstart = () => { isStandaloneTranscribing = true; btn.classList.replace("btn-warning", "btn-danger"); btn.classList.add("storage-alarm"); document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)"; };
-        standaloneRecognition.onresult = (event) => { let interimTranscript = '', finalTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = baseText + finalTranscript + interimTranscript; };
-        standaloneRecognition.onend = () => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } };
-        try { standaloneRecognition.start(); } catch(e) { if (isCameraOn) initCamera(); }
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; 
+        if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ dịch thuật giọng nói!");
+        
+        // Bước 1: Ngắt và đóng hoàn toàn luồng camera cũ để giải phóng Mic trên iOS
+        if (localStream) { 
+            localStream.getTracks().forEach(track => track.stop()); 
+            localStream = null; 
+            document.getElementById("video-preview").srcObject = null; 
+        }
+        
+        isStandaloneTranscribing = true;
+        const btn = document.getElementById("btn-standalone-stt"); 
+        btn.classList.replace("btn-warning", "btn-danger"); 
+        btn.classList.add("storage-alarm"); 
+        document.getElementById("stt-btn-text").innerText = "ĐANG KHỞI ĐỘNG BỘ LỌC MICRO...";
+
+        // Bước 2: Tạo khoảng trễ 350ms để hệ thống iOS kịp xả sạch hàng chờ khóa cứng âm thanh
+        setTimeout(() => {
+            if (!isStandaloneTranscribing) return; // Đề phòng trường hợp ấn tắt nhanh khi đang đợi delay
+
+            if (standaloneRecognition) {
+                try { standaloneRecognition.stop(); } catch(e){}
+                standaloneRecognition = null;
+            }
+
+            standaloneRecognition = new SpeechRecognition(); 
+            standaloneRecognition.lang = 'vi-VN'; 
+            standaloneRecognition.continuous = true; 
+            standaloneRecognition.interimResults = true;
+            
+            const textArea = document.getElementById("standalone-stt-result"); 
+            let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
+            
+            standaloneRecognition.onstart = () => {
+                document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)";
+            };
+            
+            standaloneRecognition.onresult = (event) => { 
+                let interimTranscript = '', finalTranscript = ''; 
+                for (let i = event.resultIndex; i < event.results.length; ++i) { 
+                    if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; 
+                    else interimTranscript += event.results[i][0].transcript; 
+                } 
+                textArea.value = baseText + finalTranscript + interimTranscript; 
+            };
+            
+            standaloneRecognition.onerror = (e) => {
+                if (e.error === 'no-speech' || e.error === 'aborted') return;
+                if (e.error === 'not-allowed') {
+                    alert("iOS chặn quyền truy cập Microphone do tranh chấp tiến trình!");
+                    stopStandaloneTranscribe();
+                }
+            };
+            
+            standaloneRecognition.onend = () => { 
+                // Tự động kết nối lại nếu bị iOS ngắt tạm thời do khoảng lặng im lặng quá dài
+                if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } 
+            };
+            
+            try { standaloneRecognition.start(); } catch(e) { if (isCameraOn) initCamera(); }
+        }, 350);
     }
+
     function stopStandaloneTranscribe() {
-        isStandaloneTranscribing = false; if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
-        const btn = document.getElementById("btn-standalone-stt"); btn.classList.remove("storage-alarm"); btn.classList.replace("btn-danger", "btn-warning"); document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
+        isStandaloneTranscribing = false; 
+        document.getElementById("stt-btn-text").innerText = "ĐANG GIẢI PHÓNG MIC...";
+        
+        if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
+        const btn = document.getElementById("btn-standalone-stt"); 
+        btn.classList.remove("storage-alarm"); 
+        btn.classList.replace("btn-danger", "btn-warning"); 
+        document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
+        
+        // Khởi động lại luồng camera bình thường sau khi mic đã được trả tự do hoàn toàn
         if (isCameraOn) { initCamera(); }
     }
+
     function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản!"); }
     function clearStandaloneSTT() { if(confirm("Xóa bảng nội dung?")) document.getElementById("standalone-stt-result").value = ""; }
     function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id=\"preview-player\" src=\"${currentMediaBlobUrl}\" controls playsinline style=\"max-width:100%; max-height:400px;\"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id=\"preview-player\" src=\"${currentMediaBlobUrl}\" controls style=\"width:90%; margin:20px 0;\"></audio>`; transcribeBox.classList.remove("d-none"); } openModal('mediaPreviewModal'); }
