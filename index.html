@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V47.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V48.0)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -555,7 +555,7 @@
     }
 
     // --- INDEXEDDB STORAGE ---
-    const dbRequest = indexedDB.open("AirGapCameraV47", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV48", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) { database.createObjectStore("photos", { keyPath: "id" }); }
@@ -807,7 +807,9 @@
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT";
                 if (itemTypeMarker === "QT") filePrefix = "QT_" + filePrefix; else if (itemTypeMarker === "FULL") filePrefix = "FULL_" + filePrefix;
-                const newItem = { id: "stitched_" + Date.now() + Math.floor(Math.random()*100), type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_GRP_${Date.now()}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampStr: new Date().toLocaleString("vi-VN") };
+                
+                // 🛠️ PWA V48.0: Bổ sung trường lõi thời gian timestampMs cho ảnh ghép hàng loạt bên thứ ba
+                const newItem = { id: "stitched_" + Date.now() + Math.floor(Math.random()*100), type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_GRP_${Date.now()}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), timestampStr: new Date().toLocaleString("vi-VN") };
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 let objIds = loaded.map(l => l.obj.id);
                 if (itemTypeMarker === "QT") repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
@@ -842,7 +844,9 @@
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT"; if (isQT) filePrefix = "QT_" + filePrefix;
                 const formatTime = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; };
-                const newItem = { id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), type: isQT ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampStr: new Date().toLocaleString("vi-VN") };
+                
+                // 🛠️ PWA V48.0: Bổ sung trường lõi thời gian timestampMs cho ảnh ghép đôi
+                const newItem = { id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), type: isQT ? "STITCHED_QT" : "STITCHED", name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`, dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), timestampStr: new Date().toLocaleString("vi-VN") };
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 if (isQT) repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id); else { repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id); }
                 deleteFromDB(bObj.id); deleteFromDB(aObj.id); updateUIState(); if (callback) callback(); if (showAlert) { renderPending(); renderGallery(); alert(`Đã ghép thành công:\n${newItem.name}`); } resolve();
@@ -862,7 +866,7 @@
     async function quickStitchTSOnly() {
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
-        processStitching(captureBuffer.TRƯỚC, captureBuffer.SAU, true, customNote, () => {
+        processStitching(captureBuffer.TRƯBEFORE || captureBuffer.TRƯỚC, captureBuffer.SAU, true, customNote, () => {
             captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
             document.getElementById("preview-before").innerHTML = '<span class="text-muted small text-center">TRƯỚC</span>';
             document.getElementById("preview-after").innerHTML = '<span class="text-muted small text-center">SAU</span>';
@@ -987,14 +991,16 @@
     }
     function saveToDB(item) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").put(item); calculateStorageQuota(); } }
     function deleteFromDB(id) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").delete(id); calculateStorageQuota(); } }
+    
+    // 🛠️ PWA V48.0: SỬA LỖI SẮP XẾP KHO ẢNH - Ép toàn bộ hệ thống gom và xếp theo lõi thời gian thay vì text ID chuỗi
     function loadDataFromDB() {
         if (!db) return;
         db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
             const allData = e.target.result || [];
-            repoBefore = allData.filter(x => x.type === "TRƯỚC").sort((a,b) => b.id.localeCompare(a.id));
-            repoAfter = allData.filter(x => x.type === "SAU").sort((a,b) => b.id.localeCompare(a.id));
-            repoProcess = allData.filter(x => x.type === "QUÁ TRÌNH").sort((a,b) => b.id.localeCompare(a.id));
-            repoStitched = allData.filter(x => x.type === "STITCHED" || x.type === "STITCHED_QT").sort((a,b) => b.id.localeCompare(a.id));
+            repoBefore = allData.filter(x => x.type === "TRƯỚC").sort((a,b) => b.timestampMs - a.timestampMs);
+            repoAfter = allData.filter(x => x.type === "SAU").sort((a,b) => b.timestampMs - a.timestampMs);
+            repoProcess = allData.filter(x => x.type === "QUÁ TRÌNH").sort((a,b) => b.timestampMs - a.timestampMs);
+            repoStitched = allData.filter(x => x.type === "STITCHED" || x.type === "STITCHED_QT").sort((a,b) => (b.timestampMs || 0) - (a.timestampMs || 0) || b.id.localeCompare(a.id));
             updateUIState();
         };
     }
@@ -1056,6 +1062,7 @@
     function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
     function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
     
+    // 🛠️ PWA V48.0: Nâng cấp hàm tính phiên với trị tuyệt đối để ngăn chặn lỗi khi trộn lẫn ảnh upload ngoài
     function renderPending() {
         const renderListWithSeparators = (repo, inputName, inputType, color) => {
             if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>';
@@ -1063,7 +1070,8 @@
             repo.forEach((item, index) => {
                 listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}</div></div>`;
                 if (index < repo.length - 1) {
-                    const nextItem = repo[index+1]; let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
+                    const nextItem = repo[index+1]; 
+                    let isNewSession = Math.abs(item.timestampMs - nextItem.timestampMs) > GAP_MS;
                     if (isNewSession) { listHtml += `<div class="w-100 text-center my-2" style="height: 20px;"><span class="badge bg-dark text-${color} border border-${color}" style="font-size:9px;">Chuyển Phiên</span></div>`; }
                 }
             }); return listHtml;
@@ -1176,7 +1184,6 @@
         ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight); ctx.restore();
         
-        // 🛠️ SỬA LỖI 1: In trực tiếp phụ đề bóc băng lên màn hình Canvas video phía trên chân trang đen
         if (document.getElementById("toggle-subtitle").checked && currentSubtitle) {
             ctx.save();
             ctx.font = `bold ${24 * scale}px Arial`;
@@ -1186,7 +1193,6 @@
             let subX = canvas.width / 2;
             let subY = videoRenderHeight - 45 * scale;
             
-            // Hộp nền đen mờ bo tròn nhẹ hỗ trợ đọc chữ chống lóa cực tốt ngoài công trường
             ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
             ctx.fillRect(subX - subWidth/2 - 15*scale, subY - 18*scale, subWidth + 30*scale, 36*scale);
             
@@ -1320,7 +1326,6 @@
         try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
     }
     
-    // --- 🛠️ SỬA LỖI 2: Tối ưu bộ nhận diện chữ, thêm hàm tự động kết nối lại khi Chrome tự ngắt quãng do im lặng
     function initLiveSubtitle() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -1333,7 +1338,6 @@
             }; 
             
             recognition.onend = () => {
-                // Nếu video vẫn đang trong trạng thái bấm ghi hình, tự động chạy lại luồng dịch chữ liên tục
                 if (isRecording && document.getElementById("toggle-subtitle").checked) {
                     try { recognition.start(); } catch(e){}
                 }
