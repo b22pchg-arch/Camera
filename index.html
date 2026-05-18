@@ -377,7 +377,7 @@
                     <li><b>Chuẩn bị:</b> Nhập Tên Tổ Đội và Mã Hiện Trường. Cài đặt các ảnh chân trang (Selfie, Bản đồ, La bàn) ở khung trên cùng.</li>
                     <li><b>Chụp ảnh:</b> Bấm [Chụp TRƯỚC] và [Chụp SAU]. Hệ thống tự động đóng dấu Tọa độ, Thời gian và các ảnh phụ trợ vào chân trang (không đè lên ảnh gốc).</li>
                     <li><b>Ghép ảnh:</b> Nhập "Ghi chú", bấm [GHÉP NGAY] nếu vừa chụp xong 1 cặp. Hoặc vào Tab "Chờ Ghép" để ghép tự động/thủ công nhiều ảnh. Dòng ghi chú sẽ tự động nằm ở tâm giao điểm giữa 2 bức ảnh ghép.</li>
-                    <li><b>Xuất báo cáo:</b> Vào Tab "Đã Ghép", chọn các ảnh hoàn thiện và bấm [CHIA SẺ / TẢI VỀ].</li>
+                    <li><b>Xuất báo cáo:</b> Vào Tab "Đã Ghép", chọn các ảnh hoàn thiện and bấm [CHIA SẺ / TẢI VỀ].</li>
                 </ol>
 
                 <p class="text-danger fw-bold mb-1 mt-3"><i class="fa-solid fa-video me-1"></i> 4. QUAY VIDEO HIỆN TRƯỜNG:</p>
@@ -403,7 +403,7 @@
         </div>
         
         <div id="transcribe-container" class="mt-2 d-none text-start">
-            <label class="small text-warning fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>BÓC BĂNG THÀNH VĂN BẢN (Cần 4G):</label>
+            <label class="small text-warning fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>BÓC BĂNG THÀNH VĂN BẢN:</label>
             <p class="text-secondary" style="font-size: 11px; margin-bottom: 5px;">*Mẹo: Hãy bật <b>Loa ngoài (Speaker)</b> điện thoại thật to. Trình duyệt sẽ phát âm thanh và dùng chính Micro để nghe lại và dịch.</p>
             <button id="btn-start-transcribe" class="btn btn-sm btn-outline-info w-100 mb-2 fw-bold" onclick="startAudioTranscription()"><i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH & BẮT ĐẦU DỊCH</button>
             <textarea id="transcribe-result" class="form-control bg-secondary text-white border-secondary" rows="4" placeholder="Kết quả bóc băng sẽ hiển thị ở đây..."></textarea>
@@ -1288,7 +1288,6 @@
         });
     }
 
-    // 🌟 CẬP NHẬT LÕI GHÉP: TỰ ĐỘNG THÊM DÒNG QT BÊN DƯỚI GHI CHÚ NẾU CÓ ẢNH QUÁ TRÌNH
     function processStitching(bObj, aObj, showAlert = true, customNote = null, callback = null, isQT = false, qtCount = 0) {
         return new Promise((resolve) => {
             const stitchCanvas = document.createElement("canvas");
@@ -1310,13 +1309,11 @@
                 let showQTLine = (qtCount > 0 && !isQT);
                 let qtText = showQTLine ? `QT: ${qtCount}` : "";
                 
-                // Nếu tồn tại ghi chú hoặc có số lượng ảnh QT thì tiến hành đóng dấu hộp thông tin
                 if (noteText || showQTLine) {
                     const imgScale = loadedB.width / 1000;
                     const noteSize = Math.round(45 * imgScale);
                     ctx.font = `bold ${noteSize}px Arial`;
                     
-                    // Tính toán chiều rộng dài nhất của hộp thông tin dựa vào 2 dòng chữ
                     let maxTextWidth = noteText ? ctx.measureText(noteText).width : 0;
                     if (showQTLine) {
                         let qtWidth = ctx.measureText(qtText).width;
@@ -1327,7 +1324,7 @@
                     let lineCount = (noteText && showQTLine) ? 2 : 1;
                     let noteHeight = noteSize * lineCount + paddingY;
                     if (lineCount === 2) {
-                        noteHeight += 15 * imgScale; // Cộng thêm khoảng giãn cách dòng
+                        noteHeight += 15 * imgScale;
                     }
                     
                     const singleImgBoxSize = Math.min(280 * imgScale, loadedB.width * 0.18);
@@ -1336,13 +1333,11 @@
                     const noteX = loadedB.width; 
                     const noteY = stitchCanvas.height - footerH; 
                     
-                    // Vẽ nền hộp bo góc đen mờ
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
                     ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) 
                                   : ctx.fillRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight);
                     ctx.fill();
                     
-                    // Vẽ viền màu Cyan bảo vệ
                     ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
                     ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) 
                                   : ctx.strokeRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight);
@@ -1350,7 +1345,6 @@
 
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
                     
-                    // Thực hiện căn dòng viết chữ dựa theo số lượng dòng hiển thị
                     if (lineCount === 2) {
                         ctx.fillText(noteText, noteX, noteY - (noteSize / 2) - 2 * imgScale);
                         ctx.fillText(qtText, noteX, noteY + (noteSize / 2) + 8 * imgScale);
@@ -1594,13 +1588,22 @@
         const mimeType = getSupportedMimeType();
         if (!mimeType) return alert("Trình duyệt không hỗ trợ ghi hình!");
 
+        isRecording = true;
+        recordingTime = 0;
+        currentSubtitle = "";
+
+        // 🛠️ SỬA LỖI 1: Gọi hàm vẽ khung hình đầu tiên trước để Canvas có dữ liệu, tránh trống luồng gây lỗi trên di động
+        drawVideoFrame();
+
         try {
             const stream = canvas.captureStream(24);
             if (localStream && localStream.getAudioTracks().length > 0) {
                 stream.addTrack(localStream.getAudioTracks()[0]);
             } 
-            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: 2500000 });
+            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: 1500000 });
         } catch (e) {
+            isRecording = false;
+            cancelAnimationFrame(animationFrameId);
             return alert("Lỗi khởi tạo bộ ghi hình: " + e.message);
         }
 
@@ -1610,6 +1613,11 @@
         };
 
         mediaRecorder.onstop = () => {
+            // 🛠️ SỬA LỖI 2: Ngăn chặn mở trình xem ảo nếu chưa có giây dữ liệu thực tế nào (do crash luồng trên điện thoại)
+            if (recordedChunks.length === 0 || recordingTime < 1) {
+                console.log("Luồng ghi hình bị ngắt do lỗi cấu hình phần cứng thiết bị.");
+                return;
+            }
             const blob = new Blob(recordedChunks, { type: mimeType });
             const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
             
@@ -1624,9 +1632,11 @@
             showMediaPreview();
         };
 
-        isRecording = true;
-        recordingTime = 0;
-        currentSubtitle = "";
+        // Thêm bắt lỗi kịch bản của MediaRecorder ngầm
+        mediaRecorder.onerror = (err) => {
+            console.error("Lỗi MediaRecorder:", err);
+            stopRecording();
+        };
         
         if (document.getElementById("toggle-subtitle").checked) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1662,7 +1672,7 @@
                 recognition.onerror = (e) => console.log("Lỗi nhận diện giọng nói: ", e.error);
                 try { recognition.start(); } catch(e) {}
             } else {
-                alert("Trình duyệt của bạn không hỗ trợ tính năng Phụ đề (Speech to Text)!");
+                alert("Trình duyệt không hỗ trợ tính năng Phụ đề trực tiếp!");
                 document.getElementById("toggle-subtitle").checked = false;
             }
         }
@@ -1673,8 +1683,13 @@
         btn.classList.add("storage-alarm");
         btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (0s/30s)`;
 
-        mediaRecorder.start(500);
-        drawVideoFrame();
+        try {
+            mediaRecorder.start(500);
+        } catch(err) {
+            stopRecording();
+            alert("Thiết bị di động không hỗ trợ mã hóa trực tiếp Canvas + Audio. Vui lòng quay video thường hoặc dùng Máy tính.");
+            return;
+        }
 
         recordingInterval = setInterval(() => {
             recordingTime++;
@@ -1686,9 +1701,14 @@
     function stopRecording() {
         if (!isRecording) return;
         isRecording = false;
-        mediaRecorder.stop();
         clearInterval(recordingInterval);
         cancelAnimationFrame(animationFrameId);
+        
+        try {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+        } catch(e) {}
         
         if (recognition) {
             try { recognition.stop(); } catch(e) {}
@@ -1700,7 +1720,7 @@
         btn.classList.replace("btn-warning", "btn-danger");
         btn.classList.replace("text-dark", "text-white");
         btn.classList.remove("storage-alarm");
-        btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> BẮT ĐẦU QUAY VIDEO (Có Đóng Dấu - Max 30s)`;
+        btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> QUAY VIDEO`;
     }
 
     function drawVideoFrame() {
@@ -1821,6 +1841,7 @@
         audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
         
         audioRecorder.onstop = () => {
+            if (audioChunks.length === 0 || audioRecordingTime < 1) return;
             const blob = new Blob(audioChunks, { type: mimeType });
             const ext = mimeType.includes('mp4') ? 'm4a' : 'webm';
             
@@ -1906,7 +1927,7 @@
         setTimeout(() => { document.body.removeChild(a); }, 100);
         
         const textResult = document.getElementById("transcribe-result").value.trim();
-        if (currentMediaType === 'audio' && textResult) {
+        if (currentMediaType === 'audio' && textResult && !textResult.startsWith("⚠️")) {
             const txtBlob = new Blob([textResult], {type: "text/plain;charset=utf-8"});
             const txtUrl = URL.createObjectURL(txtBlob);
             const aTxt = document.createElement('a');
@@ -1919,6 +1940,7 @@
         discardMedia();
     }
 
+    // 🛠️ SỬA LỖI 3: Trực quan hóa kết quả/thông báo lỗi bóc băng AI lên màn hình người dùng
     function startAudioTranscription() {
         const player = document.getElementById("preview-player");
         if(!player) return;
@@ -1936,6 +1958,7 @@
         offlineRecognition.interimResults = true;
         
         const textArea = document.getElementById("transcribe-result");
+        textArea.value = "⏳ Đang lắng nghe âm thanh và tiến hành bóc băng...";
         let finalTranscript = '';
         
         offlineRecognition.onresult = (event) => {
@@ -1950,7 +1973,18 @@
             textArea.value = finalTranscript + interimTranscript;
         };
         
-        offlineRecognition.onerror = (e) => console.log("Lỗi Dịch: ", e.error);
+        offlineRecognition.onerror = (e) => {
+            console.log("Lỗi hệ thống dịch thuật: ", e.error);
+            if (e.error === 'network') {
+                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nTính năng bóc băng (Speech-to-Text) của trình duyệt bắt buộc phải có kết nối Internet (4G/Wifi) để xử lý dữ liệu. Trong môi trường ngắt kết nối (Offline), trình duyệt không thể bóc băng.";
+            } else if (e.error === 'no-speech') {
+                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nKhông thu được tín hiệu giọng nói. Trên điện thoại di động, khi chạy loa ngoài phát âm thanh, hệ thống sẽ tự động bật bộ lọc triệt tiêu Microphone (Echo Cancellation) để chống hú, khiến Mic bị điếc tạm thời. Bạn nên bật âm lượng loa điện thoại ở mức LỚN NHẤT, đưa Mic gần sát loa hoặc thực hiện bóc băng trên Máy tính để đạt độ chính xác cao.";
+            } else if (e.error === 'not-allowed') {
+                textArea.value = "⚠️ KHÔNG RA KẾT QUẢ:\nQuyền sử dụng Microphone bị từ chối hoặc đang bị ứng dụng hệ thống khác chiếm dụng.";
+            } else {
+                textArea.value = `⚠️ KHÔNG RA KẾT QUẢ (Lỗi: ${e.error}):\nHãy kiểm tra lại kết nối mạng and đảm bảo loa ngoài đang phát âm thanh đủ lớn để điện thoại nghe lại được.`;
+            }
+        };
         
         offlineRecognition.onend = () => {
             if (!player.paused && !player.ended) {
