@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V45.0)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V46.0)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -56,7 +56,7 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('✅ Đăng ký Hệ Thống PWA Thành Công!', reg.scope))
+                    .then(reg => console.log('✅ Đăng ký Hệ Thống PWA Thành Công:', reg.scope))
                     .catch(err => console.error('❌ Lỗi khởi động PWA:', err));
             });
         }
@@ -479,7 +479,7 @@
     let recordingInterval = null;
     let animationFrameId = null;
     let isRecording = false;
-    let dynamicAudioStream = null; // Luồng Micro độc quyền riêng cho quay phim
+    let dynamicAudioStream = null; 
     
     let recognition = null;
     let currentSubtitle = "";
@@ -503,7 +503,7 @@
     let currentStoragePercent = 0;
     let globalExtras = { selfie: null, map: null, compass: null };
 
-    // --- VANILLA UI FALLBACK ENGINE (100% OFFLINE) ---
+    // --- VANILLA UI FALLBACK ENGINE ---
     document.addEventListener("click", function(e) {
         const toggleCollapse = e.target.closest('[data-bs-toggle="collapse"]');
         if (toggleCollapse) {
@@ -555,7 +555,7 @@
     }
 
     // --- INDEXEDDB STORAGE ---
-    const dbRequest = indexedDB.open("AirGapCameraV45", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV46", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) { database.createObjectStore("photos", { keyPath: "id" }); }
@@ -661,20 +661,16 @@
         if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; }
         
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            // Thiết lập ban đầu kích hoạt cả video và audio để tạo hộp thoại cấp quyền đồng bộ tức thì
             navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: currentFacingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }, 
                 audio: true 
             })
             .then(stream => {
                 localStream = stream;
-                // Mute/Stop ngay lập tức kênh âm thanh nền để giữ Micro tự do cho bộ dịch AI độc lập
                 stream.getAudioTracks().forEach(track => track.stop());
-                
                 document.getElementById("video-preview").srcObject = stream;
                 document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
             }).catch(err => {
-                // Thử lại phương án chỉ lấy hình ảnh nếu thiết bị đang kẹt cứng Micro ở ứng dụng khác
                 navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })
                 .then(s => { localStream = s; document.getElementById("video-preview").srcObject = s; });
             });
@@ -781,7 +777,7 @@
         else if (type === "SAU") { repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`; } 
         else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`; }
         saveToDB(photoObj);
-        if (captureBuffer.TRƯCOOK && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
+        if (captureBuffer.TRƯỚC && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
         updateUIState();
     }
 
@@ -954,13 +950,22 @@
         });
         document.getElementById('autoStitchModalBody').innerHTML = html; openModal('autoStitchModal');
     }
+    
+    // 🛠️ SỬA LỖI ĐẾM QT COUNT: Đưa biến đếm ra trước tiến trình giải phóng lưu trữ
     async function confirmAutoStitch() {
         closeModal('autoStitchModal'); let count = 0;
         for (let i = 0; i < windowAutoMatches.length; i++) {
             const match = windowAutoMatches[i]; const customNote = document.getElementById('auto-note-' + i).value.trim();
             let minT = Math.min(match.before.timestampMs, match.after.timestampMs); let maxT = Math.max(match.before.timestampMs, match.after.timestampMs);
-            await handleSessionQTStitch(match.before, match.after, customNote); await new Promise(r => setTimeout(r, 120)); 
-            await processStitching(match.before, match.after, false, customNote, null, false, repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length); count++;
+            
+            // Tính số lượng ảnh QT có trong khoảng Trước-Sau trước khi bị gom cụm xóa
+            let autoQtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
+            
+            await handleSessionQTStitch(match.before, match.after, customNote); 
+            await new Promise(r => setTimeout(r, 120)); 
+            
+            await processStitching(match.before, match.after, false, customNote, null, false, autoQtCount); 
+            count++;
         }
         alert(`Đã ghép tự động ${count} cặp!`); renderPending(); renderGallery();
     }
@@ -1083,7 +1088,7 @@
         }); grid.innerHTML = html;
     }
 
-    // --- MODULE QUAY VIDEO CAO CẤP (XỬ LÝ TRIỆT ĐỂ LỖI MÃ HÓA CỨNG) ---
+    // --- MODULE QUAY VIDEO CAO CẤP (XỬ LÝ TRIỆT ĐỂ LỖI CÚ PHÁP CANVAS) ---
     function toggleRecording() { if (isRecording) stopRecording(); else startRecording(); }
     
     async function startRecording() {
@@ -1104,7 +1109,6 @@
         btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm"; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`;
         
         try {
-            // Cấp phát Micro động riêng lẻ độc quyền cho luồng quay video
             try { 
                 dynamicAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); 
             } catch(errMic) { 
@@ -1115,7 +1119,8 @@
             const canvasStream = canvas.captureStream(25); 
             const combinedStream = new MediaStream();
             
-            if (canvasStream.getVideoTracks().length > 0) {
+            // 🛠️ SỬA LỖI ĐÓNG GÓI CANVAS: Trích xuất trực tiếp Track của Stream, không gọi lặp hàm khởi tạo
+            if (canvasStream && canvasStream.getVideoTracks().length > 0) {
                 combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
             }
             if (dynamicAudioStream && dynamicAudioStream.getAudioTracks().length > 0) { 
@@ -1123,7 +1128,6 @@
             }
             
             recordedChunks = [];
-            // 🛠️ BẬT CASCADE FALLBACK: Kiểm tra và bọc lỗi MediaRecorder chống treo mã hóa cứng
             try {
                 if (mimeType !== '') {
                     mediaRecorder = new MediaRecorder(combinedStream, { mimeType: mimeType });
@@ -1131,7 +1135,6 @@
                     mediaRecorder = new MediaRecorder(combinedStream);
                 }
             } catch (eAllocation) {
-                // Phương án an toàn tuyệt đối: Nếu gộp âm thanh gây lỗi crash, ngắt bỏ Audio lưu thuần túy Canvas
                 console.error("Lỗi đồng bộ mã hóa cứng. Kích hoạt chế độ quay dự phòng.");
                 const pureCanvas = new MediaStream([canvasStream.getVideoTracks()[0]]);
                 mediaRecorder = new MediaRecorder(pureCanvas);
@@ -1144,8 +1147,6 @@
                 const ext = (mediaRecorder.mimeType && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
                 currentMediaFilename = `VIDEO_${document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT"}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.${ext}`;
                 currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'video'; showMediaPreview();
-                
-                // Giải phóng Micro ngay lập tức khi dừng quay phim
                 if (dynamicAudioStream) { dynamicAudioStream.getTracks().forEach(t => t.stop()); dynamicAudioStream = null; }
             }; 
             
@@ -1202,14 +1203,32 @@
         animationFrameId = requestAnimationFrame(drawVideoFrame);
     }
 
-    // --- MODULE BÓC BĂNG ĐỘC LẬP TẬP TRUNG (SỬA LỖI TREO KHOÁN ĐỔI) ---
+    function toggleAudioRecording() { if (isAudioRecording) stopAudioRecording(); else startAudioRecording(); }
+    async function startAudioRecording() {
+        let audioStream = null;
+        try { audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(e) { return alert("Không kích hoạt được Micro!"); }
+        let mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+        try { audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType }); } catch(e) { return; }
+        audioChunks = []; audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+        audioRecorder.onstop = () => { 
+            if (audioChunks.length === 0 || audioRecordingTime < 1) return; 
+            currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`; 
+            currentMediaBlobUrl = URL.createObjectURL(new Blob(audioChunks, { type: mimeType })); 
+            currentMediaType = 'audio'; showMediaPreview(); 
+            audioStream.getTracks().forEach(t => t.stop());
+        };
+        isAudioRecording = true; audioRecordingTime = 0; const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm";
+        audioRecorder.start(); audioInterval = setInterval(() => { audioRecordingTime++; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`; }, 1000);
+    }
+    function stopAudioRecording() { if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval); const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`; }
+
+    // --- MODULE BÓC BĂNG ĐỘC LẬP TẬP TRUNG ---
     function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
     
     function startStandaloneTranscribe() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; 
         if (!SpeechRecognition) return alert("Hệ điều hành di động không hỗ trợ lõi Speech-to-Text!");
         
-        // Bước 1: Tiêu hủy triệt để luồng preview camera để nhường Mic tuyệt đối cho AI
         if (localStream) { 
             document.getElementById("video-preview").srcObject = null;
             localStream.getTracks().forEach(track => track.stop()); 
@@ -1246,19 +1265,16 @@
         };
         
         standaloneRecognition.onerror = (e) => {
-            console.error("Speech Error Log: ", e.error);
             if (e.error === 'not-allowed') {
-                alert("Lỗi bảo mật: Trình duyệt chưa được cấp quyền truy cập Mic. Hãy kiểm tra cài đặt của máy!");
+                alert("Lỗi bảo mật: Hãy kiểm tra quyền truy cập Micro trên trình duyệt!");
                 stopStandaloneTranscribe();
             }
         };
         
         standaloneRecognition.onend = () => { 
-            // Tự động kết nối lại nếu gặp khoảng lặng quá lâu ngoài hiện trường gây ngắt quãng
             if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } 
         };
         
-        // Khởi động đồng bộ tức thì chặn đứng cơ chế SandBox của iOS Safari
         try { 
             standaloneRecognition.start(); 
         } catch(e) { 
@@ -1273,30 +1289,8 @@
         btn.classList.remove("storage-alarm"); 
         btn.classList.replace("btn-danger", "btn-warning"); 
         document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
-        
-        // Khởi động lại luồng camera bình thường sau khi cổng âm thanh được giải phóng
         if (isCameraOn) { initCamera(); }
     }
-
-    // --- CÁC TIỆN ÍCH TRANSCRIBE & AUDIO KHÁC ---
-    function toggleAudioRecording() { if (isAudioRecording) stopAudioRecording(); else startAudioRecording(); }
-    async function startAudioRecording() {
-        let audioStream = null;
-        try { audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(e) { return alert("Không kích hoạt được Micro!"); }
-        let mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-        try { audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType }); } catch(e) { return; }
-        audioChunks = []; audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-        audioRecorder.onstop = () => { 
-            if (audioChunks.length === 0 || audioRecordingTime < 1) return; 
-            currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`; 
-            currentMediaBlobUrl = URL.createObjectURL(new Blob(audioChunks, { type: mimeType })); 
-            currentMediaType = 'audio'; showMediaPreview(); 
-            audioStream.getTracks().forEach(t => t.stop());
-        };
-        isAudioRecording = true; audioRecordingTime = 0; const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm";
-        audioRecorder.start(); audioInterval = setInterval(() => { audioRecordingTime++; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`; }, 1000);
-    }
-    function stopAudioRecording() { if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval); const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`; }
 
     function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản!"); }
     function clearStandaloneSTT() { if(confirm("Xóa bảng nội dung?")) document.getElementById("standalone-stt-result").value = ""; }
@@ -1308,7 +1302,19 @@
         offlineRecognition = new SpeechRecognition(); offlineRecognition.lang = 'vi-VN'; offlineRecognition.continuous = true; offlineRecognition.interimResults = true; const textArea = document.getElementById("transcribe-result"); textArea.value = "⏳ Đang trích xuất chữ..."; let finalTranscript = '';
         offlineRecognition.onresult = (event) => { let interimTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = finalTranscript + interimTranscript; };
         offlineRecognition.onstart = () => { player.play(); }; offlineRecognition.onend = () => { document.getElementById("btn-start-transcribe").innerHTML = `PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info"); };
-        try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
+        try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤCT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
+    }
+    function initLiveSubtitle() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition(); recognition.lang = 'vi-VN'; recognition.continuous = true; recognition.interimResults = true;
+            recognition.onresult = (event) => {
+                let interimTranscript = '', finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript; else interimTranscript += event.results[i][0].transcript; }
+                let combined = (finalTranscript + " " + interimTranscript).trim();
+                if (combined !== '') { let words = combined.split(/\s+/); currentSubtitle = words.slice(Math.floor((words.length - 1) / 12) * 12).join(' '); }
+            }; try { recognition.start(); } catch(e) {}
+        }
     }
 
     function getSupportedMimeType() {
