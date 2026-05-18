@@ -169,13 +169,19 @@
                 <i class="fa-solid fa-chevron-down"></i>
             </button>
             
-            <div class="collapse mb-3" id="media-controls">
+            <div class="collapse mb-2" id="media-controls">
                 <div class="card card-body bg-dark border-secondary p-2">
                     <div class="row g-2">
-                        <div class="col-12 mb-1">
+                        <div class="col-12">
                             <div class="form-check form-switch border border-secondary rounded p-2 d-flex align-items-center" style="background-color: #1a1d20;">
                                 <input class="form-check-input ms-1 me-2" type="checkbox" role="switch" id="toggle-subtitle">
-                                <label class="form-check-label text-warning small fw-bold" style="padding-top:2px;" for="toggle-subtitle"><i class="fa-solid fa-closed-captioning me-1"></i>Bật Phụ Đề Trực Tiếp (Cần mạng 4G)</label>
+                                <label class="form-check-label text-warning small fw-bold" style="padding-top:2px;" for="toggle-subtitle"><i class="fa-solid fa-closed-captioning me-1"></i>Bật Phụ Đề Video (Tốt nhất trên Máy Tính)</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-secondary text-light border-secondary small fw-bold" style="font-size:11px;">Thời gian quay tối đa (giây):</span>
+                                <input type="number" id="max-record-time" class="form-control bg-dark text-info border-secondary text-center fw-bold" value="30" min="5" max="300">
                             </div>
                         </div>
                         <div class="col-7">
@@ -189,6 +195,25 @@
                                 <i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-outline-warning w-100 mb-3 py-2 fw-bold text-uppercase d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#standalone-transcribe" style="font-size: 13px;">
+                <span><i class="fa-solid fa-ear-listen me-1"></i> Bóc Băng Độc Lập (Nguồn Phát Ngoài)</span>
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
+            
+            <div class="collapse mb-3" id="standalone-transcribe">
+                <div class="card card-body bg-dark border-warning p-2">
+                    <p class="text-secondary small mb-2 text-warning" style="font-size: 11px; line-height: 1.4;"><i class="fa-solid fa-circle-info me-1"></i> <b>Giải pháp cho điện thoại di động:</b> Chức năng này chỉ bật Microphone để nghe trực tiếp từ thiết bị phát bên ngoài (Điện thoại thứ 2, bộ đàm hiện trường) mà không phát loa trong, giúp tránh triệt để lỗi xung đột phần cứng di động.</p>
+                    <button id="btn-standalone-stt" class="btn btn-warning text-dark w-100 fw-bold mb-2 py-2" onclick="toggleStandaloneTranscribe()">
+                        <i class="fa-solid fa-microphone me-1"></i> <span id="stt-btn-text">BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI</span>
+                    </button>
+                    <textarea id="standalone-stt-result" class="form-control bg-secondary text-white border-secondary small" rows="5" placeholder="Văn bản bóc băng từ nguồn ngoài phát vào mic điện thoại sẽ hiển thị ở đây theo thời gian thực..."></textarea>
+                    <div class="d-flex gap-2 mt-2">
+                        <button class="btn btn-sm btn-outline-light flex-fill" onclick="copyStandaloneSTT()"><i class="fa-solid fa-copy me-1"></i> Sao chép chữ</button>
+                        <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearStandaloneSTT()"><i class="fa-solid fa-trash me-1"></i> Xóa bảng nội dung</button>
                     </div>
                 </div>
             </div>
@@ -363,28 +388,23 @@
                 <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> 1. LƯU Ý QUAN TRỌNG VỀ PWA (BẮT BUỘC):</p>
                 <ul class="text-secondary ps-3 mb-3">
                     <li>Để ứng dụng hoạt động <b>Offline (không cần mạng)</b> và full màn hình, bắt buộc phải chọn <b>"Thêm vào màn hình chính" (Add to Home Screen)</b> trên Chrome/Safari.</li>
-                    <li>Khi có bản cập nhật mới, cần xóa biểu tượng app cũ ngoài màn hình, vào phần Cài đặt của trình duyệt xóa "Dữ liệu trang web", sau đó tải lại link và ghim lại ra màn hình.</li>
                 </ul>
 
                 <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-hard-drive me-1"></i> 2. GIỚI HẠN DUNG LƯỢNG KHO LƯU TRỮ:</p>
                 <ul class="text-secondary ps-3 mb-3">
-                    <li>Trình duyệt (Chrome/Safari) cấp một dung lượng bộ nhớ giới hạn cho ứng dụng. Thanh trạng thái ở góc trên bên phải sẽ báo số % đã dùng.</li>
-                    <li>Khi báo <span class="text-danger fw-bold">Màu Đỏ (>80%)</span>, bộ nhớ sắp đầy. Anh em cần tải các ảnh ở tab "Đã Ghép" về máy, sau đó <b>XÓA ẢNH TRÊN APP</b> để giải phóng dung lượng. Nếu đầy 100%, app sẽ không thể lưu thêm ảnh.</li>
+                    <li>Trình duyệt cấp một dung lượng bộ nhớ giới hạn. Khi báo <span class="text-danger fw-bold">Màu Đỏ (>80%)</span>, anh em cần tải các ảnh ở tab "Đã Ghép" về máy, sau đó xóa trên ứng dụng để giải phóng dung lượng.</li>
                 </ul>
 
                 <p class="text-info fw-bold mb-1"><i class="fa-solid fa-camera me-1"></i> 3. THAO TÁC CHỤP & GHÉP ẢNH:</p>
                 <ol class="text-secondary ps-3 mb-0">
-                    <li><b>Chuẩn bị:</b> Nhập Tên Tổ Đội và Mã Hiện Trường. Cài đặt các ảnh chân trang (Selfie, Bản đồ, La bàn) ở khung trên cùng.</li>
-                    <li><b>Chụp ảnh:</b> Bấm [Chụp TRƯỚC] và [Chụp SAU]. Hệ thống tự động đóng dấu Tọa độ, Thời gian và các ảnh phụ trợ vào chân trang (không đè lên ảnh gốc).</li>
-                    <li><b>Ghép ảnh:</b> Nhập "Ghi chú", bấm [GHÉP NGAY] nếu vừa chụp xong 1 cặp. Hoặc vào Tab "Chờ Ghép" để ghép tự động/thủ công nhiều ảnh. Dòng ghi chú sẽ tự động nằm ở tâm giao điểm giữa 2 bức ảnh ghép.</li>
-                    <li><b>Xuất báo cáo:</b> Vào Tab "Đã Ghép", chọn các ảnh hoàn thiện và bấm [CHIA SẺ / TẢI VỀ].</li>
+                    <li>Nhập Tên Tổ Đội và Mã Hiện Trường trước khi chụp.</li>
+                    <li>Bấm [Chụp TRƯỚC] và [Chụp SAU]. Hệ thống tự động đóng dấu chân ảnh hoàn toàn tự động.</li>
                 </ol>
 
-                <p class="text-danger fw-bold mb-1 mt-3"><i class="fa-solid fa-video me-1"></i> 4. QUAY VIDEO HIỆN TRƯỜNG:</p>
+                <p class="text-danger fw-bold mb-1 mt-3"><i class="fa-solid fa-video me-1"></i> 4. QUAY VIDEO & BÓC BĂNG:</p>
                 <ul class="text-secondary ps-3 mb-0">
-                    <li><b>Giới hạn 30s:</b> Để tránh treo máy và quá tải bộ nhớ, mỗi video chỉ được quay tối đa 30 giây. Hết giờ hệ thống tự ngắt và tự xuất file.</li>
-                    <li><b>Đóng dấu & Âm thanh:</b> Chức năng sẽ ghi lại toàn bộ <b>âm thanh hiện trường</b> (tiếng người nói, tiếng thiết bị) và tự động đóng dấu Tọa độ, Thời gian, Tổ đội ở một dải băng đen dưới đáy màn hình.</li>
-                    <li><b>Lưu trữ an toàn:</b> Khác với ảnh, video quay xong sẽ <b>KHÔNG</b> nằm trong kho của app mà <b>tự động tải thẳng xuống thư viện thiết bị (thư mục Downloads hoặc Ảnh)</b>. Cơ chế này đảm bảo app không bao giờ bị báo đầy bộ nhớ vì video.</li>
+                    <li><b>Thời gian quay tối đa:</b> Có thể thay đổi linh hoạt bằng ô số cấu hình. Hết giờ máy tự ngắt xuất file tải thẳng về mục Downloads thiết bị.</li>
+                    <li><b>Bóc băng độc lập:</b> Khi dùng điện thoại ở hiện trường, hãy dùng mô-đun bóc băng độc lập, bật mic và dùng nguồn phát ngoài (máy khác hoặc bộ đàm) đưa sát vào điện thoại để chữ tự động nhảy ra mà không lo lỗi triệt âm loa trong.</li>
                 </ul>
             </div>
         </div>
@@ -403,10 +423,9 @@
         </div>
         
         <div id="transcribe-container" class="mt-2 d-none text-start">
-            <label class="small text-warning fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>BÓC BĂNG THÀNH VĂN BẢN:</label>
-            <p class="text-secondary" style="font-size: 11px; margin-bottom: 5px;">*Mẹo: Hãy bật <b>Loa ngoài (Speaker)</b> điện thoại thật to. Trình duyệt sẽ phát âm thanh và dùng chính Micro để nghe lại và dịch.</p>
-            <button id="btn-start-transcribe" class="btn btn-sm btn-outline-info w-100 mb-2 fw-bold" onclick="startAudioTranscription()"><i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH & BẮT ĐẦU DỊCH</button>
-            <textarea id="transcribe-result" class="form-control bg-secondary text-white border-secondary" rows="4" placeholder="Kết quả bóc băng sẽ hiển thị ở đây..."></textarea>
+            <label class="small text-warning fw-bold mb-1"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>BÓC BĂNG FILE VỪA GHI (Phù hợp máy tính):</label>
+            <button id="btn-start-transcribe" class="btn btn-sm btn-outline-info w-100 mb-2 fw-bold" onclick="startAudioTranscription()"><i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH</button>
+            <textarea id="transcribe-result" class="form-control bg-secondary text-white border-secondary" rows="4" placeholder="Kết quả bóc băng nội bộ..."></textarea>
         </div>
       </div>
       <div class="modal-footer border-secondary p-2 d-flex justify-content-between">
@@ -469,12 +488,14 @@
     let currentMediaFilename = null;
     let currentMediaType = null;
     let offlineRecognition = null;
+
+    // Các biến phục vụ chức năng bóc băng độc lập từ nguồn ngoài
+    let standaloneRecognition = null;
+    let isStandaloneTranscribing = false;
     
     let cachedVideoExtras = { compass: null, map: null, selfie: null };
-
     let windowAutoMatches = [];
     let currentStoragePercent = 0;
-    
     let globalExtras = { selfie: null, map: null, compass: null };
 
     const dbRequest = indexedDB.open("AirGapCameraV40", 1);
@@ -554,7 +575,7 @@
     }
 
     function toggleCamera() {
-        if (!isCameraOn) return alert("Vui lòng bật camera (Nút Xanh) trước khi đổi cam!");
+        if (!isCameraOn) return alert("Vui lòng bật camera trước khi đổi cam!");
         currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
         initCamera();
     }
@@ -767,9 +788,7 @@
         
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        
         const scale = video.videoWidth / 1000;
-        
         const imgBoxSize = Math.min(280 * scale, video.videoWidth * 0.18);
         const footerH = imgBoxSize + 40 * scale; 
         
@@ -793,7 +812,6 @@
         const now = new Date();
         const timeStr = `${now.toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - ${now.toLocaleDateString("vi-VN")}`;
         const teamText = document.getElementById("tab1-team").value.trim();
-        
         const pad = 20 * scale;
         let maxTextW = canvas.width - (3 * imgBoxSize) - (5 * pad); 
         if (maxTextW < 100) maxTextW = 100;
@@ -828,25 +846,18 @@
                     ctx.fillStyle = "#000";
                     ctx.fillRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
                     ctx.drawImage(img, xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
-                    
-                    ctx.strokeStyle = "#495057";
-                    ctx.lineWidth = 4 * scale;
+                    ctx.strokeStyle = "#495057"; ctx.lineWidth = 4 * scale;
                     ctx.strokeRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
                     
                     let labelH = imgBoxSize * 0.18;
                     ctx.fillStyle = "rgba(0,0,0,0.7)";
                     ctx.fillRect(xPos, fY + 20 * scale + imgBoxSize - labelH, imgBoxSize, labelH);
-                    
-                    ctx.fillStyle = "#0dcaf0";
-                    ctx.font = `bold ${labelH * 0.6}px Arial`;
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "middle";
+                    ctx.fillStyle = "#0dcaf0"; ctx.font = `bold ${labelH * 0.6}px Arial`;
+                    ctx.textAlign = "center"; ctx.textBaseline = "middle";
                     ctx.fillText(labelText, xPos + imgBoxSize/2, fY + 20 * scale + imgBoxSize - labelH/2);
-                    
                     resolve();
                 };
-                img.onerror = resolve;
-                img.src = sourceToDraw;
+                img.onerror = resolve; img.src = sourceToDraw;
             });
         };
 
@@ -858,42 +869,31 @@
 
         let startY = fY + 40 * scale;
         let lineGap = (footerH - 60 * scale) / 3;
-        
-        ctx.textAlign = type === "SAU" ? "right" : "left";
-        ctx.textBaseline = "middle";
-        
+        ctx.textAlign = type === "SAU" ? "right" : "left"; ctx.textBaseline = "middle";
         ctx.fillStyle = type === "TRƯỚC" ? "#0d6efd" : (type === "QUÁ TRÌNH" ? "#ffc107" : "#20c997");
-        ctx.font = `bold ${lineGap * 0.7}px Arial`;
-        ctx.fillText(`${type}`, textX, startY, maxTextW);
+        ctx.font = `bold ${lineGap * 0.7}px Arial`; ctx.fillText(`${type}`, textX, startY, maxTextW);
         
-        ctx.fillStyle = "#ffffff";
-        ctx.font = `bold ${lineGap * 0.55}px Arial`;
+        ctx.fillStyle = "#ffffff"; ctx.font = `bold ${lineGap * 0.55}px Arial`;
         ctx.fillText(`THỜI GIAN: ${timeStr}`, textX, startY + lineGap, maxTextW);
         ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, textX, startY + lineGap * 2, maxTextW);
         
         if (teamText) {
-            ctx.fillStyle = "#ffc107";
-            ctx.fillText(`TỔ ĐỘI: ${teamText}`, textX, startY + lineGap * 3, maxTextW);
+            ctx.fillStyle = "#ffc107"; ctx.fillText(`TỔ ĐỘI: ${teamText}`, textX, startY + lineGap * 3, maxTextW);
         }
 
         const photoObj = {
-            id: "img_" + Date.now(),
-            type: type,
-            dataUrl: canvas.toDataURL("image/jpeg", 0.85),
-            timestampMs: now.getTime()
+            id: "img_" + Date.now(), type: type,
+            dataUrl: canvas.toDataURL("image/jpeg", 0.85), timestampMs: now.getTime()
         };
 
         if (type === "TRƯỚC") {
-            repoBefore.unshift(photoObj);
-            captureBuffer.TRƯỚC = photoObj;
+            repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj;
             document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}">`;
         } else if (type === "SAU") {
-            repoAfter.unshift(photoObj);
-            captureBuffer.SAU = photoObj;
+            repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj;
             document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`;
         } else if (type === "QUÁ TRÌNH") {
-            repoProcess.unshift(photoObj);
-            captureBuffer.QUÁ_TRÌNH.push(photoObj);
+            repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj);
             document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`;
         }
         saveToDB(photoObj);
@@ -903,16 +903,13 @@
             document.getElementById("btn-stitch-ts-only").removeAttribute("disabled");
             document.getElementById("btn-stitch-full").removeAttribute("disabled");
         }
-
         updateUIState();
-        document.body.style.opacity = 0.5;
-        setTimeout(() => document.body.style.opacity = 1, 100);
+        document.body.style.opacity = 0.5; setTimeout(() => document.body.style.opacity = 1, 100);
     }
 
     function handleFileUpload(event, type) {
         const files = event.target.files;
         if (!files.length) return;
-
         Array.from(files).forEach(file => {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -926,18 +923,13 @@
                         w = w * ratio; h = h * ratio;
                     }
                     canvas.width = w; canvas.height = h;
-                    const ctx = canvas.getContext("2d");
-                    ctx.drawImage(img, 0, 0, w, h);
-
+                    const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
                     const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
                     const photoObj = {
                         id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000),
-                        type: type,
-                        dataUrl: compressedDataUrl,
-                        timestampMs: Date.now(),
+                        type: type, dataUrl: compressedDataUrl, timestampMs: Date.now(),
                         name: type === "STITCHED" ? file.name : undefined
                     };
-
                     if (type === "TRƯỚC") repoBefore.unshift(photoObj);
                     else if (type === "SAU") repoAfter.unshift(photoObj);
                     else if (type === "QUÁ TRÌNH") repoProcess.unshift(photoObj);
@@ -964,9 +956,8 @@
         document.querySelectorAll('input[name="radioBefore"]:checked').forEach(e => dels.push(e.value));
         document.querySelectorAll('input[name="checkQT"]:checked').forEach(e => dels.push(e.value));
         document.querySelectorAll('input[name="radioAfter"]:checked').forEach(e => dels.push(e.value));
-        
-        if(dels.length === 0) return alert("Vui lòng chọn ảnh cần xóa (Tích vào ô vuông ở góc ảnh)!");
-        if(confirm(`Xóa ${dels.length} ảnh đang chọn khỏi kho chờ?`)) {
+        if(dels.length === 0) return alert("Vui lòng chọn ảnh cần xóa!");
+        if(confirm(`Xóa ${dels.length} ảnh khỏi kho chờ?`)) {
             dels.forEach(id => deleteFromDB(id));
             repoBefore = repoBefore.filter(x => !dels.includes(x.id));
             repoProcess = repoProcess.filter(x => !dels.includes(x.id));
@@ -979,9 +970,8 @@
         let minT = Math.min(bObj.timestampMs, aObj.timestampMs);
         let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
-        
         if (sessionQts.length > 0) {
-            let mode = document.getElementById("qt-stitch-mode") ? document.getElementById("qt-stitch-mode").value : "2";
+            let mode = document.getElementById("qt-stitch-mode").value;
             if (mode === 'all') {
                 await processMultiStitching(sessionQts, "QT", customNote);
             } else {
@@ -1012,7 +1002,6 @@
         let minT = Math.min(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
         let maxT = Math.max(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
-        
         let allObjs = [captureBuffer.TRƯỚC, ...sessionQts, captureBuffer.SAU];
         await processMultiStitching(allObjs, "FULL", customNote, () => {
             captureBuffer.TRƯỚC = null; captureBuffer.SAU = null; captureBuffer.QUÁ_TRÌNH = [];
@@ -1026,7 +1015,6 @@
     async function quickStitchTS() {
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
-        
         let minT = Math.min(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
         let maxT = Math.max(captureBuffer.TRƯỚC.timestampMs, captureBuffer.SAU.timestampMs);
         let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
@@ -1045,7 +1033,7 @@
     async function manualStitchTSOnly() {
         const checkedBefore = document.querySelector('input[name="radioBefore"]:checked');
         const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
-        if (!checkedBefore || !checkedAfter) return alert("Chọn 1 ảnh TRƯỚC và 1 ảnh SAU để ghép!");
+        if (!checkedBefore || !checkedAfter) return alert("Chọn 1 ảnh TRƯỚC và 1 ảnh SAU!");
         const bObj = repoBefore.find(x => x.id === checkedBefore.value);
         const aObj = repoAfter.find(x => x.id === checkedAfter.value);
         let customNote = document.getElementById("tab2-note").value.trim();
@@ -1055,30 +1043,25 @@
     async function manualStitchFull() {
         const checkedBefore = document.querySelector('input[name="radioBefore"]:checked');
         const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
-        if (!checkedBefore || !checkedAfter) return alert("Chọn 1 ảnh TRƯỚC và 1 ảnh SAU để chốt phiên!");
+        if (!checkedBefore || !checkedAfter) return alert("Chọn đủ ảnh để ghép chốt phiên!");
         const bObj = repoBefore.find(x => x.id === checkedBefore.value);
         const aObj = repoAfter.find(x => x.id === checkedAfter.value);
         let customNote = document.getElementById("tab2-note").value.trim();
-        
         let minT = Math.min(bObj.timestampMs, aObj.timestampMs);
         let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
-        
         let allObjs = [bObj, ...sessionQts, aObj];
         await processMultiStitching(allObjs, "FULL", customNote, null);
-        alert("Đã ghép thành công Toàn bộ phiên thành 1 ảnh!");
-        renderPending(); renderGallery();
+        alert("Đã hoàn thành!"); renderPending(); renderGallery();
     }
 
     async function manualStitchTS() {
         const checkedBefore = document.querySelector('input[name="radioBefore"]:checked');
         const checkedAfter = document.querySelector('input[name="radioAfter"]:checked');
-        if (!checkedBefore || !checkedAfter) return alert("Chọn 1 ảnh TRƯỚC và 1 ảnh SAU để ghép!");
-
+        if (!checkedBefore || !checkedAfter) return alert("Vui lòng chọn ảnh!");
         const bObj = repoBefore.find(x => x.id === checkedBefore.value);
         const aObj = repoAfter.find(x => x.id === checkedAfter.value);
         let customNote = document.getElementById("tab2-note").value.trim();
-        
         let minT = Math.min(bObj.timestampMs, aObj.timestampMs);
         let maxT = Math.max(bObj.timestampMs, aObj.timestampMs);
         let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
@@ -1090,13 +1073,11 @@
     
     async function manualStitchQT() {
         const checkedQT = document.querySelectorAll('input[name="checkQT"]:checked');
-        if (checkedQT.length === 0) return alert("Vui lòng chọn ít nhất 1 ảnh Quá Trình!");
+        if (checkedQT.length === 0) return alert("Vui lòng chọn ảnh Quá Trình!");
         let objs = Array.from(checkedQT).map(cb => repoProcess.find(x => x.id === cb.value));
         objs.sort((a,b) => a.timestampMs - b.timestampMs);
-        
         let customNote = document.getElementById("tab2-note").value.trim();
-        let mode = document.getElementById("qt-stitch-mode-tab2") ? document.getElementById("qt-stitch-mode-tab2").value : "2";
-        
+        let mode = document.getElementById("qt-stitch-mode-tab2").value;
         if (mode === 'all') {
             await processMultiStitching(objs, "QT", customNote);
         } else {
@@ -1106,24 +1087,19 @@
                 await processMultiStitching(chunk, "QT", customNote);
             }
         }
-        
-        alert("Đã ghép các ảnh Quá Trình được chọn!");
-        renderPending(); renderGallery();
+        alert("Xử lý xong ảnh Quá Trình!"); renderPending(); renderGallery();
     }
 
     function autoStitch() {
-        if (repoBefore.length === 0 || repoAfter.length === 0) return alert("Không đủ dữ liệu!");
-
+        if (repoBefore.length === 0 || repoAfter.length === 0) return alert("Không đủ dữ liệu đối khớp!");
         windowAutoMatches = [];
         let availableAfters = [...repoAfter];
         let sortedBefores = [...repoBefore].sort((a,b) => a.timestampMs - b.timestampMs);
-        
         for (let b of sortedBefores) {
             if (availableAfters.length === 0) break;
             let closestA = availableAfters[0];
             let minDiff = Math.abs(b.timestampMs - closestA.timestampMs);
             let closestIdx = 0;
-            
             for (let i = 1; i < availableAfters.length; i++) {
                 let diff = Math.abs(b.timestampMs - availableAfters[i].timestampMs);
                 if (diff < minDiff) { minDiff = diff; closestA = availableAfters[i]; closestIdx = i; }
@@ -1131,30 +1107,19 @@
             windowAutoMatches.push({ before: b, after: closestA });
             availableAfters.splice(closestIdx, 1);
         }
-        
-        if (windowAutoMatches.length === 0) return alert("Lỗi cặp đối khớp!");
-
-        let html = `<p class="small text-info mb-3">Tìm thấy <b>${windowAutoMatches.length}</b> cặp ảnh trùng khớp:</p>`;
+        if (windowAutoMatches.length === 0) return alert("Không tìm thấy cặp!");
+        let html = `<p class="small text-info mb-3">Tìm thấy <b>${windowAutoMatches.length}</b> cặp:</p>`;
         windowAutoMatches.forEach((m, idx) => {
             const timeB = new Date(m.before.timestampMs).toLocaleTimeString("vi-VN");
             const timeA = new Date(m.after.timestampMs).toLocaleTimeString("vi-VN");
-            html += `
-                <div class="card bg-secondary mb-3 p-2 border-0 shadow-sm">
-                    <div class="d-flex justify-content-between small fw-bold mb-1">
-                        <span class="text-warning"><i class="fa-solid fa-clock"></i> Trước: ${timeB}</span>
-                        <span class="text-success"><i class="fa-solid fa-clock"></i> Sau: ${timeA}</span>
-                    </div>
+            html += `<div class="card bg-secondary mb-3 p-2 border-0 shadow-sm">
+                    <div class="d-flex justify-content-between small fw-bold mb-1"><span class="text-warning">Trước: ${timeB}</span><span class="text-success">Sau: ${timeA}</span></div>
                     <div class="d-flex gap-1 mb-2">
-                        <div style="flex: 1; aspect-ratio: 4/3; background: #111; border-radius: 4px; overflow: hidden;">
-                            <img src="${m.before.dataUrl}" style="width: 100%; height: 100%; object-fit: contain;">
-                        </div>
-                        <div style="flex: 1; aspect-ratio: 4/3; background: #111; border-radius: 4px; overflow: hidden;">
-                            <img src="${m.after.dataUrl}" style="width: 100%; height: 100%; object-fit: contain;">
-                        </div>
+                        <div style="flex: 1; aspect-ratio: 4/3; background: #111;"><img src="${m.before.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
+                        <div style="flex: 1; aspect-ratio: 4/3; background: #111;"><img src="${m.after.dataUrl}" style="width:100%; height:100%; object-fit:contain;"></div>
                     </div>
-                    <input type="text" id="auto-note-${idx}" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Ghi chú cho cặp này (TỰ ĐỘNG IN HOA)...">
-                </div>
-            `;
+                    <input type="text" id="auto-note-${idx}" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Ghi chú cặp này...">
+                </div>`;
         });
         document.getElementById('autoStitchModalBody').innerHTML = html;
         new bootstrap.Modal(document.getElementById('autoStitchModal')).show();
@@ -1163,23 +1128,19 @@
     async function confirmAutoStitch() {
         const modalEl = document.getElementById('autoStitchModal');
         bootstrap.Modal.getInstance(modalEl).hide();
-
         let count = 0;
         for (let i = 0; i < windowAutoMatches.length; i++) {
             const match = windowAutoMatches[i];
             const customNote = document.getElementById('auto-note-' + i).value.trim();
-            
             let minT = Math.min(match.before.timestampMs, match.after.timestampMs);
             let maxT = Math.max(match.before.timestampMs, match.after.timestampMs);
             let qtCount = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).length;
-            
             await handleSessionQTStitch(match.before, match.after, customNote);
             await new Promise(r => setTimeout(r, 120)); 
             await processStitching(match.before, match.after, false, customNote, null, false, qtCount);
             count++;
         }
-        alert(`Tự động ghép thành công ${count} cặp ảnh!`);
-        renderPending(); renderGallery();
+        alert(`Đã ghép tự động ${count} cặp!`); renderPending(); renderGallery();
     }
     
     function processMultiStitching(imgObjs, itemTypeMarker, customNote, callback) {
@@ -1190,223 +1151,124 @@
             }))).then(loaded => {
                 const stitchCanvas = document.createElement("canvas");
                 const ctx = stitchCanvas.getContext("2d");
-                
                 let N = loaded.length;
-                let mode = document.getElementById("qt-stitch-mode") ? document.getElementById("qt-stitch-mode").value : "2";
-                
+                let mode = document.getElementById("qt-stitch-mode").value;
                 let useGrid = (mode === 'all' || itemTypeMarker === "FULL") && N > 2;
                 let cols, rows;
-                
-                if (useGrid) {
-                    cols = Math.ceil(Math.sqrt(N));
-                    rows = Math.ceil(N / cols);
-                } else {
-                    cols = N;
-                    rows = 1;
-                }
-
-                let singleW = loaded[0].img.width;
-                let singleH = loaded[0].img.height;
-                
-                stitchCanvas.width = cols * singleW;
-                stitchCanvas.height = rows * singleH;
-                
+                if (useGrid) { cols = Math.ceil(Math.sqrt(N)); rows = Math.ceil(N / cols); } 
+                else { cols = N; rows = 1; }
+                let singleW = loaded[0].img.width; let singleH = loaded[0].img.height;
+                stitchCanvas.width = cols * singleW; stitchCanvas.height = rows * singleH;
                 loaded.forEach((item, index) => {
-                    let c = index % cols;
-                    let r = Math.floor(index / cols);
+                    let c = index % cols; let r = Math.floor(index / cols);
                     ctx.drawImage(item.img, c * singleW, r * singleH, singleW, singleH);
                 });
-                
                 let rawNote = (customNote !== null) ? customNote : document.getElementById("tab1-note").value.trim();
                 let noteText = rawNote.toUpperCase();
-                
                 if (noteText) {
-                    const imgScale = singleW / 1000;
-                    const noteSize = Math.round(45 * imgScale);
-                    ctx.font = `bold ${noteSize}px Arial`;
-                    const noteWidth = ctx.measureText(noteText).width;
+                    const imgScale = singleW / 1000; const noteSize = Math.round(45 * imgScale);
+                    ctx.font = `bold ${noteSize}px Arial`; const noteWidth = ctx.measureText(noteText).width;
                     const paddingY = 40 * imgScale; const noteHeight = noteSize + paddingY;
-                    
                     const singleImgBoxSize = Math.min(280 * imgScale, singleW * 0.18);
                     const footerH = singleImgBoxSize + 40 * imgScale;
-                    const noteX = stitchCanvas.width / 2;
-                    const noteY = stitchCanvas.height - footerH;
-                    
+                    const noteX = stitchCanvas.width / 2; const noteY = stitchCanvas.height - footerH;
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
                     ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) 
                                   : ctx.fillRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight);
                     ctx.fill();
-                    
                     ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
                     ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) 
                                   : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight);
                     ctx.stroke();
-
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
                     ctx.fillText(noteText, noteX, noteY);
                 }
-                
                 let prefixVal = document.getElementById("tab1-prefix").value.trim();
                 let teamVal = document.getElementById("tab1-team").value.trim();
-                let nameParts = [];
-                if (prefixVal) nameParts.push(prefixVal);
-                if (teamVal) nameParts.push(teamVal);
-                if (rawNote) nameParts.push(rawNote);
-
+                let nameParts = []; if (prefixVal) nameParts.push(prefixVal); if (teamVal) nameParts.push(teamVal); if (rawNote) nameParts.push(rawNote);
                 let combinedPrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_');             
                 let filePrefix = combinedPrefix ? combinedPrefix : "HT";
                 if (itemTypeMarker === "QT") filePrefix = "QT_" + filePrefix;
                 else if (itemTypeMarker === "FULL") filePrefix = "FULL_" + filePrefix;
-
                 const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
                 let finalName = `${filePrefix}_${dateStr}_GRP_${Date.now()}.jpg`;
 
-                const finalType = itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED";
                 const newItem = { 
                     id: "stitched_" + Date.now() + Math.floor(Math.random()*100), 
-                    type: finalType, name: finalName, 
-                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), 
-                    timestampStr: new Date().toLocaleString("vi-VN") 
+                    type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", name: finalName, 
+                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampStr: new Date().toLocaleString("vi-VN") 
                 };
-                
                 repoStitched.unshift(newItem); saveToDB(newItem);
-                
                 let objIds = loaded.map(l => l.obj.id);
-                if (itemTypeMarker === "QT") {
-                    repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
-                } else if (itemTypeMarker === "FULL") {
+                if (itemTypeMarker === "QT") repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
+                else if (itemTypeMarker === "FULL") {
                     repoBefore = repoBefore.filter(x => !objIds.includes(x.id));
                     repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
                     repoAfter = repoAfter.filter(x => !objIds.includes(x.id));
                 }
-                objIds.forEach(id => deleteFromDB(id));
-                
-                updateUIState();
-                if (callback) callback();
-                resolve();
+                objIds.forEach(id => deleteFromDB(id)); updateUIState();
+                if (callback) callback(); resolve();
             });
         });
     }
 
     function processStitching(bObj, aObj, showAlert = true, customNote = null, callback = null, isQT = false, qtCount = 0) {
         return new Promise((resolve) => {
-            const stitchCanvas = document.createElement("canvas");
-            const ctx = stitchCanvas.getContext("2d");
-
+            const stitchCanvas = document.createElement("canvas"); const ctx = stitchCanvas.getContext("2d");
             const loadB = new Promise(res => { const i = new Image(); i.src = bObj.dataUrl; i.onload = () => res(i); });
             const loadA = new Promise(res => { const i = new Image(); i.src = aObj.dataUrl; i.onload = () => res(i); });
-
             Promise.all([loadB, loadA]).then(([loadedB, loadedA]) => {
-                
-                stitchCanvas.width = loadedB.width + loadedA.width; 
-                stitchCanvas.height = Math.max(loadedB.height, loadedA.height);
-                
-                ctx.drawImage(loadedB, 0, 0, loadedB.width, loadedB.height);
-                ctx.drawImage(loadedA, loadedB.width, 0, loadedA.width, loadedA.height);
-
+                stitchCanvas.width = loadedB.width + loadedA.width; stitchCanvas.height = Math.max(loadedB.height, loadedA.height);
+                ctx.drawImage(loadedB, 0, 0, loadedB.width, loadedB.height); ctx.drawImage(loadedA, loadedB.width, 0, loadedA.width, loadedA.height);
                 let rawNote = (customNote !== null) ? customNote : document.getElementById("tab1-note").value.trim();
-                let noteText = rawNote.toUpperCase();
-                let showQTLine = (qtCount > 0 && !isQT);
-                let qtText = showQTLine ? `QT: ${qtCount}` : "";
-                
+                let noteText = rawNote.toUpperCase(); let showQTLine = (qtCount > 0 && !isQT); let qtText = showQTLine ? `QT: ${qtCount}` : "";
                 if (noteText || showQTLine) {
-                    const imgScale = loadedB.width / 1000;
-                    const noteSize = Math.round(45 * imgScale);
+                    const imgScale = loadedB.width / 1000; const noteSize = Math.round(45 * imgScale);
                     ctx.font = `bold ${noteSize}px Arial`;
-                    
                     let maxTextWidth = noteText ? ctx.measureText(noteText).width : 0;
-                    if (showQTLine) {
-                        let qtWidth = ctx.measureText(qtText).width;
-                        if (qtWidth > maxTextWidth) maxTextWidth = qtWidth;
-                    }
-
-                    const paddingY = 40 * imgScale; 
-                    let lineCount = (noteText && showQTLine) ? 2 : 1;
-                    let noteHeight = noteSize * lineCount + paddingY;
-                    if (lineCount === 2) {
-                        noteHeight += 15 * imgScale;
-                    }
-                    
-                    const singleImgBoxSize = Math.min(280 * imgScale, loadedB.width * 0.18);
-                    const footerH = singleImgBoxSize + 40 * imgScale; 
-                    
-                    const noteX = loadedB.width; 
-                    const noteY = stitchCanvas.height - footerH; 
+                    if (showQTLine) { let qtWidth = ctx.measureText(qtText).width; if (qtWidth > maxTextWidth) maxTextWidth = qtWidth; }
+                    const paddingY = 40 * imgScale; let lineCount = (noteText && showQTLine) ? 2 : 1;
+                    let noteHeight = noteSize * lineCount + paddingY; if (lineCount === 2) noteHeight += 15 * imgScale;
+                    const singleImgBoxSize = Math.min(280 * imgScale, loadedB.width * 0.18); const footerH = singleImgBoxSize + 40 * imgScale;
+                    const noteX = loadedB.width; const noteY = stitchCanvas.height - footerH;
                     
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
                     ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) 
                                   : ctx.fillRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight);
                     ctx.fill();
-                    
                     ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
                     ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) 
                                   : ctx.strokeRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight);
                     ctx.stroke();
-
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
-                    
-                    if (lineCount === 2) {
-                        ctx.fillText(noteText, noteX, noteY - (noteSize / 2) - 2 * imgScale);
-                        ctx.fillText(qtText, noteX, noteY + (noteSize / 2) + 8 * imgScale);
-                    } else if (noteText) {
-                        ctx.fillText(noteText, noteX, noteY);
-                    } else if (showQTLine) {
-                        ctx.fillText(qtText, noteX, noteY);
-                    }
+                    if (lineCount === 2) { ctx.fillText(noteText, noteX, noteY - (noteSize / 2) - 2 * imgScale); ctx.fillText(qtText, noteX, noteY + (noteSize / 2) + 8 * imgScale); } 
+                    else if (noteText) ctx.fillText(noteText, noteX, noteY); else if (showQTLine) ctx.fillText(qtText, noteX, noteY);
                 }
-
                 let prefixVal = document.getElementById("tab1-prefix").value.trim();
                 let teamVal = document.getElementById("tab1-team").value.trim();
-                let nameParts = [];
-                if (prefixVal) nameParts.push(prefixVal);
-                if (teamVal) nameParts.push(teamVal);
-                if (rawNote) nameParts.push(rawNote);
-
+                let nameParts = []; if (prefixVal) nameParts.push(prefixVal); if (teamVal) nameParts.push(teamVal); if (rawNote) nameParts.push(rawNote);
                 let combinedPrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_');             
-                let filePrefix = combinedPrefix ? combinedPrefix : "HT";
-                if (isQT) filePrefix = "QT_" + filePrefix;
+                let filePrefix = combinedPrefix ? combinedPrefix : "HT"; if (isQT) filePrefix = "QT_" + filePrefix;
+                const formatTime = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; };
+                let finalName = `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`;
 
-                const formatTime = (ts) => {
-                    const d = new Date(ts);
-                    return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`;
-                };
-                
-                const timeBStr = formatTime(bObj.timestampMs);
-                const timeAStr = formatTime(aObj.timestampMs);
-                const timeNowStr = formatTime(Date.now());
-                const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
-
-                let finalName = `${filePrefix}_${dateStr}_${timeBStr}-${timeAStr}-${timeNowStr}.jpg`;
-
-                const itemType = isQT ? "STITCHED_QT" : "STITCHED";
                 const newItem = { 
                     id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), 
-                    type: itemType, name: finalName, 
-                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), 
-                    timestampStr: new Date().toLocaleString("vi-VN") 
+                    type: isQT ? "STITCHED_QT" : "STITCHED", name: finalName, 
+                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), timestampStr: new Date().toLocaleString("vi-VN") 
                 };
-                
                 repoStitched.unshift(newItem); saveToDB(newItem);
-                if (isQT) {
-                    repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id);
-                } else {
-                    repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id);
-                }
-                deleteFromDB(bObj.id); deleteFromDB(aObj.id);
-                updateUIState();
-                
+                if (isQT) repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id);
+                else { repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id); }
+                deleteFromDB(bObj.id); deleteFromDB(aObj.id); updateUIState();
                 if (callback) callback();
-                if (showAlert) {
-                    renderPending(); renderGallery();
-                    alert(`Đã ghép thành công:\n${finalName}`);
-                }
+                if (showAlert) { renderPending(); renderGallery(); alert(`Đã ghép thành công:\n${finalName}`); }
                 resolve();
             });
         });
     }
 
     function saveToDB(item) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").put(item); calculateStorageQuota(); } }
-    
     function deleteFromDB(id) { if (db) { db.transaction("photos", "readwrite").objectStore("photos").delete(id); calculateStorageQuota(); } }
     
     function loadDataFromDB() {
@@ -1441,19 +1303,12 @@
                         <img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')">
                         <div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div>
                       </div>`;
-                
                 if (index < repo.length - 1) {
-                    const nextItem = repo[index+1];
-                    let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
-                    
+                    const nextItem = repo[index+1]; let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
                     if (!isNewSession) {
-                        if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') {
-                            isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs);
-                        } else if (typeStr === 'SAU') {
-                            isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs);
-                        }
+                        if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs);
+                        else if (typeStr === 'SAU') isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs);
                     }
-                    
                     if (isNewSession) {
                         listHtml += `<div class="w-100 text-center my-2 position-relative" style="height: 20px;">
                                 <div class="position-absolute w-100 border-bottom border-${color}" style="top: 10px; border-style: dashed !important; opacity: 0.4;"></div>
@@ -1464,26 +1319,18 @@
             });
             return listHtml;
         };
-
-        const boxB = document.getElementById("list-before"); 
-        const boxP = document.getElementById("list-process"); 
-        const boxA = document.getElementById("list-after");
-        
-        boxB.innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
-        boxP.innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
-        boxA.innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
+        document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
+        document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
+        document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
     }
 
     function renderGallery() {
         const grid = document.getElementById("gallery-grid"); const emptyMsg = document.getElementById("gallery-empty-msg");
         document.getElementById("select-all-checkbox").checked = false; document.getElementById("selected-counter").innerText = "Đã chọn: 0";
-        
         const showQT = document.getElementById("toggle-show-qt").checked;
         const itemsToRender = showQT ? repoStitched : repoStitched.filter(x => x.type !== "STITCHED_QT");
-        
         if (itemsToRender.length === 0) { grid.innerHTML = ""; emptyMsg.classList.remove("d-none"); return; }
-        emptyMsg.classList.add("d-none");
-        let html = "";
+        emptyMsg.classList.add("d-none"); let html = "";
         itemsToRender.forEach(item => {
             const qtBadge = item.type === "STITCHED_QT" ? `<span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2;">QUÁ TRÌNH</span>` : "";
             html += `<div class="col-12 col-sm-6" id="card_${item.id}"><div class="photo-card stitched shadow-sm">${qtBadge}<input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${item.id}" onchange="calculateSelection()"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-2"><div class="small fw-bold text-info text-break">${item.name}</div><div class="text-secondary" style="font-size:11px;">${item.timestampStr}</div></div></div></div>`;
@@ -1508,7 +1355,6 @@
         if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!");
         const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id"));
         const itemsToShare = repoStitched.filter(item => selectedIds.includes(item.id));
-
         if (navigator.canShare && navigator.share) {
             try {
                 let filesArray = [];
@@ -1541,47 +1387,26 @@
 
     function getSupportedMimeType() {
         const types = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm'];
-        for (let t of types) {
-            if (MediaRecorder.isTypeSupported(t)) return t;
-        }
+        for (let t of types) { if (MediaRecorder.isTypeSupported(t)) return t; }
         return '';
     }
 
-    // 🛠️ TỐI ƯU TOÀN DIỆN CHO DI ĐỘNG: Tạo độ trễ và gỡ rối cấu hình luồng phần cứng
     function startRecording() {
         const video = document.getElementById("video-preview");
         if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
-
-        const canvas = document.getElementById("video-canvas");
-        const ctx = canvas.getContext("2d");
-
-        let scaleFactor = 1;
-        if (video.videoHeight > 720) {
-            scaleFactor = 720 / video.videoHeight;
-        }
+        const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d");
+        let scaleFactor = 1; if (video.videoHeight > 720) scaleFactor = 720 / video.videoHeight;
         canvas.width = video.videoWidth * scaleFactor;
-        
-        const imgBoxSize = Math.min(280 * scaleFactor, canvas.width * 0.18);
-        const footerH = imgBoxSize + 40 * scaleFactor;
+        const imgBoxSize = Math.min(280 * scaleFactor, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scaleFactor;
         canvas.height = (video.videoHeight * scaleFactor) + footerH;
-
         cachedVideoExtras = { compass: null, map: null, selfie: null };
-        
         const getSourceDataUrl = (globalSource, canvasId) => {
             if (globalSource) return globalSource;
-            if (canvasId) {
-                let c = document.getElementById(canvasId);
-                if (c && !c.classList.contains('d-none')) {
-                    try { return c.toDataURL("image/jpeg", 0.9); } catch(e) {}
-                }
-            }
+            if (canvasId) { let c = document.getElementById(canvasId); if (c && !c.classList.contains('d-none')) { try { return c.toDataURL("image/jpeg", 0.9); } catch(e) {} } }
             return null;
         };
-
         const mapSrc = getSourceDataUrl(globalExtras.map, 'canvas-map');
-        const compassSrc = getSourceDataUrl(globalExtras.compass, 'canvas-compass');
-        const selfieSrc = globalExtras.selfie;
-
+        const compassSrc = getSourceDataUrl(globalExtras.compass, 'canvas-compass'); const selfieSrc = globalExtras.selfie;
         if (compassSrc) { let i = new Image(); i.src = compassSrc; cachedVideoExtras.compass = i; }
         if (mapSrc) { let i = new Image(); i.src = mapSrc; cachedVideoExtras.map = i; }
         if (selfieSrc) { let i = new Image(); i.src = selfieSrc; cachedVideoExtras.selfie = i; }
@@ -1589,134 +1414,69 @@
         const mimeType = getSupportedMimeType();
         if (!mimeType) return alert("Trình duyệt không hỗ trợ ghi hình!");
 
-        isRecording = true;
-        recordingTime = 0;
-        currentSubtitle = "";
-
-        // Kích hoạt tiến trình render đồ họa lên Canvas trước để chuẩn bị luồng dữ liệu ổn định
+        isRecording = true; recordingTime = 0; currentSubtitle = "";
         drawVideoFrame();
 
         const btn = document.getElementById("btn-record-video");
-        btn.classList.replace("btn-danger", "btn-warning");
-        btn.classList.replace("text-white", "text-dark");
-        btn.classList.add("storage-alarm");
+        let maxTimeVal = parseInt(document.getElementById("max-record-time").value) || 30;
+        btn.classList.replace("btn-danger", "btn-warning"); btn.classList.replace("text-white", "text-dark"); btn.classList.add("storage-alarm");
         btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`;
 
-        // Trì hoãn 300ms hoàn hảo để tránh Empty Track Crash trên iOS/Android
         setTimeout(() => {
             if (!isRecording) return;
-
             try {
-                const canvasStream = canvas.captureStream(25); 
-                const combinedStream = new MediaStream();
-
-                if (canvasStream.getVideoTracks().length > 0) {
-                    combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
-                }
-
+                const canvasStream = canvas.captureStream(25); const combinedStream = new MediaStream();
+                if (canvasStream.getVideoTracks().length > 0) combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
                 if (localStream && localStream.getAudioTracks().length > 0) {
-                    try {
-                        const audioTrack = localStream.getAudioTracks()[0].clone();
-                        combinedStream.addTrack(audioTrack);
-                    } catch (audioErr) {
-                        combinedStream.addTrack(localStream.getAudioTracks()[0]);
-                    }
+                    try { combinedStream.addTrack(localStream.getAudioTracks()[0].clone()); } catch (e) { combinedStream.addTrack(localStream.getAudioTracks()[0]); }
                 }
-
-                let options = {};
-                if (mimeType) options.mimeType = mimeType;
-                if (!mimeType.includes('mp4')) {
-                    options.videoBitsPerSecond = 1200000; 
-                }
+                let options = {}; if (mimeType) options.mimeType = mimeType;
+                if (!mimeType.includes('mp4')) options.videoBitsPerSecond = 1200000;
 
                 recordedChunks = [];
-                
-                try {
-                    mediaRecorder = new MediaRecorder(combinedStream, options);
-                } catch (eOptions) {
-                    try {
-                        mediaRecorder = new MediaRecorder(combinedStream);
-                    } catch (eCombined) {
-                        // Hàng rào bảo vệ cấp 3: Ghi hình không tiếng nếu điện thoại từ chối gộp âm thanh
-                        const pureVideoStream = new MediaStream([canvasStream.getVideoTracks()[0]]);
-                        mediaRecorder = new MediaRecorder(pureVideoStream);
+                try { mediaRecorder = new MediaRecorder(combinedStream, options); } catch (eO) {
+                    try { mediaRecorder = new MediaRecorder(combinedStream); } catch (eC) {
+                        mediaRecorder = new MediaRecorder(new MediaStream([canvasStream.getVideoTracks()[0]]));
                     }
                 }
-
-                mediaRecorder.ondataavailable = e => {
-                    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
-                };
-
+                mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.onstop = () => {
                     if (recordedChunks.length === 0 || recordingTime < 1) return;
                     const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
-                    const currentMime = mediaRecorder.mimeType || 'video/mp4';
-                    const ext = currentMime.includes('mp4') ? 'mp4' : 'webm';
-                    
-                    let teamVal = document.getElementById("tab1-team").value.trim().replace(/\s+/g, '_');
-                    let prefix = document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT";
-                    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
-                    
-                    currentMediaFilename = `VIDEO_${prefix}_${teamVal}_${dateStr}.${ext}`;
-                    currentMediaBlobUrl = URL.createObjectURL(blob);
-                    currentMediaType = 'video';
-                    
+                    currentMediaFilename = `VIDEO_${document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT"}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.${mediaRecorder.mimeType.includes('mp4')?'mp4':'webm'}`;
+                    currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'video';
                     showMediaPreview();
                 };
-
-                mediaRecorder.onerror = (err) => {
-                    console.error("Lỗi MediaRecorder:", err);
-                    stopRecording();
-                };
-
                 mediaRecorder.start(500);
 
-                btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (0s/30s) - BẤM DỪNG`;
+                btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (0s/${maxTimeVal}s) - BẤM DỪNG`;
                 recordingInterval = setInterval(() => {
                     recordingTime++;
-                    btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/30s) - BẤM DỪNG`;
-                    if (recordingTime >= 30) stopRecording();
+                    let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30;
+                    btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s) - BẤM DỪNG`;
+                    if (recordingTime >= dynamicMax) stopRecording();
                 }, 1000);
 
-                if (document.getElementById("toggle-subtitle").checked) {
-                    initLiveSubtitle();
-                }
-
-            } catch (globalErr) {
-                console.error("Lỗi khởi tạo tổng thể bộ quay:", globalErr);
-                stopRecording();
-                alert("Thiết bị không tương thích mã hóa đồ họa động. Vui lòng quay video mặc định bằng máy ảnh điện thoại.");
-            }
+                if (document.getElementById("toggle-subtitle").checked) initLiveSubtitle();
+            } catch (gErr) { stopRecording(); alert("Thiết bị không tương thích mã hóa luồng!"); }
         }, 300);
     }
 
     function initLiveSubtitle() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.lang = 'vi-VN';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            
+            recognition = new SpeechRecognition(); recognition.lang = 'vi-VN'; recognition.continuous = true; recognition.interimResults = true;
             recognition.onresult = (event) => {
-                let interimTranscript = '';
-                let finalTranscript = '';
+                let interimTranscript = '', finalTranscript = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
-                    } else {
-                        interimTranscript += event.results[i][0].transcript;
-                    }
+                    if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
+                    else interimTranscript += event.results[i][0].transcript;
                 }
-                
                 let combined = (finalTranscript + " " + interimTranscript).trim();
                 if (combined !== '') {
-                    let words = combined.split(/\s+/);
-                    const CHUNK_SIZE = 12;
-                    let chunkIndex = Math.floor((words.length - 1) / CHUNK_SIZE);
-                    currentSubtitle = words.slice(chunkIndex * CHUNK_SIZE).join(' ');
+                    let words = combined.split(/\s+/); const CHUNK_SIZE = 12;
+                    currentSubtitle = words.slice(Math.floor((words.length - 1) / CHUNK_SIZE) * CHUNK_SIZE).join(' ');
                 }
-                
                 if (subtitleTimeout) clearTimeout(subtitleTimeout);
                 subtitleTimeout = setTimeout(() => { currentSubtitle = ""; }, 3000);
             };
@@ -1725,324 +1485,191 @@
     }
 
     function stopRecording() {
-        if (!isRecording) return;
-        isRecording = false;
-        clearInterval(recordingInterval);
-        cancelAnimationFrame(animationFrameId);
-        
-        try {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
-        } catch(e) {}
-        
-        if (recognition) {
-            try { recognition.stop(); } catch(e){}
-            recognition = null;
-            currentSubtitle = "";
-        }
-        
+        if (!isRecording) return; isRecording = false; clearInterval(recordingInterval); cancelAnimationFrame(animationFrameId);
+        try { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); } catch(e) {}
+        if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; currentSubtitle = ""; }
         const btn = document.getElementById("btn-record-video");
-        btn.classList.replace("btn-warning", "btn-danger");
-        btn.classList.replace("text-dark", "text-white");
-        btn.classList.remove("storage-alarm");
-        btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> QUAY VIDEO`;
+        btn.className = "btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger"; btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> QUAY VIDEO`;
     }
 
     function drawVideoFrame() {
         if (!isRecording) return;
-
-        const video = document.getElementById("video-preview");
-        const canvas = document.getElementById("video-canvas");
-        const ctx = canvas.getContext("2d");
-
-        const scale = canvas.width / 1000;
-        const imgBoxSize = Math.min(280 * scale, canvas.width * 0.18);
-        const footerH = imgBoxSize + 40 * scale;
+        const video = document.getElementById("video-preview"); const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d");
+        const scale = canvas.width / 1000; const imgBoxSize = Math.min(280 * scale, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scale;
         const videoRenderHeight = canvas.height - footerH;
 
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight); ctx.restore();
 
-        ctx.save();
-        if (currentFacingMode === "user") {
-            ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
-        }
-        ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight);
-        ctx.restore();
-
-        const now = new Date();
-        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')} - ${now.toLocaleDateString("vi-VN")}`;
-        const teamText = document.getElementById("tab1-team").value.trim();
-        const pad = 20 * scale;
-
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-        ctx.fillRect(0, canvas.height - footerH, canvas.width, footerH);
-
+        // Vẽ Phụ Đề trực tiếp lên vùng video an toàn
         if (currentSubtitle) {
-            ctx.font = `bold ${30 * scale}px Arial`;
-            let subText = currentSubtitle.toUpperCase();
-            let subW = ctx.measureText(subText).width + 40 * scale;
-            let maxW = canvas.width - 20 * scale;
-            
-            if (subW > maxW) subW = maxW;
-            
-            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-            ctx.fillRect(canvas.width/2 - subW/2, canvas.height - footerH - 60*scale, subW, 50*scale);
-            
-            ctx.fillStyle = "#ffc107";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(subText, canvas.width/2, canvas.height - footerH - 35*scale, subW - 20*scale);
+            let subFontSize = Math.round(32 * scale); ctx.font = `bold ${subFontSize}px Arial`;
+            let subText = currentSubtitle.toUpperCase(); let subW = ctx.measureText(subText).width + 40 * scale;
+            let maxW = canvas.width - 40 * scale; if (subW > maxW) subW = maxW;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.75)"; ctx.fillRect(canvas.width/2 - subW/2, videoRenderHeight - 65 * scale, subW, 50 * scale);
+            ctx.fillStyle = "#ffc107"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillText(subText, canvas.width/2, videoRenderHeight - 40 * scale, subW - 20 * scale);
         }
 
-        let compassX = pad;
-        let mapX = compassX + imgBoxSize + pad;
-        let selfieX = mapX + imgBoxSize + pad;
-        let textX = selfieX + imgBoxSize + pad;
-
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)"; ctx.fillRect(0, canvas.height - footerH, canvas.width, footerH);
         const drawExtra = (cachedImg, x) => {
-            if (cachedImg && cachedImg.complete && cachedImg.naturalWidth > 0) {
-                try {
-                    ctx.drawImage(cachedImg, x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize);
-                } catch(e) {}
-            } else {
-                ctx.strokeStyle = "#495057"; ctx.lineWidth = 2 * scale;
-                ctx.strokeRect(x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize);
-            }
+            if (cachedImg && cachedImg.complete && cachedImg.naturalWidth > 0) ctx.drawImage(cachedImg, x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize);
+            else { ctx.strokeStyle = "#495057"; ctx.lineWidth = 2 * scale; ctx.strokeRect(x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); }
         };
+        drawExtra(cachedVideoExtras.compass, pad = 20 * scale); drawExtra(cachedVideoExtras.map, pad + imgBoxSize + pad); drawExtra(cachedVideoExtras.selfie, pad + imgBoxSize + pad + imgBoxSize + pad);
 
-        drawExtra(cachedVideoExtras.compass, compassX);
-        drawExtra(cachedVideoExtras.map, mapX);
-        drawExtra(cachedVideoExtras.selfie, selfieX);
-
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        
-        const lineGap = imgBoxSize / 4;
-        let currentTextY = canvas.height - footerH + 20*scale + lineGap/2;
-        
-        if (Math.floor(Date.now() / 1000) % 2 === 0) {
-            ctx.fillStyle = "#dc3545";
-            ctx.font = `bold ${lineGap * 0.8}px Arial`;
-            ctx.fillText("● REC (VIDEO)", textX, currentTextY);
-        }
-        
-        currentTextY += lineGap;
-        ctx.fillStyle = "#ffffff";
-        ctx.font = `bold ${lineGap * 0.55}px Arial`;
-        ctx.fillText(`GPS: ${currentGpsData.text}`, textX, currentTextY);
-        
-        currentTextY += lineGap;
-        ctx.fillStyle = "#0dcaf0";
-        ctx.fillText(`T.GIAN: ${timeStr}`, textX, currentTextY);
-        
-        currentTextY += lineGap;
-        ctx.fillStyle = "#ffc107";
-        let finalTeamText = teamText ? `TỔ ĐỘI: ${teamText}` : "";
-        ctx.fillText(finalTeamText, textX, currentTextY);
+        ctx.textAlign = "left"; ctx.textBaseline = "middle"; const lineGap = imgBoxSize / 4; let textY = canvas.height - footerH + 20*scale + lineGap/2;
+        if (Math.floor(Date.now() / 1000) % 2 === 0) { ctx.fillStyle = "#dc3545"; ctx.font = `bold ${lineGap * 0.8}px Arial`; ctx.fillText("● REC (VIDEO)", pad + imgBoxSize + pad + imgBoxSize + pad + imgBoxSize + pad, textY); }
+        textY += lineGap; ctx.fillStyle = "#ffffff"; ctx.font = `bold ${lineGap * 0.55}px Arial`; ctx.fillText(`GPS: ${currentGpsData.text}`, pad + imgBoxSize + pad + imgBoxSize + pad + imgBoxSize + pad, textY);
+        textY += lineGap; ctx.fillStyle = "#0dcaf0"; ctx.fillText(`T.GIAN: ${new Date().toLocaleTimeString("vi-VN")}`, pad + imgBoxSize + pad + imgBoxSize + pad + imgBoxSize + pad, textY);
+        textY += lineGap; ctx.fillStyle = "#ffc107"; ctx.fillText(document.getElementById("tab1-team").value.trim() ? `ĐỘI: ${document.getElementById("tab1-team").value.trim()}` : "", pad + imgBoxSize + pad + imgBoxSize + pad + imgBoxSize + pad, textY);
 
         animationFrameId = requestAnimationFrame(drawVideoFrame);
     }
 
-    function toggleAudioRecording() {
-        if (isAudioRecording) stopAudioRecording();
-        else startAudioRecording();
-    }
-
+    function toggleAudioRecording() { if (isAudioRecording) stopAudioRecording(); else startAudioRecording(); }
     function startAudioRecording() {
         if (!localStream || localStream.getAudioTracks().length === 0) return alert("Không tìm thấy Microphone!");
-        
-        const audioStream = new MediaStream(localStream.getAudioTracks());
-        let mimeType = 'audio/webm';
-        if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/mp4';
-        
-        try {
-            audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType });
-        } catch(e) {
-            return alert("Lỗi khởi tạo ghi âm: " + e.message);
-        }
-
-        audioChunks = [];
-        audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-        
+        const audioStream = new MediaStream(localStream.getAudioTracks()); let mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+        try { audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType }); } catch(e) { return alert("Lỗi ghi âm: " + e.message); }
+        audioChunks = []; audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
         audioRecorder.onstop = () => {
             if (audioChunks.length === 0 || audioRecordingTime < 1) return;
             const blob = new Blob(audioChunks, { type: mimeType });
-            const ext = mimeType.includes('mp4') ? 'm4a' : 'webm';
-            
-            let teamVal = document.getElementById("tab1-team").value.trim().replace(/\s+/g, '_');
-            let prefix = document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT";
-            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, "");
-            
-            currentMediaFilename = `AUDIO_${prefix}_${teamVal}_${dateStr}.${ext}`;
-            currentMediaBlobUrl = URL.createObjectURL(blob);
-            currentMediaType = 'audio';
-            
-            showMediaPreview();
+            currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`;
+            currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'audio'; showMediaPreview();
         };
-
-        isAudioRecording = true;
-        audioRecordingTime = 0;
-        
-        const btn = document.getElementById("btn-record-audio");
-        btn.classList.replace("btn-secondary", "btn-warning");
-        btn.classList.replace("text-white", "text-dark");
-        btn.classList.add("storage-alarm");
-        btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (0s)`;
-
+        isAudioRecording = true; audioRecordingTime = 0;
+        const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm";
         audioRecorder.start();
-        
-        audioInterval = setInterval(() => {
-            audioRecordingTime++;
-            btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`;
-        }, 1000);
+        audioInterval = setInterval(() => { audioRecordingTime++; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`; }, 1000);
+    }
+    function stopAudioRecording() {
+        if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval);
+        const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`;
     }
 
-    function stopAudioRecording() {
-        if (!isAudioRecording) return;
-        isAudioRecording = false;
-        audioRecorder.stop();
-        clearInterval(audioInterval);
+    // 🛠️ PHÁT TRIỂN MỚI: CHỨC NĂNG BÓC BĂNG ĐỘC LẬP (KHÔNG XUNG ĐỘT AUDIO SESSION MOBILE)
+    function toggleStandaloneTranscribe() {
+        if (isStandaloneTranscribing) { stopStandaloneTranscribe(); } 
+        else { startStandaloneTranscribe(); }
+    }
+
+    function startStandaloneTranscribe() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ dịch thuật giọng nói!");
         
-        const btn = document.getElementById("btn-record-audio");
-        btn.classList.replace("btn-warning", "btn-secondary");
-        btn.classList.replace("text-dark", "text-white");
-        btn.classList.remove("storage-alarm");
-        btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`;
+        standaloneRecognition = new SpeechRecognition();
+        standaloneRecognition.lang = 'vi-VN';
+        standaloneRecognition.continuous = true;
+        standaloneRecognition.interimResults = true;
+
+        const btn = document.getElementById("btn-standalone-stt");
+        const textArea = document.getElementById("standalone-stt-result");
+        let baseText = textArea.value.trim();
+        if (baseText) baseText += "\n";
+
+        standaloneRecognition.onstart = () => {
+            isStandaloneTranscribing = true;
+            btn.classList.replace("btn-warning", "btn-danger");
+            btn.classList.add("storage-alarm");
+            document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)";
+        };
+
+        standaloneRecognition.onresult = (event) => {
+            let interimTranscript = '', finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. ';
+                else interimTranscript += event.results[i][0].transcript;
+            }
+            textArea.value = baseText + finalTranscript + interimTranscript;
+        };
+
+        standaloneRecognition.onerror = (e) => {
+            console.error("Lỗi STT độc lập: ", e.error);
+            if (e.error === 'network') {
+                textArea.value += "\n[⚠️ Không có mạng Internet để gửi gói nhận diện AI]";
+            }
+        };
+
+        standaloneRecognition.onend = () => {
+            if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} }
+        };
+
+        try { standaloneRecognition.start(); } catch(e) { alert("Lỗi mở Mic: " + e.message); }
+    }
+
+    function stopStandaloneTranscribe() {
+        isStandaloneTranscribing = false;
+        if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
+        const btn = document.getElementById("btn-standalone-stt");
+        btn.classList.remove("storage-alarm"); btn.classList.replace("btn-danger", "btn-warning");
+        document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
+    }
+
+    function copyStandaloneSTT() {
+        const txt = document.getElementById("standalone-stt-result"); txt.select();
+        document.execCommand("copy"); alert("Đã sao chép văn bản bóc băng vào bộ nhớ tạm!");
+    }
+
+    function clearStandaloneSTT() {
+        if(confirm("Xóa bảng chữ đã bóc băng?")) document.getElementById("standalone-stt-result").value = "";
     }
 
     function showMediaPreview() {
-        const container = document.getElementById("media-player-container");
-        const transcribeBox = document.getElementById("transcribe-container");
+        const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container");
         document.getElementById("transcribe-result").value = "";
-        
         if (currentMediaType === 'video') {
             container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width: 100%; max-height: 400px;"></video>`;
             transcribeBox.classList.add("d-none");
-            document.getElementById("mediaPreviewTitle").innerHTML = `<i class="fa-solid fa-video me-2"></i>XEM LẠI VIDEO`;
         } else {
             container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width: 90%; margin: 20px 0;"></audio>`;
             transcribeBox.classList.remove("d-none");
-            document.getElementById("mediaPreviewTitle").innerHTML = `<i class="fa-solid fa-microphone-lines me-2"></i>NGHE LẠI GHI ÂM`;
         }
-        
         new bootstrap.Modal(document.getElementById('mediaPreviewModal')).show();
     }
 
     function discardMedia() {
-        const player = document.getElementById("preview-player");
-        if(player) { player.pause(); player.src = ""; }
+        const player = document.getElementById("preview-player"); if(player) { player.pause(); player.src = ""; }
         if(offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} }
-        
-        if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl);
-        currentMediaBlobUrl = null;
-        currentMediaFilename = null;
-        
+        if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl); currentMediaBlobUrl = null;
         bootstrap.Modal.getInstance(document.getElementById('mediaPreviewModal')).hide();
     }
 
     function downloadMedia() {
         if (!currentMediaBlobUrl) return;
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = currentMediaBlobUrl;
-        a.download = currentMediaFilename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { document.body.removeChild(a); }, 100);
-        
-        const textResult = document.getElementById("transcribe-result").value.trim();
-        if (currentMediaType === 'audio' && textResult && !textResult.startsWith("⚠️")) {
-            const txtBlob = new Blob([textResult], {type: "text/plain;charset=utf-8"});
-            const txtUrl = URL.createObjectURL(txtBlob);
-            const aTxt = document.createElement('a');
-            aTxt.href = txtUrl;
-            aTxt.download = currentMediaFilename.replace(/\.[^/.]+$/, ".txt");
-            document.body.appendChild(aTxt);
-            setTimeout(() => { aTxt.click(); document.body.removeChild(aTxt); URL.revokeObjectURL(txtUrl); }, 300);
-        }
-        
+        const a = document.createElement('a'); a.style.display = 'none'; a.href = currentMediaBlobUrl; a.download = currentMediaFilename;
+        document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); }, 100);
         discardMedia();
     }
 
-    // 🛠️ SỬA LỖI ĐỘC QUYỀN TRÊN MOBILE: Đưa ra chỉ dẫn trực quan khi chip chống hú chặn Microphone
     function startAudioTranscription() {
-        const player = document.getElementById("preview-player");
-        if(!player) return;
-        
+        const player = document.getElementById("preview-player"); if(!player) return;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ bóc băng bằng AI!");
-        
-        if (offlineRecognition) {
-            try { offlineRecognition.stop(); } catch(e){}
-        }
-        
-        offlineRecognition = new SpeechRecognition();
-        offlineRecognition.lang = 'vi-VN';
-        offlineRecognition.continuous = true;
-        offlineRecognition.interimResults = true;
-        
-        const textArea = document.getElementById("transcribe-result");
-        textArea.value = "⏳ Đang kết nối máy chủ dịch thuật AI...";
-        
+        if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ bóc băng.");
+        if (offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} }
+        offlineRecognition = new SpeechRecognition(); offlineRecognition.lang = 'vi-VN'; offlineRecognition.continuous = true; offlineRecognition.interimResults = true;
+        const textArea = document.getElementById("transcribe-result"); textArea.value = "⏳ Đang nhận diện...";
+        let finalTranscript = '';
         offlineRecognition.onresult = (event) => {
             let interimTranscript = '';
-            let finalTranscript = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript + '. ';
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
-                }
+                if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. ';
+                else interimTranscript += event.results[i][0].transcript;
             }
             textArea.value = finalTranscript + interimTranscript;
         };
-        
-        offlineRecognition.onerror = (e) => {
-            console.log("Lỗi SpeechRecognition:", e.error);
-            if (e.error === 'network' || e.error === 'no-speech') {
-                textArea.value = `⚠️ HƯỚNG DẪN XỬ LÝ TRÊN ĐIỆN THOẠI:\n\n` +
-                                `Mạng và loa ngoài của bạn rất tốt, lỗi không ra chữ này xuất hiện do tính năng bảo mật mặc định của ĐIỆN THOẠI DI ĐỘNG:\n` +
-                                `Khi ứng dụng phát âm thanh ra loa ngoài, chip di động tự động kích hoạt chế độ "Khử tiếng vọng" (Echo Cancellation) và cô lập Microphone để chống hú. Trình duyệt bị điếc tạm thời nên máy chủ AI sẽ trả về lỗi Mạng (Network) hoặc Không có âm thanh (No Speech).\n\n` +
-                                `👉 CÁCH KHẮC PHỤC TRIỆT ĐỂ:\n` +
-                                `1. Sử dụng Máy tính (PC / Laptop): Tính năng bóc băng chạy HOÀN HẢO 100% trên máy tính vì hệ điều hành PC cho phép nghe lại luồng âm thanh nội bộ (Internal Loopback) mà không cần qua Mic vật lý.\n` +
-                                `2. Nếu bắt buộc dùng Điện thoại: Hãy bấm nút dịch này, sau đó mở một chiếc điện thoại khác hoặc máy bộ đàm đặt sát cạnh để phát file ghi âm cho máy này nghe, chữ sẽ nhảy ra ngay lập tức!`;
-            } else if (e.error === 'not-allowed') {
-                textArea.value = "⚠️ LỖI: Trình duyệt chưa được cấp quyền sử dụng Microphone.";
-            } else {
-                textArea.value = `⚠️ LỖI HỆ THỐNG DI ĐỘNG (Mã lỗi: ${e.error}). Vui lòng thực hiện tính năng này trên Máy tính.`;
-            }
-            try { player.pause(); } catch(err) {}
-        };
-        
-        offlineRecognition.onstart = () => {
-            textArea.value = "🎧 AI đang lắng nghe âm thanh. Đang phát file...";
-            player.play().catch(err => {
-                textArea.value = "❌ Lỗi: Hãy bấm nút Play trên trình phát nhạc để AI bắt đầu nghe.";
-            });
-        };
-
+        offlineRecognition.onstart = () => { player.play(); };
         offlineRecognition.onend = () => {
-            if (!player.paused && !player.ended) {
-                try { offlineRecognition.start(); } catch(e){}
-            } else {
-                document.getElementById("btn-start-transcribe").innerHTML = `<i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH & BẮT ĐẦU DỊCH`;
-                document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info");
-            }
+            document.getElementById("btn-start-transcribe").innerHTML = `<i class="fa-solid fa-ear-listen me-1"></i> PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`;
+            document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info");
         };
-
         try { 
-            offlineRecognition.start(); 
-            const btn = document.getElementById("btn-start-transcribe");
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG NGHE & DỊCH...`;
+            offlineRecognition.start();
+            const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> ĐANG TRÍCH XUẤT CHỮ...`;
             btn.classList.replace("btn-outline-info", "btn-danger");
-        } catch(e) {
-            textArea.value = "❌ Không thể khởi động bộ nhận diện: " + e.message;
-        }
-        
-        player.onpause = () => { if(offlineRecognition) offlineRecognition.stop(); };
-        player.onended = () => { if(offlineRecognition) offlineRecognition.stop(); };
+        } catch(e) {}
     }
 </script>
 <script>
