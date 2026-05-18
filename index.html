@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V40.1)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V41.0)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -206,7 +206,7 @@
             
             <div class="collapse mb-3" id="standalone-transcribe">
                 <div class="card card-body bg-dark border-warning p-2">
-                    <p class="text-secondary small mb-2 text-warning" style="font-size: 11px; line-height: 1.4;"><i class="fa-solid fa-circle-info me-1"></i> <b>Giải pháp phần cứng di động:</b> Khi bật tính năng này, Camera hiện trường sẽ tạm ẩn để giải phóng khóa Microphone độc quyền của iOS. Bạn hãy đưa nguồn phát ngoài (Máy bộ đàm, điện thoại thứ 2) sát cạnh điện thoại để dịch thành văn bản.</p>
+                    <p class="text-secondary small mb-2 text-warning" style="font-size: 11px; line-height: 1.4;"><i class="fa-solid fa-circle-info me-1"></i> <b>Giải pháp phần cứng di động:</b> Khi bật tính năng này, Camera hiện trường sẽ tạm ẩn để giải phóng khóa Microphone độc quyền của iOS/Android. Bạn hãy đưa nguồn phát ngoài (Máy bộ đàm, điện thoại thứ 2) sát cạnh điện thoại để dịch thành văn bản.</p>
                     <button id="btn-standalone-stt" class="btn btn-warning text-dark w-100 fw-bold mb-2 py-2" onclick="toggleStandaloneTranscribe()">
                         <i class="fa-solid fa-microphone me-1"></i> <span id="stt-btn-text">BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI</span>
                     </button>
@@ -384,9 +384,13 @@
         <div class="tab-pane fade" id="help-content" role="tabpanel">
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm text-light" style="font-size: 13px; line-height: 1.6;">
                 <h6 class="text-info fw-bold border-bottom border-secondary pb-2 mb-3"><i class="fa-solid fa-book me-2"></i>HƯỚNG DẪN SỬ DỤNG NHANH</h6>
-                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> BÓC BĂNG ĐỘC LẬP TRÊN ĐIỆN THOẠI:</p>
+                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> KHỞI ĐỘNG LA BÀN TRÊN IPHONE (SAFARI):</p>
                 <ul class="text-secondary ps-3 mb-3">
-                    <li>Do cơ chế chặn Microphone chạy song song của điện thoại di động, khi bật **Bóc băng độc lập**, màn hình Camera sẽ tạm thời tắt đi để nhường quyền thu âm hoàn toàn cho AI dịch thuật. Khi bạn bấm **DỪNG**, Camera hiện trường sẽ tự động bật lại bình thường.</li>
+                    <li>Do cơ chế bảo mật nghiêm ngặt của Apple, la bàn không được tự động chạy. Anh em bắt buộc phải **chạm tay vào ô La bàn** (Góc phải chân trang tự động), một cửa sổ hệ thống sẽ hiện ra xin quyền truy cập cảm biến, chọn **Cho phép (Allow)** là la bàn hoạt động ngay lập tức.</li>
+                </ul>
+                <p class="text-danger fw-bold mb-1"><i class="fa-solid fa-microphone me-1"></i> BÓC BĂNG ĐỘC LẬP TRÊN ĐIỆN THOẠI:</p>
+                <ul class="text-secondary ps-3 mb-0">
+                    <li>Khi mở **Bóc băng độc lập**, màn hình Camera hiện trường sẽ tạm thời đóng luồng để nhường phần cứng thu âm hoàn toàn cho bộ nhận diện chữ AI. Khi bấm **DỪNG**, Camera sẽ tự động mở lại ngay.</li>
                 </ul>
             </div>
         </div>
@@ -442,6 +446,7 @@
     let db = null;
     let currentHeading = 0;
     
+    // Khởi tạo trạng thái quyền La bàn iOS mặc định là false
     let isCompassPermissionGranted = false;
     
     let repoBefore = [];
@@ -481,7 +486,7 @@
     let currentStoragePercent = 0;
     let globalExtras = { selfie: null, map: null, compass: null };
 
-    const dbRequest = indexedDB.open("AirGapCameraV40", 1);
+    const dbRequest = indexedDB.open("AirGapCameraV41", 1);
     dbRequest.onupgradeneeded = (e) => {
         let database = e.target.result;
         if (!database.objectStoreNames.contains("photos")) {
@@ -497,6 +502,7 @@
         initCamera();
         initGpsTracking();
         
+        // Với thiết bị Android hoặc PC không cần xin quyền phức tạp, tự động bật luồng lắng nghe
         if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') {
             isCompassPermissionGranted = true;
             initCompassListener();
@@ -522,6 +528,7 @@
         setInterval(drawCompassCanvas, 200);
     });
 
+    // SỬA ĐỔI CHÍNH: Hàm xử lý xin quyền cảm biến Orientation thông qua Gesture Click (Bắt buộc cho iOS Safari)
     function requestCompassPermission() {
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             DeviceOrientationEvent.requestPermission()
@@ -530,12 +537,12 @@
                         isCompassPermissionGranted = true;
                         initCompassListener();
                     } else {
-                        alert("Hệ thống từ chối quyền truy cập cảm biến La bàn!");
+                        alert("Hệ thống từ chối cấp quyền truy cập La bàn!");
                     }
                 })
                 .catch(err => {
-                    console.error("Lỗi xin quyền:", err);
-                    alert("Cần chạy trang web dưới giao thức bảo mật HTTPS để kích hoạt la bàn.");
+                    console.error("Lỗi cấp quyền cảm biến:", err);
+                    alert("Yêu cầu chạy trang web dưới giao thức bảo mật mã hóa HTTPS để kích hoạt tính năng La bàn hiện trường.");
                 });
         } else {
             isCompassPermissionGranted = true;
@@ -566,19 +573,13 @@
         const btn = document.getElementById("btn-power-camera");
         const video = document.getElementById("video-preview");
         if (isCameraOn) {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-            video.srcObject = null;
-            isCameraOn = false;
+            if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; }
+            video.srcObject = null; isCameraOn = false;
             btn.classList.replace("btn-outline-success", "btn-outline-danger");
             btn.innerHTML = '<i class="fa-solid fa-video-slash"></i>';
         } else {
-            isCameraOn = true;
-            btn.classList.replace("btn-outline-danger", "btn-outline-success");
-            btn.innerHTML = '<i class="fa-solid fa-video"></i>';
-            initCamera();
+            isCameraOn = true; btn.classList.replace("btn-outline-danger", "btn-outline-success");
+            btn.innerHTML = '<i class="fa-solid fa-video"></i>'; initCamera();
         }
     }
 
@@ -599,7 +600,7 @@
                 localStream = stream;
                 document.getElementById("video-preview").srcObject = stream;
                 document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
-            }).catch(err => alert("Không thể mở camera hiện trường. Vui lòng cấp quyền!"));
+            }).catch(err => alert("Không thể mở camera hiện trường. Vui lòng cấp quyền hệ thống!"));
         }
     }
 
@@ -652,6 +653,7 @@
         else if (alpha !== null) { currentHeading = Math.abs(alpha - 360); }
     }
 
+    // SỬA ĐỔI CHÍNH: Vẽ giao diện nhắc bấm nếu iPhone chưa được người dùng cấp quyền
     function drawCompassCanvas() {
         if(globalExtras.compass) return;
         const c = document.getElementById('canvas-compass');
@@ -856,7 +858,7 @@
     async function quickStitchFull() {
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
-        // 🛠️ FIX lỗi cú pháp TRƯBEFORE tồn dư
+        // SỬA ĐỔI CHÍNH: Sửa biến rác TRƯBEFORE giúp tính năng ghép toàn bộ chuỗi sự kiện chạy mượt mà
         let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
         let maxT = Math.max(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
@@ -973,7 +975,7 @@
                     const footerH = Math.min(280 * imgScale, singleW * 0.18) + 40 * imgScale; const noteX = stitchCanvas.width / 2, noteY = stitchCanvas.height - footerH;
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
                     ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.fillRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.fill();
-                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale; ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.stroke();
+                    ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale; ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight); ctx.stroke();
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillText(noteText, noteX, noteY);
                 }
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
@@ -1028,7 +1030,11 @@
     function toggleSelectAll(master) { document.querySelectorAll(".gallery-item-check").forEach(cb => cb.checked = master.checked); calculateSelection(); }
     function deleteSelectedPhotos() { const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked"); if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!"); if (confirm(`Xóa vĩnh viễn ${checkedBoxes.length} ảnh này?`)) { const ids = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id")); ids.forEach(id => deleteFromDB(id)); repoStitched = repoStitched.filter(item => !ids.includes(item.id)); renderGallery(); updateUIState(); } }
     async function shareSelectedPhotos() { const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked"); if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!"); const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id")); const itemsToShare = repoStitched.filter(item => selectedIds.includes(item.id)); if (navigator.canShare && navigator.share) { try { let filesArray = []; for (let item of itemsToShare) { let arr = item.dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8 = new Uint8Array(n); while(n--) u8[n] = bstr.charCodeAt(n); filesArray.push(new File([new Blob([u8], {type:mime})], item.name, { type: "image/jpeg" })); } await navigator.share({ files: filesArray, title: 'Báo cáo PC Tuyên Quang' }); } catch (err) { if (err.name !== "AbortError") triggerBatchDownloads(itemsToShare); } } else { triggerBatchDownloads(itemsToShare); } }
+    function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
+    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style=\"margin:0; background:#000; display:flex; align-items:center; justify-content:center;\"><img src=\"${url}\" style=\"max-width:100%; max-height:100%;\"></body>`); }
+    function renderPending() { const GAP_MS = 15 * 60 * 1000; const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => { if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>'; let listHtml = ''; repo.forEach((item, index) => { listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}</div></div>`; if (index < repo.length - 1) { const nextItem = repo[index+1]; let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS; if (!isNewSession) { if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs); else if (typeStr === 'SAU') isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs); } if (isNewSession) { listHtml += `<div class="w-100 text-center my-2 position-relative" style="height: 20px;"><div class="position-absolute w-100 border-bottom border-${color}" style="top: 10px; border-style: dashed !important; opacity: 0.4;"></div><span class="badge bg-dark text-${color} border border-${color} position-relative px-1" style="font-size:9px;">Chuyển Phiên</span></div>`; } } }); return listHtml; }; document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC'); document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH'); document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU'); }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     function toggleRecording() { if (isRecording) stopRecording(); else startRecording(); }
     function getSupportedMimeType() { const types = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm']; for (let t of types) { if (MediaRecorder.isTypeSupported(t)) return t; } return ''; }
@@ -1099,7 +1105,6 @@
         const scale = canvas.width / 1000; const imgBoxSize = Math.min(280 * scale, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scale; const videoRenderHeight = canvas.height - footerH;
         ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight); ctx.restore();
-        
         if (currentSubtitle) {
             let subFontSize = Math.round(32 * scale); ctx.font = `bold ${subFontSize}px Arial`; let subText = currentSubtitle.toUpperCase(); let subW = ctx.measureText(subText).width + 40 * scale; let maxW = canvas.width - 40 * scale; if (subW > maxW) subW = maxW;
             ctx.fillStyle = "rgba(0, 0, 0, 0.75)"; ctx.fillRect(canvas.width/2 - subW/2, videoRenderHeight - 65 * scale, subW, 50 * scale); ctx.fillStyle = "#ffc107"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(subText, canvas.width/2, videoRenderHeight - 40 * scale, subW - 20 * scale);
@@ -1107,15 +1112,8 @@
         ctx.fillStyle = "rgba(0, 0, 0, 0.7)"; ctx.fillRect(0, canvas.height - footerH, canvas.width, footerH);
         const drawExtra = (cachedImg, x) => { if (cachedImg && cachedImg.complete && cachedImg.naturalWidth > 0) ctx.drawImage(cachedImg, x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); else { ctx.strokeStyle = "#495057"; ctx.lineWidth = 2 * scale; ctx.strokeRect(x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); } };
         
-        let pad = 20 * scale;
-        let compX = pad;
-        let mpX = compX + imgBoxSize + pad;
-        let slfX = mpX + imgBoxSize + pad;
-        let txtX = slfX + imgBoxSize + pad;
-        
-        drawExtra(cachedVideoExtras.compass, compX); 
-        drawExtra(cachedVideoExtras.map, mpX); 
-        drawExtra(cachedVideoExtras.selfie, slfX);
+        let pad = 20 * scale; let compX = pad; let mpX = compX + imgBoxSize + pad; let slfX = mpX + imgBoxSize + pad; let txtX = slfX + imgBoxSize + pad;
+        drawExtra(cachedVideoExtras.compass, compX); drawExtra(cachedVideoExtras.map, mpX); drawExtra(cachedVideoExtras.selfie, slfX);
         
         ctx.textAlign = "left"; ctx.textBaseline = "middle"; const lineGap = imgBoxSize / 4; let textY = canvas.height - footerH + 20*scale + lineGap/2;
         if (Math.floor(Date.now() / 1000) % 2 === 0) { ctx.fillStyle = "#dc3545"; ctx.font = `bold ${lineGap * 0.8}px Arial`; ctx.fillText("● REC (VIDEO)", txtX, textY); }
@@ -1137,76 +1135,33 @@
     }
     function stopAudioRecording() { if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval); const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`; }
 
-    // 🛠️ TỐI ƯU ĐỘC QUYỀN CHO MOBILE: Tắt hẳn Camera để thu âm bóc băng không tiếng vọng
+    // TỐI ƯU ĐỘC QUYỀN CHO MOBILE: Nhường quyền điều khiển Mic để bóc băng ngoài mượt mà
     function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
     
     function startStandaloneTranscribe() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; 
-        if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ dịch thuật giọng nói!");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) return alert("Trình duyệt không hỗ trợ dịch thuật giọng nói!");
         
-        // 1. GIẢI PHÓNG PHẦN CỨNG LOCK ĐỂ BIẾN IPHONE THÀNH THIẾT BỊ NGHE THUẦN TÚY
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-            localStream = null;
-            document.getElementById("video-preview").srcObject = null;
-        }
-
-        standaloneRecognition = new SpeechRecognition(); 
-        standaloneRecognition.lang = 'vi-VN'; 
-        standaloneRecognition.continuous = true; 
-        standaloneRecognition.interimResults = true;
-
-        const btn = document.getElementById("btn-standalone-stt"); 
-        const textArea = document.getElementById("standalone-stt-result"); 
-        let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
-
-        standaloneRecognition.onstart = () => {
-            isStandaloneTranscribing = true;
-            btn.classList.replace("btn-warning", "btn-danger"); btn.classList.add("storage-alarm");
-            document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)";
-        };
-
-        standaloneRecognition.onresult = (event) => {
-            let interimTranscript = '', finalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. ';
-                else interimTranscript += event.results[i][0].transcript;
-            }
-            textArea.value = baseText + finalTranscript + interimTranscript;
-        };
-
-        standaloneRecognition.onerror = (e) => {
-            console.error("Lỗi hệ thống dịch:", e.error);
-            if (e.error === 'no-speech') return; // Bỏ qua thông báo khi lặng tiếng
-            textArea.value += `\n[⚠️ Lỗi luồng dịch AI: ${e.error}]`;
-        };
-
-        standaloneRecognition.onend = () => {
-            if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} }
-        };
-
-        try { 
-            standaloneRecognition.start(); 
-        } catch(e) { 
-            alert("Lỗi mở Mic: " + e.message); 
-            if (isCameraOn) initCamera();
-        }
+        // GIẢI PHÓNG KHOÁ MICROPHONE PHẦN CỨNG CỦA TRÌNH QUAY VIDEO
+        if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; document.getElementById("video-preview").srcObject = null; }
+        standaloneRecognition = new SpeechRecognition(); standaloneRecognition.lang = 'vi-VN'; standaloneRecognition.continuous = true; standaloneRecognition.interimResults = true;
+        const btn = document.getElementById("btn-standalone-stt"); const textArea = document.getElementById("standalone-stt-result"); let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
+        
+        standaloneRecognition.onstart = () => { isStandaloneTranscribing = true; btn.classList.replace("btn-warning", "btn-danger"); btn.classList.add("storage-alarm"); document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)"; };
+        standaloneRecognition.onresult = (event) => { let interimTranscript = '', finalTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = baseText + finalTranscript + interimTranscript; };
+        standaloneRecognition.onerror = (e) => { if (e.error !== 'no-speech') textArea.value += `\n[⚠️ Lỗi luồng dịch AI: ${e.error}]`; };
+        standaloneRecognition.onend = () => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } };
+        try { standaloneRecognition.start(); } catch(e) { alert("Lỗi mở Mic: " + e.message); if (isCameraOn) initCamera(); }
     }
 
     function stopStandaloneTranscribe() {
-        isStandaloneTranscribing = false;
-        if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
-        const btn = document.getElementById("btn-standalone-stt");
-        btn.classList.remove("storage-alarm"); btn.classList.replace("btn-danger", "btn-warning");
-        document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
-
-        // 2. KHỞI ĐỘNG LẠI CAMERA SAU KHI HOÀN THÀNH PHIÊN BÓC BĂNG NGOÀI
+        isStandaloneTranscribing = false; if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
+        const btn = document.getElementById("btn-standalone-stt"); btn.classList.remove("storage-alarm"); btn.classList.replace("btn-danger", "btn-warning"); document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
+        // KHỞI ĐỘNG LẠI LUỒNG CAMERA CHO PHIÊN LÀM VIỆC TIẾP THEO
         if (isCameraOn) { initCamera(); }
     }
 
     function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản bóc băng!"); }
     function clearStandaloneSTT() { if(confirm("Xóa bảng chữ đã bóc băng?")) document.getElementById("standalone-stt-result").value = ""; }
-
     function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width:100%; max-height:400px;"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width:90%; margin:20px 0;"></audio>`; transcribeBox.classList.remove("d-none"); } new bootstrap.Modal(document.getElementById('mediaPreviewModal')).show(); }
     function discardMedia() { const player = document.getElementById("preview-player"); if(player) { player.pause(); player.src = ""; } if(offlineRecognition) { try { offlineRecognition.stop(); } catch(e){} } if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl); currentMediaBlobUrl = null; bootstrap.Modal.getInstance(document.getElementById('mediaPreviewModal')).hide(); }
     function downloadMedia() { if (!currentMediaBlobUrl) return; const a = document.createElement('a'); a.style.display = 'none'; a.href = currentMediaBlobUrl; a.download = currentMediaFilename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); }, 100); discardMedia(); }
