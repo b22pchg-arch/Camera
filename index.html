@@ -962,10 +962,30 @@ function getPhotoQualitySetting() {
     const sel = document.getElementById("photo-quality-select");
     const mode = sel ? sel.value : "balanced";
     const presets = {
-        saving:   { width: 1280, height: 720,  jpeg: 0.72, label: "Tiết kiệm" },
-        balanced: { width: 1600, height: 900,  jpeg: 0.84, label: "Chuẩn hiện trường" },
-        high:     { width: 1920, height: 1080, jpeg: 0.92, label: "Nét cao" },
-        original: { width: 2560, height: 1440, jpeg: 0.96, label: "Gốc camera" }
+        saving: {
+            width: 1280, height: 720, jpeg: 0.72,
+            maxLongEdge: 1280, stitchPanelLongEdge: 1280, extraSquare: 480,
+            videoMaxHeight: 720, fps: 20, videoBitsPerSecond: 1800000,
+            label: "Tiết kiệm"
+        },
+        balanced: {
+            width: 1600, height: 900, jpeg: 0.84,
+            maxLongEdge: 1600, stitchPanelLongEdge: 1600, extraSquare: 640,
+            videoMaxHeight: 1080, fps: 25, videoBitsPerSecond: 3500000,
+            label: "Chuẩn hiện trường"
+        },
+        high: {
+            width: 1920, height: 1080, jpeg: 0.92,
+            maxLongEdge: 2200, stitchPanelLongEdge: 1920, extraSquare: 800,
+            videoMaxHeight: 1440, fps: 30, videoBitsPerSecond: 6000000,
+            label: "Nét cao"
+        },
+        original: {
+            width: 2560, height: 1440, jpeg: 0.96,
+            maxLongEdge: 4096, stitchPanelLongEdge: 2560, extraSquare: 1000,
+            videoMaxHeight: 2160, fps: 30, videoBitsPerSecond: 9000000,
+            label: "Gốc camera"
+        }
     };
     return presets[mode] || presets.balanced;
 }
@@ -976,13 +996,47 @@ function getCameraConstraints() {
         video: {
             facingMode: currentFacingMode,
             width: { ideal: q.width },
-            height: { ideal: q.height }
+            height: { ideal: q.height },
+            frameRate: { ideal: q.fps || 25 }
         }
     };
 }
 
 function getJpegQuality() {
     return getPhotoQualitySetting().jpeg;
+}
+
+function getVideoQualitySetting() {
+    const q = getPhotoQualitySetting();
+    return {
+        maxHeight: q.videoMaxHeight,
+        fps: q.fps,
+        videoBitsPerSecond: q.videoBitsPerSecond,
+        label: q.label
+    };
+}
+
+function getScaledDimensions(srcW, srcH, maxLongEdge) {
+    srcW = Math.max(1, Math.round(srcW || 1));
+    srcH = Math.max(1, Math.round(srcH || 1));
+    maxLongEdge = Math.round(maxLongEdge || 0);
+    if (!maxLongEdge || Math.max(srcW, srcH) <= maxLongEdge) return { width: srcW, height: srcH, ratio: 1 };
+    const ratio = maxLongEdge / Math.max(srcW, srcH);
+    return { width: Math.max(1, Math.round(srcW * ratio)), height: Math.max(1, Math.round(srcH * ratio)), ratio };
+}
+
+function getCaptureOutputDimensions(videoW, videoH) {
+    return getScaledDimensions(videoW, videoH, getPhotoQualitySetting().maxLongEdge);
+}
+
+function drawImageContain(ctx, img, x, y, w, h, fill = "#000") {
+    if (fill) { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); }
+    const scale = Math.min(w / img.width, h / img.height);
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    const dx = x + (w - dw) / 2;
+    const dy = y + (h - dh) / 2;
+    ctx.drawImage(img, dx, dy, dw, dh);
 }
 
 function updateCameraFrameRatio() {
@@ -993,28 +1047,17 @@ function updateCameraFrameRatio() {
     container.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
     if (note) {
         const q = getPhotoQualitySetting();
-        note.innerHTML = `Đang lấy đủ khung hình <b>${video.videoWidth}×${video.videoHeight}</b> - chế độ <b>${q.label}</b>.`;
+        const out = getCaptureOutputDimensions(video.videoWidth, video.videoHeight);
+        note.innerHTML = `Đang lấy đủ khung hình <b>${video.videoWidth}×${video.videoHeight}</b>; ảnh xuất <b>${out.width}×${out.height}</b>, JPEG <b>${Math.round(q.jpeg * 100)}%</b>; video <b>${q.videoMaxHeight}p/${q.fps}fps</b> - <b>${q.label}</b>.`;
     }
 }
 
 function applyCameraQualitySetting(restartCamera = false) {
     const note = document.getElementById("camera-frame-note");
     const q = getPhotoQualitySetting();
-    if (note) note.innerHTML = `Đã chọn <b>${q.label}</b>. Ảnh sẽ nén JPEG mức <b>${Math.round(q.jpeg * 100)}%</b>.`;
+    if (note) note.innerHTML = `Đã chọn <b>${q.label}</b>. Ảnh/ảnh ghép dùng JPEG <b>${Math.round(q.jpeg * 100)}%</b>, cạnh dài tối đa <b>${q.maxLongEdge}px</b>; video <b>${q.videoMaxHeight}p/${q.fps}fps</b>, bitrate khoảng <b>${Math.round(q.videoBitsPerSecond/1000000)} Mbps</b>.`;
     if (restartCamera && isCameraOn) initCamera();
 }
-function getVideoQualitySetting() {
-    const sel = document.getElementById("photo-quality-select");
-    const mode = sel ? sel.value : "balanced";
-    const presets = {
-        saving:   { maxHeight: 720,  fps: 20, videoBitsPerSecond: 1800000, label: "Tiết kiệm" },
-        balanced: { maxHeight: 1080, fps: 25, videoBitsPerSecond: 3500000, label: "Chuẩn hiện trường" },
-        high:     { maxHeight: 1440, fps: 30, videoBitsPerSecond: 6000000, label: "Nét cao" },
-        original: { maxHeight: 2160, fps: 30, videoBitsPerSecond: 9000000, label: "Gốc camera" }
-    };
-    return presets[mode] || presets.balanced;
-}
-
 function toggleQtArea(area) {
     if (area === "camera") {
         isQtCameraVisible = !isQtCameraVisible;
@@ -1189,9 +1232,10 @@ function showCameraErrorUI(err) {
     function captureExtra(key) {
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
         const canvas = document.createElement("canvas"); let size = Math.min(video.videoWidth, video.videoHeight);
-        canvas.width = 640; canvas.height = 640; const ctx = canvas.getContext("2d");
+        const q = getPhotoQualitySetting(); const outSize = q.extraSquare || 640;
+        canvas.width = outSize; canvas.height = outSize; const ctx = canvas.getContext("2d");
         if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
-        ctx.drawImage(video, (video.videoWidth - size) / 2, (video.videoHeight - size) / 2, size, size, 0, 0, 640, 640);
+        ctx.drawImage(video, (video.videoWidth - size) / 2, (video.videoHeight - size) / 2, size, size, 0, 0, outSize, outSize);
         let dataUrl = canvas.toDataURL("image/jpeg", getJpegQuality()); globalExtras[key] = dataUrl;
         document.getElementById(`img-${key}`).src = dataUrl; document.getElementById(`img-${key}`).classList.remove('d-none');
         document.getElementById(`btn-grp-${key}`).classList.add('d-none'); document.getElementById(`clear-${key}`).classList.remove('d-none');
@@ -1205,8 +1249,9 @@ function showCameraErrorUI(err) {
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement("canvas"); let size = Math.min(img.width, img.height);
-                canvas.width = 640; canvas.height = 640; const ctx = canvas.getContext("2d");
-                ctx.drawImage(img, (img.width - size) / 2, (img.height - size) / 2, size, size, 0, 0, 640, 640);
+                const q = getPhotoQualitySetting(); const outSize = q.extraSquare || 640;
+                canvas.width = outSize; canvas.height = outSize; const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, (img.width - size) / 2, (img.height - size) / 2, size, size, 0, 0, outSize, outSize);
                 let dataUrl = canvas.toDataURL("image/jpeg", getJpegQuality()); globalExtras[key] = dataUrl;
                 document.getElementById(`img-${key}`).src = dataUrl; document.getElementById(`img-${key}`).classList.remove('d-none');
                 if(key==='selfie') { document.getElementById(`btn-grp-${key}`).classList.add('d-none'); document.getElementById(`clear-${key}`).classList.remove('d-none'); } 
@@ -1224,11 +1269,13 @@ function showCameraErrorUI(err) {
     async function capturePhoto(type) {
         if (currentStoragePercent > 95) return alert(`Bộ nhớ thiết bị đầy!`);
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
-        const canvas = document.createElement("canvas"); const ctx = canvas.getContext("2d"); const scale = video.videoWidth / 1000;
-        const imgBoxSize = Math.min(280 * scale, video.videoWidth * 0.18); const footerH = imgBoxSize + 40 * scale; 
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight + footerH; 
-        ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, video.videoHeight); ctx.restore();
-        const fY = video.videoHeight; ctx.fillStyle = "#111111"; ctx.fillRect(0, fY, canvas.width, footerH);
+        const canvas = document.createElement("canvas"); const ctx = canvas.getContext("2d");
+        const out = getCaptureOutputDimensions(video.videoWidth, video.videoHeight);
+        const scale = out.width / 1000;
+        const imgBoxSize = Math.min(280 * scale, out.width * 0.18); const footerH = imgBoxSize + 40 * scale; 
+        canvas.width = out.width; canvas.height = out.height + footerH; 
+        ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, out.height); ctx.restore();
+        const fY = out.height; ctx.fillStyle = "#111111"; ctx.fillRect(0, fY, canvas.width, footerH);
         const now = new Date(); const timeStr = `${now.toLocaleTimeString("vi-VN")} - ${now.toLocaleDateString("vi-VN")}`;
         const teamText = document.getElementById("tab1-team").value.trim(); const pad = 20 * scale;
         let maxTextW = canvas.width - (3 * imgBoxSize) - (5 * pad);
@@ -1284,9 +1331,11 @@ function showCameraErrorUI(err) {
                 const stitchCanvas = document.createElement("canvas"); const ctx = stitchCanvas.getContext("2d"); let N = loaded.length;
                 let useGrid = (document.getElementById("qt-stitch-mode").value === 'all' || itemTypeMarker === "FULL") && N > 2;
                 let cols = useGrid ? Math.ceil(Math.sqrt(N)) : N, rows = useGrid ? Math.ceil(N / cols) : 1;
-                let singleW = loaded[0].img.width, singleH = loaded[0].img.height;
+                const q = getPhotoQualitySetting();
+                const firstDim = getScaledDimensions(loaded[0].img.width, loaded[0].img.height, q.stitchPanelLongEdge);
+                let singleW = firstDim.width, singleH = firstDim.height;
                 stitchCanvas.width = cols * singleW; stitchCanvas.height = rows * singleH;
-                loaded.forEach((item, index) => { ctx.drawImage(item.img, (index % cols) * singleW, Math.floor(index / cols) * singleH, singleW, singleH); });
+                loaded.forEach((item, index) => { drawImageContain(ctx, item.img, (index % cols) * singleW, Math.floor(index / cols) * singleH, singleW, singleH); });
                 let rawNote = (customNote !== null) ? customNote : document.getElementById("tab1-note").value.trim();
                 let noteText = rawNote.toUpperCase();
                 if (noteText) {
@@ -1330,15 +1379,19 @@ function showCameraErrorUI(err) {
             const loadB = new Promise(res => { const i = new Image(); i.src = bObj.dataUrl; i.onload = () => res(i); });
             const loadA = new Promise(res => { const i = new Image(); i.src = aObj.dataUrl; i.onload = () => res(i); });
             Promise.all([loadB, loadA]).then(([loadedB, loadedA]) => {
-                stitchCanvas.width = loadedB.width + loadedA.width; stitchCanvas.height = Math.max(loadedB.height, loadedA.height);
-                ctx.drawImage(loadedB, 0, 0, loadedB.width, loadedB.height); ctx.drawImage(loadedA, loadedB.width, 0, loadedA.width, loadedA.height);
+                const q = getPhotoQualitySetting();
+                const bDim = getScaledDimensions(loadedB.width, loadedB.height, q.stitchPanelLongEdge);
+                const aDim = getScaledDimensions(loadedA.width, loadedA.height, q.stitchPanelLongEdge);
+                stitchCanvas.width = bDim.width + aDim.width; stitchCanvas.height = Math.max(bDim.height, aDim.height);
+                drawImageContain(ctx, loadedB, 0, 0, bDim.width, stitchCanvas.height);
+                drawImageContain(ctx, loadedA, bDim.width, 0, aDim.width, stitchCanvas.height);
                 let rawNote = (customNote !== null) ? customNote : document.getElementById("tab1-note").value.trim();
                 let noteText = rawNote.toUpperCase(); let showQTLine = (qtCount > 0 && !isQT); let qtText = showQTLine ? `QT: ${qtCount}` : "";
                 if (noteText || showQTLine) {
-                    const imgScale = loadedB.width / 1000; const noteSize = Math.round(45 * imgScale); ctx.font = `bold ${noteSize}px Arial`;
+                    const imgScale = bDim.width / 1000; const noteSize = Math.round(45 * imgScale); ctx.font = `bold ${noteSize}px Arial`;
                     let maxTextWidth = noteText ? ctx.measureText(noteText).width : 0; if (showQTLine) { let qtWidth = ctx.measureText(qtText).width; if (qtWidth > maxTextWidth) maxTextWidth = qtWidth; }
                     let lineCount = (noteText && showQTLine) ? 2 : 1; let noteHeight = noteSize * lineCount + 40 * imgScale; if (lineCount === 2) noteHeight += 15 * imgScale;
-                    const noteX = loadedB.width; const noteY = stitchCanvas.height - (Math.min(280 * imgScale, loadedB.width * 0.18) + 40 * imgScale);
+                    const noteX = bDim.width; const noteY = stitchCanvas.height - (Math.min(280 * imgScale, bDim.width * 0.18) + 40 * imgScale);
                     ctx.fillStyle = "rgba(0, 0, 0, 0.85)"; ctx.beginPath();
                     ctx.roundRect ? ctx.roundRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.fillRect(noteX - maxTextWidth/2 - 40*imgScale, noteY - noteHeight/2, maxTextWidth + 80*imgScale, noteHeight); ctx.fill();
                     ctx.strokeStyle = "#0dcaf0"; ctx.lineWidth = 4 * imgScale;
@@ -1495,8 +1548,9 @@ function showCameraErrorUI(err) {
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    const canvas = document.createElement("canvas"); let w = img.width; let h = img.height; const maxDim = 1920;
-                    if (w > maxDim || h > maxDim) { const ratio = Math.min(maxDim/w, maxDim/h); w = w * ratio; h = h * ratio; }
+                    const canvas = document.createElement("canvas");
+                    const out = getScaledDimensions(img.width, img.height, getPhotoQualitySetting().maxLongEdge);
+                    let w = out.width; let h = out.height;
                     canvas.width = w; canvas.height = h; const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
                     const photoObj = { id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()), timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined, sessionStartMs: Date.now() - 2000, sessionEndMs: Date.now(), qtTimeMs: Date.now() };
                     if (type === "TRƯỚC") repoBefore.unshift(photoObj); else if (type === "SAU") repoAfter.unshift(photoObj); else if (type === "QUÁ TRÌNH") repoProcess.unshift(photoObj); else repoStitched.unshift(photoObj);
@@ -1693,7 +1747,12 @@ function showCameraErrorUI(err) {
     async function startRecording() {
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
         const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d"); const videoQ = getVideoQualitySetting(); let scaleFactor = 1; if (video.videoHeight > videoQ.maxHeight) scaleFactor = videoQ.maxHeight / video.videoHeight;
-        canvas.width = Math.round(video.videoWidth * scaleFactor); const imgBoxSize = Math.min(280 * scaleFactor, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scaleFactor; canvas.height = Math.round(video.videoHeight * scaleFactor) + footerH;
+        canvas.width = Math.round(video.videoWidth * scaleFactor);
+        const scaledVideoHeight = Math.round(video.videoHeight * scaleFactor);
+        const videoCanvasScale = canvas.width / 1000;
+        const imgBoxSize = Math.min(280 * videoCanvasScale, canvas.width * 0.18);
+        const footerH = imgBoxSize + 40 * videoCanvasScale;
+        canvas.height = scaledVideoHeight + footerH;
         
         cachedVideoExtras = { compass: null, map: null, selfie: null };
         const getSourceDataUrl = (globalSource, canvasId) => { if (globalSource) return globalSource; if (canvasId) { let c = document.getElementById(canvasId); if (c && !c.classList.contains('d-none')) { try { return c.toDataURL("image/jpeg", getJpegQuality()); } catch(e) {} } } return null; };
