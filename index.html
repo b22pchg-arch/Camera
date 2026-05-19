@@ -533,9 +533,9 @@ function showUpdateNotification() {
         </div>
         <div class="col-6">
             <label class="btn btn-success w-100 fw-bold py-2 small m-0 text-center cursor-pointer">
-                <i class="fa-solid fa-file-import me-1"></i> NHẬP FILE JSON
-                <input type="file" class="d-none" accept=".json" multiple onchange="importSyncFileWithValidation(event)">
-            </label>
+    <i class="fa-solid fa-file-import me-1"></i> NHẬP FILE DỮ LIỆU
+    <input type="file" class="d-none" accept=".json,.txt" multiple onchange="importSyncFileWithValidation(event)">
+</label>
         </div>
     </div>
 </div>
@@ -1701,7 +1701,7 @@ function showCameraErrorUI(err) {
     // =========================================================================
 
     // --- GIẢI PHÁP 1: XUẤT / NHẬP FILE OFFLINE (.JSON ĐÓNG GÓI) ---
-    // --- GIẢI PHÁP 1: XUẤT VÀ TỰ ĐỘNG BẬT CỬA SỔ CHIA SẺ TIỆN LỢI ---
+// --- SỬA ĐỔI: XUẤT FILE DƯỚI DẠNG VĂN BẢN ĐỂ VƯỢT BỘ LỌC BẢO MẬT DI ĐỘNG ---
 function exportSyncFile() {
     if (!db) return alert("Cơ sở dữ liệu chưa sẵn sàng!");
     
@@ -1710,38 +1710,33 @@ function exportSyncFile() {
         if (allData.length === 0) return alert("Kho lưu trữ trống, không có ảnh để đóng gói!");
         
         const jsonStr = JSON.stringify(allData); 
-        const blob = new Blob([jsonStr], { type: "application/json" }); 
+        
+        // 🚀 CỐT LÕI: Đổi MIME type thành text/plain để đánh lừa bộ lọc bảo mật của Android/iOS
+        const blob = new Blob([jsonStr], { type: "text/plain;charset=utf-8" }); 
         const now = new Date(); 
         
-        // Định dạng tên file chuyên nghiệp chuẩn hóa thời gian
         const filePrefix = document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT";
         const dateStr = now.toISOString().slice(0,10).replace(/-/g,"");
         const timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
-        const filename = `PC_TQ_SYNC_${filePrefix}_${dateStr}_${timeStr}.json`;
         
-        // 🚀 CỐT LÕI: Chuyển đổi Blob thành đối tượng File để nạp vào hệ thống chia sẻ của hệ điều hành
-        const fileToShare = new File([blob], filename, { type: "application/json" });
+        // Đổi tên đuôi file thành .txt để hệ điều hành mở khóa quyền Quick Share / Zalo
+        const filename = `PC_TQ_SYNC_${filePrefix}_${dateStr}_${timeStr}.txt`;
         
-        // Kiểm tra xem trình duyệt di động có hỗ trợ chia sẻ File trực tiếp hay không
+        const fileToShare = new File([blob], filename, { type: "text/plain" });
+        
         if (navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
             navigator.share({
                 files: [fileToShare],
                 title: 'Dữ liệu đồng bộ hiện trường',
                 text: `Gửi tệp dữ liệu PC Tuyên Quang (Tổng số: ${allData.length} ảnh)`
             })
-            .then(() => {
-                console.log("✅ Anh em đã chia sẻ file thành công.");
-            })
             .catch((err) => {
-                // Nếu anh em bấm nút thoát/hủy cửa sổ chia sẻ (AbortError), không báo lỗi. 
-                // Nếu là lỗi hệ thống khác, tự động kích hoạt luồng tải về truyền thống để dự phòng
                 if (err.name !== "AbortError") {
                     console.warn("Thất bại khi gọi cửa sổ chia sẻ, chuyển hướng tải về:", err);
                     triggerFallbackDownload(blob, filename, allData.length);
                 }
             });
         } else {
-            // Luồng dự phòng (Fallback) nếu chạy trên các trình duyệt máy tính cũ không có tính năng Share File
             triggerFallbackDownload(blob, filename, allData.length);
         }
     };
