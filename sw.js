@@ -1,7 +1,9 @@
-// TỰ ĐỘNG lấy số phiên bản từ tham số URL truyền vào
-const params = new URL(self.location).searchParams;
-const VERSION = params.get('v') || '1.0.0'; 
-const CACHE_NAME = 'AirGapCamera-v' + VERSION; // Kết quả tự động sinh ra: 'AirGapCamera-v53.2'
+// 🛠️ MẸO QUẢN LÝ CỦA ANH: Không cần sửa tên Cache cứng.
+// Mỗi lần anh sửa code HTML xong đưa lên Host, anh chỉ cần vào đây gõ thêm hoặc sửa vài chữ 
+// ở dòng bình luận ngày tháng này (Ví dụ đổi ngày: 19/05/2026). File sw.js thay đổi 1 byte là app bắt được.
+// Nhật ký cập nhật: Bản vá lỗi đồng bộ và nút check thủ công - Ngày 19/05/2026
+
+const CACHE_NAME = 'AirGapCamera-Static-Storage'; 
 
 const ASSETS = [
     './',
@@ -14,43 +16,35 @@ const ASSETS = [
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'
 ];
 
-// Cài đặt và lưu vào bộ nhớ cache tĩnh
+// Cài đặt và tải tài nguyên
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
+            // Lệnh addAll khi chạy sẽ tự động kéo các file mới từ Server về ghi đè thẳng vào tên Cache cũ
             return cache.addAll(ASSETS);
-        })
+        }).then(() => self.skipWaiting())
     );
 });
 
-// Lắng nghe lệnh kích hoạt cưỡng bách từ giao diện chính
+self.addEventListener('activate', (event) => {
+    event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('message', (event) => {
     if (event.data && event.data.action === 'skipWaiting') {
         self.skipWaiting();
     }
 });
 
-// TỰ ĐỘNG dọn dẹp các bản Cache cũ khi bản mới được kích hoạt
-self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cache) => {
-                    if (cache !== CACHE_NAME) {
-                        console.log('🧹 Đã xóa bộ nhớ Cache cũ:', cache);
-                        return caches.delete(cache);
-                    }
-                })
-            );
-        }).then(() => self.clients.claim())
-    );
-});
-
-// Chiến lược lấy dữ liệu (Fetch)
+// 🌟 CHIẾN LƯỢC ĐỘC QUYỀN HIỆN TRƯỜNG: 100% CACHE-FIRST (Tốc độ tối thượng)
 self.addEventListener('fetch', (event) => {
     event.respondWith(
-        caches.match(event.request).then((response) => {
-            return response || fetch(event.request);
+        caches.match(event.request).then((cachedResponse) => {
+            // Nếu tìm thấy file trong bộ nhớ đệm PWA, trả kết quả lập tức trong 0.01 giây, không màng tới mạng mạng
+            if (cachedResponse) return cachedResponse;
+            
+            // Nếu là tài nguyên phát sinh ngoài danh mục (Ví dụ ảnh bản đồ từ OpenStreetMap trực tuyến)
+            return fetch(event.request);
         })
     );
 });
