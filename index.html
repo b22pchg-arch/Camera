@@ -27,7 +27,10 @@
         #camera-frame-note { font-size: 10px; color: #adb5bd; line-height: 1.25; }
         
         .preview-box { background: #111; border: 2px dashed #495057; border-radius: 8px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-        .preview-box img { width: 100%; height: 100%; object-fit: contain; }
+        .preview-box img { width: 100%; height: 100%; object-fit: contain; cursor: pointer; }
+        .camera-viewer-thumb { background:#111; border:1px solid #495057; border-radius:8px; overflow:hidden; position:relative; }
+        .camera-viewer-thumb img { width:100%; aspect-ratio:4/3; object-fit:contain; background:#000; cursor:pointer; }
+        .camera-viewer-thumb .small { font-size:10px; }
         
         .photo-card { background: #2b3035; border: 1px solid #495057; border-radius: 8px; overflow: hidden; position: relative; transition: transform 0.2s; }
         .photo-card img { width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #111; border-bottom: 1px solid #343a40; }
@@ -246,7 +249,26 @@ function showUpdateNotification() {
                 </span>
             </div>
 
-            <div id="camera-wrapper" class="shadow mb-2">
+            <div class="card bg-dark border-info p-2 mb-2 shadow-sm">
+                <div class="row g-2 align-items-center">
+                    <div class="col-12 col-sm-7">
+                        <label class="form-label text-info fw-bold small mb-1" for="photo-quality-select"><i class="fa-solid fa-sliders me-1"></i> CHẤT LƯỢNG ẢNH / ẢNH GHÉP / VIDEO:</label>
+                        <select id="photo-quality-select" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="applyCameraQualitySetting(true)">
+                            <option value="balanced" selected>Chuẩn hiện trường - rõ nét / dung lượng vừa</option>
+                            <option value="high">Nét cao - ưu tiên chi tiết</option>
+                            <option value="original">Gốc camera - tối đa theo máy</option>
+                            <option value="saving">Tiết kiệm - nhẹ máy, gửi nhanh</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-5">
+                        <div id="camera-frame-note" class="border border-secondary rounded p-2 bg-black bg-opacity-25 small">
+                            Khung camera đang dùng chế độ <b>lấy đủ hình</b>, không phóng cắt mép trên điện thoại.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="camera-wrapper" class="shadow mb-3">
                 <div id="camera-container">
                     <video id="video-preview" autoplay playsinline muted></video>
                 </div>
@@ -256,25 +278,6 @@ function showUpdateNotification() {
                         <span id="zoom-value-display" class="badge bg-secondary text-info fw-bold">1.0x</span>
                     </div>
                     <input type="range" id="camera-zoom-slider" class="form-range" style="accent-color: #0dcaf0;">
-                </div>
-            </div>
-
-            <div class="card bg-dark border-secondary p-2 mb-3 shadow-sm">
-                <div class="row g-2 align-items-center">
-                    <div class="col-12 col-sm-7">
-                        <label class="form-label text-info fw-bold small mb-1" for="photo-quality-select"><i class="fa-solid fa-sliders me-1"></i> CHẤT LƯỢNG ẢNH CHỤP:</label>
-                        <select id="photo-quality-select" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="applyCameraQualitySetting(true)">
-                            <option value="balanced" selected>Chuẩn hiện trường - rõ nét / dung lượng vừa</option>
-                            <option value="high">Nét cao - ưu tiên chi tiết</option>
-                            <option value="original">Gốc camera - tối đa theo máy</option>
-                            <option value="saving">Tiết kiệm - nhẹ máy, gửi nhanh</option>
-                        </select>
-                    </div>
-                    <div class="col-12 col-sm-5">
-                        <div id="camera-frame-note" class="border border-secondary rounded p-2 bg-black bg-opacity-25">
-                            Khung camera đang dùng chế độ <b>lấy đủ hình</b>, không phóng cắt mép trên điện thoại.
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -294,6 +297,20 @@ function showUpdateNotification() {
                         <i class="fa-solid fa-circle-dot d-block mb-1"></i> SAU
                     </button>
                 </div>
+            </div>
+
+            <div class="card bg-dark border-secondary p-2 mb-3 shadow-sm">
+                <div class="d-flex gap-2 align-items-center justify-content-between flex-wrap">
+                    <label class="btn btn-sm btn-outline-info fw-bold mb-0 cursor-pointer">
+                        <i class="fa-solid fa-image me-1"></i> CHỌN ẢNH ĐỂ XEM
+                        <input type="file" class="d-none" accept="image/*" multiple onchange="handleCameraViewFiles(event)">
+                    </label>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" onclick="clearCameraViewImages()"><i class="fa-solid fa-broom me-1"></i> XÓA ẢNH XEM</button>
+                    <button id="btn-toggle-qt-camera" class="btn btn-sm btn-outline-warning fw-bold ms-auto" onclick="toggleQtArea('camera')">
+                        <i class="fa-solid fa-eye-slash me-1"></i> ẨN ẢNH QUÁ TRÌNH
+                    </button>
+                </div>
+                <div id="camera-viewer-grid" class="row g-2 mt-2 d-none"></div>
             </div>
             
             <div class="form-check form-switch border border-secondary rounded p-2 mb-3 d-flex align-items-center justify-content-between bg-black bg-opacity-25" style="height: 38px;">
@@ -360,13 +377,13 @@ function showUpdateNotification() {
             </div>
 
             <div class="row g-2 mb-3">
-                <div class="col-4">
+                <div class="col-4 preview-before-column">
                     <div id="preview-before" class="preview-box"><span class="text-muted small text-center">TRƯỚC</span></div>
                 </div>
-                <div class="col-4">
+                <div class="col-4 qt-preview-column">
                     <div id="preview-process" class="preview-box"><span class="text-muted small text-center">Q.TRÌNH<br>(0)</span></div>
                 </div>
-                <div class="col-4">
+                <div class="col-4 preview-after-column">
                     <div id="preview-after" class="preview-box"><span class="text-muted small text-center">SAU</span></div>
                 </div>
             </div>
@@ -433,6 +450,9 @@ function showUpdateNotification() {
                         <option value="all">Gộp chung 1 ảnh (Vuông)</option>
                     </select>
                 </div>
+                <button id="btn-toggle-qt-pending" class="btn btn-sm btn-outline-warning w-100 fw-bold mb-2" onclick="toggleQtArea('pending')">
+                    <i class="fa-solid fa-eye-slash me-1"></i> ẨN KHU VỰC ẢNH QUÁ TRÌNH TRONG CHỜ GHÉP
+                </button>
                 <div class="row g-2 mb-2">
                     <div class="col-4">
                         <button class="btn btn-outline-primary w-100 fw-bold py-2 px-0" style="font-size:11px;" onclick="manualStitchTSOnly()">CHỈ GHÉP T/S</button>
@@ -463,7 +483,7 @@ function showUpdateNotification() {
             </div>
 
             <div class="row g-2">
-                <div class="col-4">
+                <div class="col-4 pending-before-column">
                     <div class="d-flex flex-column align-items-center border-bottom border-secondary pb-1 mb-2">
                         <span class="section-title text-primary m-0 border-0" style="font-size:12px;"><i class="fa-solid fa-box-open me-1"></i> Trước</span>
                         <label class="btn btn-sm btn-outline-primary mt-1 py-0 px-2 m-0 cursor-pointer w-100" style="font-size:10px;">
@@ -472,7 +492,7 @@ function showUpdateNotification() {
                     </div>
                     <div id="list-before" class="scrollable-box"></div>
                 </div>
-                <div class="col-4">
+                <div class="col-4 qt-pending-column">
                     <div class="d-flex flex-column align-items-center border-bottom border-secondary pb-1 mb-2">
                         <span class="section-title text-warning m-0 border-0" style="font-size:12px;"><i class="fa-solid fa-box-open me-1"></i> Q.Trình</span>
                         <label class="btn btn-sm btn-outline-warning mt-1 py-0 px-2 m-0 cursor-pointer w-100" style="font-size:10px;">
@@ -481,7 +501,7 @@ function showUpdateNotification() {
                     </div>
                     <div id="list-process" class="scrollable-box"></div>
                 </div>
-                <div class="col-4">
+                <div class="col-4 pending-after-column">
                     <div class="d-flex flex-column align-items-center border-bottom border-secondary pb-1 mb-2">
                         <span class="section-title text-success m-0 border-0" style="font-size:12px;"><i class="fa-solid fa-box-open me-1"></i> Sau</span>
                         <label class="btn btn-sm btn-outline-success mt-1 py-0 px-2 m-0 cursor-pointer w-100" style="font-size:10px;">
@@ -748,6 +768,9 @@ function showUpdateNotification() {
     let windowAutoMatches = [];
     let currentStoragePercent = 0;
     let globalExtras = { selfie: null, map: null, compass: null };
+    let isQtCameraVisible = true;
+    let isQtPendingVisible = true;
+    let cameraViewImages = [];
 
     let p2pConnection = null;
     let p2pDataChannel = null;
@@ -980,6 +1003,70 @@ function applyCameraQualitySetting(restartCamera = false) {
     if (note) note.innerHTML = `Đã chọn <b>${q.label}</b>. Ảnh sẽ nén JPEG mức <b>${Math.round(q.jpeg * 100)}%</b>.`;
     if (restartCamera && isCameraOn) initCamera();
 }
+function getVideoQualitySetting() {
+    const sel = document.getElementById("photo-quality-select");
+    const mode = sel ? sel.value : "balanced";
+    const presets = {
+        saving:   { maxHeight: 720,  fps: 20, videoBitsPerSecond: 1800000, label: "Tiết kiệm" },
+        balanced: { maxHeight: 1080, fps: 25, videoBitsPerSecond: 3500000, label: "Chuẩn hiện trường" },
+        high:     { maxHeight: 1440, fps: 30, videoBitsPerSecond: 6000000, label: "Nét cao" },
+        original: { maxHeight: 2160, fps: 30, videoBitsPerSecond: 9000000, label: "Gốc camera" }
+    };
+    return presets[mode] || presets.balanced;
+}
+
+function toggleQtArea(area) {
+    if (area === "camera") {
+        isQtCameraVisible = !isQtCameraVisible;
+        document.querySelectorAll('.qt-preview-column').forEach(el => el.classList.toggle('d-none', !isQtCameraVisible));
+        document.querySelectorAll('.preview-before-column, .preview-after-column').forEach(el => { el.classList.toggle('col-4', isQtCameraVisible); el.classList.toggle('col-6', !isQtCameraVisible); });
+        const btn = document.getElementById('btn-toggle-qt-camera');
+        if (btn) btn.innerHTML = isQtCameraVisible ? '<i class="fa-solid fa-eye-slash me-1"></i> ẨN ẢNH QUÁ TRÌNH' : '<i class="fa-solid fa-eye me-1"></i> HIỆN ẢNH QUÁ TRÌNH';
+    }
+    if (area === "pending") {
+        isQtPendingVisible = !isQtPendingVisible;
+        document.querySelectorAll('.qt-pending-column').forEach(el => el.classList.toggle('d-none', !isQtPendingVisible));
+        document.querySelectorAll('.pending-before-column, .pending-after-column').forEach(el => { el.classList.toggle('col-4', isQtPendingVisible); el.classList.toggle('col-6', !isQtPendingVisible); });
+        const btn = document.getElementById('btn-toggle-qt-pending');
+        if (btn) btn.innerHTML = isQtPendingVisible ? '<i class="fa-solid fa-eye-slash me-1"></i> ẨN KHU VỰC ẢNH QUÁ TRÌNH TRONG CHỜ GHÉP' : '<i class="fa-solid fa-eye me-1"></i> HIỆN KHU VỰC ẢNH QUÁ TRÌNH TRONG CHỜ GHÉP';
+    }
+}
+
+function handleCameraViewFiles(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    const readers = files.filter(f => f.type && f.type.startsWith('image/')).map(file => new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => resolve({ name: file.name, dataUrl: e.target.result });
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+    }));
+    Promise.all(readers).then(items => {
+        cameraViewImages = items.filter(Boolean);
+        renderCameraViewImages();
+        event.target.value = '';
+    });
+}
+
+function renderCameraViewImages() {
+    const grid = document.getElementById('camera-viewer-grid');
+    if (!grid) return;
+    if (!cameraViewImages.length) { grid.classList.add('d-none'); grid.innerHTML = ''; return; }
+    grid.classList.remove('d-none');
+    grid.innerHTML = cameraViewImages.map((img, idx) => `
+        <div class="col-6 col-sm-4">
+            <div class="camera-viewer-thumb shadow-sm">
+                <img src="${img.dataUrl}" onclick="viewFullImage('${img.dataUrl}')" alt="${img.name || 'Ảnh xem'}">
+                <div class="p-1 bg-black text-secondary small text-truncate">${idx + 1}. ${img.name || 'Ảnh xem'}</div>
+            </div>
+        </div>`).join('');
+}
+
+function clearCameraViewImages() {
+    cameraViewImages = [];
+    renderCameraViewImages();
+}
+
 
 async function initCamera() {
     if (!isCameraOn) return;
@@ -1154,7 +1241,7 @@ function showCameraErrorUI(err) {
                 let sourceToDraw = sourceDataUrl;
                 if (!sourceToDraw && canvasSourceId) {
                     let c = document.getElementById(canvasSourceId);
-                    if (c && !c.classList.contains('d-none') && isCompassPermissionGranted) { try { sourceToDraw = c.toDataURL("image/jpeg", 0.9); } catch(e) {} }
+                    if (c && !c.classList.contains('d-none') && isCompassPermissionGranted) { try { sourceToDraw = c.toDataURL("image/jpeg", getJpegQuality()); } catch(e) {} }
                 }
                 if (!sourceToDraw) { resolve(); return; }
                 let img = new Image();
@@ -1177,13 +1264,13 @@ function showCameraErrorUI(err) {
         if (teamText) { ctx.fillStyle = "#ffc107"; ctx.fillText(`TỔ ĐỘI: ${teamText}`, textX, startY + lineGap * 3, maxTextW); }
 
         const photoObj = { id: "img_" + Date.now(), type: type, dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()), timestampMs: now.getTime() };
-        if (type === "TRƯỚC") { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}">`; } 
+        if (type === "TRƯỚC") { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">`; } 
         else if (type === "SAU") { 
-            repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`; 
+            repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">`; 
             captureBuffer.QUÁ_TRÌNH = [];
             document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
         } 
-        else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`; }
+        else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`; }
         saveToDB(photoObj);
         if (captureBuffer.TRƯỚC && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
         updateUIState();
@@ -1605,11 +1692,11 @@ function showCameraErrorUI(err) {
     
     async function startRecording() {
         const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
-        const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d"); let scaleFactor = 1; if (video.videoHeight > 720) scaleFactor = 720 / video.videoHeight;
-        canvas.width = video.videoWidth * scaleFactor; const imgBoxSize = Math.min(280 * scaleFactor, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scaleFactor; canvas.height = (video.videoHeight * scaleFactor) + footerH;
+        const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d"); const videoQ = getVideoQualitySetting(); let scaleFactor = 1; if (video.videoHeight > videoQ.maxHeight) scaleFactor = videoQ.maxHeight / video.videoHeight;
+        canvas.width = Math.round(video.videoWidth * scaleFactor); const imgBoxSize = Math.min(280 * scaleFactor, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scaleFactor; canvas.height = Math.round(video.videoHeight * scaleFactor) + footerH;
         
         cachedVideoExtras = { compass: null, map: null, selfie: null };
-        const getSourceDataUrl = (globalSource, canvasId) => { if (globalSource) return globalSource; if (canvasId) { let c = document.getElementById(canvasId); if (c && !c.classList.contains('d-none')) { try { return c.toDataURL("image/jpeg", 0.9); } catch(e) {} } } return null; };
+        const getSourceDataUrl = (globalSource, canvasId) => { if (globalSource) return globalSource; if (canvasId) { let c = document.getElementById(canvasId); if (c && !c.classList.contains('d-none')) { try { return c.toDataURL("image/jpeg", getJpegQuality()); } catch(e) {} } } return null; };
         const mapSrc = getSourceDataUrl(globalExtras.map, 'canvas-map'); const compassSrc = getSourceDataUrl(globalExtras.compass, 'canvas-compass'); const selfieSrc = globalExtras.selfie;
         if (compassSrc && isCompassPermissionGranted) { let i = new Image(); i.src = compassSrc; cachedVideoExtras.compass = i; }
         if (mapSrc) { let i = new Image(); i.src = mapSrc; cachedVideoExtras.map = i; }
@@ -1620,13 +1707,20 @@ function showCameraErrorUI(err) {
         
         try {
             try { dynamicAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(errMic) { dynamicAudioStream = null; }
-            const canvasStream = canvas.captureStream(25); const combinedStream = new MediaStream();
+            const canvasStream = canvas.captureStream(videoQ.fps); const combinedStream = new MediaStream();
             if (canvasStream && canvasStream.getVideoTracks().length > 0) { combinedStream.addTrack(canvasStream.getVideoTracks()[0]); }
             if (dynamicAudioStream && dynamicAudioStream.getAudioTracks().length > 0) { combinedStream.addTrack(dynamicAudioStream.getAudioTracks()[0]); }
             
             recordedChunks = [];
-            try { if (mimeType !== '') { mediaRecorder = new MediaRecorder(combinedStream, { mimeType: mimeType }); } else { mediaRecorder = new MediaRecorder(combinedStream); } } 
-            catch (eAllocation) { const pureCanvas = new MediaStream([canvasStream.getVideoTracks()[0]]); mediaRecorder = new MediaRecorder(pureCanvas); }
+            try {
+                const recorderOptions = { videoBitsPerSecond: videoQ.videoBitsPerSecond, audioBitsPerSecond: 128000 };
+                if (mimeType !== '') recorderOptions.mimeType = mimeType;
+                mediaRecorder = new MediaRecorder(combinedStream, recorderOptions);
+            } 
+            catch (eAllocation) {
+                const pureCanvas = new MediaStream([canvasStream.getVideoTracks()[0]]);
+                mediaRecorder = new MediaRecorder(pureCanvas, { videoBitsPerSecond: videoQ.videoBitsPerSecond });
+            }
             
             mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
             mediaRecorder.onstop = () => {
