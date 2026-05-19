@@ -299,6 +299,53 @@ function showUpdateNotification() {
                 </div>
             </div>
 
+            <div class="row g-2 mb-3">
+                <div class="col-4 preview-before-column">
+                    <div id="preview-before" class="preview-box"><span class="text-muted small text-center">TRƯỚC</span></div>
+                </div>
+                <div class="col-4 qt-preview-column">
+                    <div id="preview-process" class="preview-box"><span class="text-muted small text-center">Q.TRÌNH<br>(0)</span></div>
+                </div>
+                <div class="col-4 preview-after-column">
+                    <div id="preview-after" class="preview-box"><span class="text-muted small text-center">SAU</span></div>
+                </div>
+            </div>
+
+            <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
+                <label class="form-label text-info fw-bold small mb-1">TÊN HOẶC MÃ HIỆN TRƯỜNG:</label>
+                <div class="input-group input-group-sm mb-2">
+                    <input type="text" id="tab1-prefix" class="form-control bg-secondary text-white border-secondary" placeholder="TBA_Gia_Tran_01">
+                </div>
+                
+                <label class="form-label text-warning fw-bold small mb-1">GHI CHÚ (Hiển thị chân ảnh ghép):</label>
+                <div class="input-group input-group-sm mb-3">
+                    <input type="text" id="tab1-note" class="form-control bg-secondary text-white border-secondary" placeholder="Thay sứ, vuốt lại lèo...">
+                </div>
+
+                <div class="d-flex align-items-center mb-2 p-1 bg-black rounded border border-secondary">
+                    <span class="small text-warning fw-bold me-2 px-1" style="font-size:11px;">Ghép Q.Trình:</span>
+                    <select id="qt-stitch-mode" class="form-select form-select-sm bg-secondary text-white border-secondary py-0" style="font-size:11px; height: 26px;">
+                        <option value="2" selected>Theo cặp (2 ảnh)</option>
+                        <option value="3">Nhóm 3 ảnh</option>
+                        <option value="4">Nhóm 4 ảnh</option>
+                        <option value="all">Gộp chung 1 ảnh (Vuông)</option>
+                    </select>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <button id="btn-stitch-ts-only" class="btn btn-primary w-100 fw-bold py-2" style="font-size:11px;" disabled onclick="quickStitchTSOnly()">CHỈ GHÉP T/S ĐỘC LẬP</button>
+                    </div>
+                    <div class="col-6">
+                        <button id="btn-stitch-full" class="btn btn-success w-100 fw-bold py-2" style="font-size:11px;" disabled onclick="quickStitchFull()"><i class="fa-solid fa-border-all"></i> GHÉP TẤT CẢ (T-QT-S)</button>
+                    </div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-12">
+                        <button id="btn-stitch-fast-ts" class="btn btn-info w-100 fw-bold py-2 text-dark" style="font-size:13px;" disabled onclick="quickStitchTS()">HOÀN THÀNH PHIÊN (T/S + QT riêng)</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="card bg-dark border-secondary p-2 mb-3 shadow-sm">
                 <div class="d-flex gap-2 align-items-center justify-content-between flex-wrap">
                     <label class="btn btn-sm btn-outline-info fw-bold mb-0 cursor-pointer">
@@ -372,53 +419,6 @@ function showUpdateNotification() {
                             <button class="btn btn-sm btn-outline-light flex-fill" onclick="copyStandaloneSTT()"><i class="fa-solid fa-copy me-1"></i> Sao chép chữ</button>
                             <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearStandaloneSTT()"><i class="fa-solid fa-trash me-1"></i> Xóa bảng nội dung</button>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row g-2 mb-3">
-                <div class="col-4 preview-before-column">
-                    <div id="preview-before" class="preview-box"><span class="text-muted small text-center">TRƯỚC</span></div>
-                </div>
-                <div class="col-4 qt-preview-column">
-                    <div id="preview-process" class="preview-box"><span class="text-muted small text-center">Q.TRÌNH<br>(0)</span></div>
-                </div>
-                <div class="col-4 preview-after-column">
-                    <div id="preview-after" class="preview-box"><span class="text-muted small text-center">SAU</span></div>
-                </div>
-            </div>
-
-            <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
-                <label class="form-label text-info fw-bold small mb-1">TÊN HOẶC MÃ HIỆN TRƯỜNG:</label>
-                <div class="input-group input-group-sm mb-2">
-                    <input type="text" id="tab1-prefix" class="form-control bg-secondary text-white border-secondary" placeholder="TBA_Gia_Tran_01">
-                </div>
-                
-                <label class="form-label text-warning fw-bold small mb-1">GHI CHÚ (Hiển thị chân ảnh ghép):</label>
-                <div class="input-group input-group-sm mb-3">
-                    <input type="text" id="tab1-note" class="form-control bg-secondary text-white border-secondary" placeholder="Thay sứ, vuốt lại lèo...">
-                </div>
-
-                <div class="d-flex align-items-center mb-2 p-1 bg-black rounded border border-secondary">
-                    <span class="small text-warning fw-bold me-2 px-1" style="font-size:11px;">Ghép Q.Trình:</span>
-                    <select id="qt-stitch-mode" class="form-select form-select-sm bg-secondary text-white border-secondary py-0" style="font-size:11px; height: 26px;">
-                        <option value="2" selected>Theo cặp (2 ảnh)</option>
-                        <option value="3">Nhóm 3 ảnh</option>
-                        <option value="4">Nhóm 4 ảnh</option>
-                        <option value="all">Gộp chung 1 ảnh (Vuông)</option>
-                    </select>
-                </div>
-                <div class="row g-2 mb-2">
-                    <div class="col-6">
-                        <button id="btn-stitch-ts-only" class="btn btn-primary w-100 fw-bold py-2" style="font-size:11px;" disabled onclick="quickStitchTSOnly()">CHỈ GHÉP T/S ĐỘC LẬP</button>
-                    </div>
-                    <div class="col-6">
-                        <button id="btn-stitch-full" class="btn btn-success w-100 fw-bold py-2" style="font-size:11px;" disabled onclick="quickStitchFull()"><i class="fa-solid fa-border-all"></i> GHÉP TẤT CẢ (T-QT-S)</button>
-                    </div>
-                </div>
-                <div class="row g-2">
-                    <div class="col-12">
-                        <button id="btn-stitch-fast-ts" class="btn btn-info w-100 fw-bold py-2 text-dark" style="font-size:13px;" disabled onclick="quickStitchTS()">HOÀN THÀNH PHIÊN (T/S + QT riêng)</button>
                     </div>
                 </div>
             </div>
