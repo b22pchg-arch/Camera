@@ -31,6 +31,10 @@
         .camera-viewer-thumb { background:#111; border:1px solid #495057; border-radius:8px; overflow:hidden; position:relative; }
         .camera-viewer-thumb img { width:100%; aspect-ratio:4/3; object-fit:contain; background:#000; cursor:pointer; }
         .camera-viewer-thumb .small { font-size:10px; }
+
+        .map-tag-btn { position:absolute; right:8px; bottom:8px; z-index:12; border-radius:999px; font-size:10px; font-weight:700; padding:4px 8px; box-shadow:0 2px 8px rgba(0,0,0,0.45); }
+        .map-tag-btn.top-map { bottom:auto; top:8px; right:8px; }
+        .map-tag-btn:hover { transform: translateY(-1px); }
         
         .photo-card { background: #2b3035; border: 1px solid #495057; border-radius: 8px; overflow: hidden; position: relative; transition: transform 0.2s; }
         .photo-card img { width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #111; border-bottom: 1px solid #343a40; }
@@ -1111,6 +1115,137 @@ function clearCameraViewImages() {
 }
 
 
+function hasValidGpsData(gps) {
+    return !!gps && Number.isFinite(Number(gps.lat)) && Number.isFinite(Number(gps.lng)) && !(Number(gps.lat) === 0 && Number(gps.lng) === 0);
+}
+
+function getCurrentGpsMeta() {
+    const lat = Number(currentGpsData.lat);
+    const lng = Number(currentGpsData.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
+    return {
+        lat,
+        lng,
+        gpsText: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        mapUrl: buildMapUrl(lat, lng)
+    };
+}
+
+function buildMapUrl(lat, lng) {
+    return `https://www.google.com/maps?q=${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`;
+}
+
+function getGpsMetaFromPhotos(items) {
+    const valid = (items || []).filter(item => hasValidGpsData(item));
+    if (!valid.length) return null;
+    const lat = valid.reduce((sum, item) => sum + Number(item.lat), 0) / valid.length;
+    const lng = valid.reduce((sum, item) => sum + Number(item.lng), 0) / valid.length;
+    return {
+        lat,
+        lng,
+        gpsText: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        mapUrl: buildMapUrl(lat, lng)
+    };
+}
+
+function applyGpsMeta(target, gpsMeta) {
+    if (!target || !hasValidGpsData(gpsMeta)) return target;
+    target.lat = Number(gpsMeta.lat);
+    target.lng = Number(gpsMeta.lng);
+    target.gpsText = gpsMeta.gpsText || `${target.lat.toFixed(6)}, ${target.lng.toFixed(6)}`;
+    target.mapUrl = gpsMeta.mapUrl || buildMapUrl(target.lat, target.lng);
+    return target;
+}
+
+function openMap(lat, lng) {
+    lat = Number(lat); lng = Number(lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+        alert("Ảnh này chưa có dữ liệu vị trí GPS.");
+        return;
+    }
+    window.open(buildMapUrl(lat, lng), "_blank", "noopener");
+}
+
+function mapButtonHtml(item, extraClass = "") {
+    if (!hasValidGpsData(item)) return "";
+    const title = (item.gpsText || `${Number(item.lat).toFixed(6)}, ${Number(item.lng).toFixed(6)}`).replace(/"/g, '&quot;');
+    return `<button type="button" class="btn btn-sm btn-info text-dark map-tag-btn ${extraClass}" title="${title}" onclick="event.stopPropagation(); openMap(${Number(item.lat)}, ${Number(item.lng)});"><i class="fa-solid fa-location-dot me-1"></i>Vị trí</button>`;
+}
+
+function loadImageFromDataUrl(dataUrl) {
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
+    });
+}
+
+function createQrCanvas(text, size) {
+    return new Promise(resolve => {
+        if (!window.QRCode || !text) return resolve(null);
+        const box = document.createElement("div");
+        box.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:" + size + "px;height:" + size + "px;background:#fff;";
+        document.body.appendChild(box);
+        try {
+            new QRCode(box, { text, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+            setTimeout(() => {
+                const canvas = box.querySelector("canvas");
+                const img = box.querySelector("img");
+                if (canvas) resolve(canvas);
+                else if (img && img.complete) resolve(img);
+                else if (img) { img.onload = () => resolve(img); img.onerror = () => resolve(null); }
+                else resolve(null);
+                setTimeout(() => box.remove(), 200);
+            }, 80);
+        } catch (err) {
+            box.remove(); resolve(null);
+        }
+    });
+}
+
+async function drawLocationQrOnCanvas(ctx, canvas, gpsMeta) {
+    if (!hasValidGpsData(gpsMeta)) return;
+    const W = canvas.width, H = canvas.height;
+    const base = Math.max(1, Math.min(W, H) / 1000);
+    const qrSize = Math.max(86, Math.round(Math.min(W, H) * 0.12));
+    const pad = Math.max(10, Math.round(14 * base));
+    const panelW = Math.min(W - pad * 2, Math.round(qrSize + 420 * base));
+    const panelH = Math.round(qrSize + 2 * pad);
+    const x = W - panelW - pad;
+    const y = H - panelH - pad;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.82)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, panelW, panelH, Math.round(12 * base)); else ctx.rect(x, y, panelW, panelH);
+    ctx.fill();
+    ctx.strokeStyle = "#0dcaf0";
+    ctx.lineWidth = Math.max(2, Math.round(3 * base));
+    ctx.stroke();
+
+    const qrCanvas = await createQrCanvas(gpsMeta.mapUrl || buildMapUrl(gpsMeta.lat, gpsMeta.lng), qrSize);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(x + pad, y + pad, qrSize, qrSize);
+    if (qrCanvas) ctx.drawImage(qrCanvas, x + pad, y + pad, qrSize, qrSize);
+
+    const textX = x + pad + qrSize + pad;
+    const textW = panelW - qrSize - pad * 3;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#0dcaf0";
+    ctx.font = `bold ${Math.max(16, Math.round(24 * base))}px Arial`;
+    ctx.fillText("QUÉT QR MỞ BẢN ĐỒ", textX, y + pad + qrSize * 0.28, textW);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${Math.max(13, Math.round(18 * base))}px Arial`;
+    ctx.fillText(gpsMeta.gpsText || `${Number(gpsMeta.lat).toFixed(6)}, ${Number(gpsMeta.lng).toFixed(6)}`, textX, y + pad + qrSize * 0.58, textW);
+    ctx.fillStyle = "#ffc107";
+    ctx.font = `${Math.max(11, Math.round(15 * base))}px Arial`;
+    ctx.fillText("Google Maps", textX, y + pad + qrSize * 0.82, textW);
+    ctx.restore();
+}
+
+
 async function initCamera() {
     if (!isCameraOn) return;
     
@@ -1310,14 +1445,14 @@ function showCameraErrorUI(err) {
         ctx.fillText(`THỜI GIAN: ${timeStr}`, textX, startY + lineGap, maxTextW); ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, textX, startY + lineGap * 2, maxTextW);
         if (teamText) { ctx.fillStyle = "#ffc107"; ctx.fillText(`TỔ ĐỘI: ${teamText}`, textX, startY + lineGap * 3, maxTextW); }
 
-        const photoObj = { id: "img_" + Date.now(), type: type, dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()), timestampMs: now.getTime() };
-        if (type === "TRƯỚC") { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">`; } 
+        const photoObj = applyGpsMeta({ id: "img_" + Date.now(), type: type, dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()), timestampMs: now.getTime() }, getCurrentGpsMeta());
+        if (type === "TRƯỚC") { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">${mapButtonHtml(photoObj)}`; } 
         else if (type === "SAU") { 
-            repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">`; 
+            repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">${mapButtonHtml(photoObj)}`; 
             captureBuffer.QUÁ_TRÌNH = [];
             document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
         } 
-        else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>`; }
+        else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>${mapButtonHtml(photoObj)}`; }
         saveToDB(photoObj);
         if (captureBuffer.TRƯỚC && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
         updateUIState();
@@ -1327,7 +1462,7 @@ function showCameraErrorUI(err) {
     function processMultiStitching(imgObjs, itemTypeMarker, customNote, callback) {
         return new Promise((resolve) => {
             if (!imgObjs || imgObjs.length === 0) { if(callback) callback(); resolve(); return; }
-            Promise.all(imgObjs.map(obj => new Promise(res => { const i = new Image(); i.src = obj.dataUrl; i.onload = () => res({img: i, obj: obj}); }))).then(loaded => {
+            Promise.all(imgObjs.map(obj => new Promise(res => { const i = new Image(); i.src = obj.dataUrl; i.onload = () => res({img: i, obj: obj}); }))).then(async loaded => {
                 const stitchCanvas = document.createElement("canvas"); const ctx = stitchCanvas.getContext("2d"); let N = loaded.length;
                 let useGrid = (document.getElementById("qt-stitch-mode").value === 'all' || itemTypeMarker === "FULL") && N > 2;
                 let cols = useGrid ? Math.ceil(Math.sqrt(N)) : N, rows = useGrid ? Math.ceil(N / cols) : 1;
@@ -1348,6 +1483,8 @@ function showCameraErrorUI(err) {
                     ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.stroke();
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillText(noteText, noteX, noteY);
                 }
+                const stitchGpsMeta = getGpsMetaFromPhotos(imgObjs);
+                await drawLocationQrOnCanvas(ctx, stitchCanvas, stitchGpsMeta);
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT";
                 if (itemTypeMarker === "QT") filePrefix = "QT_" + filePrefix; else if (itemTypeMarker === "FULL") filePrefix = "FULL_" + filePrefix;
@@ -1355,7 +1492,7 @@ function showCameraErrorUI(err) {
                 let earliestTs = Date.now();
                 if (imgObjs && imgObjs.length > 0) { earliestTs = Math.min(...imgObjs.map(o => o.timestampMs || Date.now())); }
 
-                const newItem = { 
+                const newItem = applyGpsMeta({ 
                     id: "stitched_" + Date.now() + Math.floor(Math.random()*100), 
                     type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", 
                     name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_GRP_${Date.now()}.jpg`, 
@@ -1363,7 +1500,7 @@ function showCameraErrorUI(err) {
                     timestampMs: Date.now(), 
                     timestampStr: new Date().toLocaleString("vi-VN"),
                     qtTimeMs: earliestTs 
-                };
+                }, stitchGpsMeta);
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 let objIds = loaded.map(l => l.obj.id);
                 if (itemTypeMarker === "QT") repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
@@ -1378,7 +1515,7 @@ function showCameraErrorUI(err) {
             const stitchCanvas = document.createElement("canvas"); const ctx = stitchCanvas.getContext("2d");
             const loadB = new Promise(res => { const i = new Image(); i.src = bObj.dataUrl; i.onload = () => res(i); });
             const loadA = new Promise(res => { const i = new Image(); i.src = aObj.dataUrl; i.onload = () => res(i); });
-            Promise.all([loadB, loadA]).then(([loadedB, loadedA]) => {
+            Promise.all([loadB, loadA]).then(async ([loadedB, loadedA]) => {
                 const q = getPhotoQualitySetting();
                 const bDim = getScaledDimensions(loadedB.width, loadedB.height, q.stitchPanelLongEdge);
                 const aDim = getScaledDimensions(loadedA.width, loadedA.height, q.stitchPanelLongEdge);
@@ -1399,6 +1536,8 @@ function showCameraErrorUI(err) {
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
                     if (lineCount === 2) { ctx.fillText(noteText, noteX, noteY - (noteSize / 2) - 2 * imgScale); ctx.fillText(qtText, noteX, noteY + (noteSize / 2) + 8 * imgScale); } else if (noteText) ctx.fillText(noteText, noteX, noteY); else if (showQTLine) ctx.fillText(qtText, noteX, noteY);
                 }
+                const stitchGpsMeta = getGpsMetaFromPhotos([bObj, aObj]);
+                await drawLocationQrOnCanvas(ctx, stitchCanvas, stitchGpsMeta);
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT"; if (isQT) filePrefix = "QT_" + filePrefix;
                 const formatTime = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; };
@@ -1406,7 +1545,7 @@ function showCameraErrorUI(err) {
                 let sessionStartMs = Math.min(bObj.timestampMs, aObj.timestampMs);
                 let sessionEndMs = Math.max(bObj.timestampMs, aObj.timestampMs);
 
-                const newItem = { 
+                const newItem = applyGpsMeta({ 
                     id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), 
                     type: isQT ? "STITCHED_QT" : "STITCHED", 
                     name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`, 
@@ -1415,7 +1554,7 @@ function showCameraErrorUI(err) {
                     timestampStr: new Date().toLocaleString("vi-VN"),
                     sessionStartMs: sessionStartMs,
                     sessionEndMs: sessionEndMs
-                };
+                }, stitchGpsMeta);
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 if (isQT) repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id); else { repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id); }
                 deleteFromDB(bObj.id); deleteFromDB(aObj.id); updateUIState(); if (callback) callback(); if (showAlert) { renderPending(); renderGallery(); alert(`Đã ghép thành công:\n${newItem.name}`); } resolve();
@@ -1446,7 +1585,7 @@ function showCameraErrorUI(err) {
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
         let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
-        let maxT = Math.max(captureBuffer.TRƯRIG ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
+        let maxT = Math.max(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
         let allObjs = [captureBuffer.TRƯỚC, ...sessionQts, captureBuffer.SAU];
         await processMultiStitching(allObjs, "FULL", customNote, () => {
@@ -1552,7 +1691,7 @@ function showCameraErrorUI(err) {
                     const out = getScaledDimensions(img.width, img.height, getPhotoQualitySetting().maxLongEdge);
                     let w = out.width; let h = out.height;
                     canvas.width = w; canvas.height = h; const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
-                    const photoObj = { id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()), timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined, sessionStartMs: Date.now() - 2000, sessionEndMs: Date.now(), qtTimeMs: Date.now() };
+                    const photoObj = applyGpsMeta({ id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()), timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined, sessionStartMs: Date.now() - 2000, sessionEndMs: Date.now(), qtTimeMs: Date.now() }, getCurrentGpsMeta());
                     if (type === "TRƯỚC") repoBefore.unshift(photoObj); else if (type === "SAU") repoAfter.unshift(photoObj); else if (type === "QUÁ TRÌNH") repoProcess.unshift(photoObj); else repoStitched.unshift(photoObj);
                     saveToDB(photoObj); updateUIState(); renderPending(); if (type === "STITCHED") renderGallery();
                 }; img.src = e.target.result;
@@ -1650,7 +1789,7 @@ function showCameraErrorUI(err) {
             let listHtml = '';
             repo.forEach((item, index) => {
                 const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' });
-                listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
+                listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')">${mapButtonHtml(item, 'top-map')}<div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
                 
                 if (index < repo.length - 1) {
                     const nextItem = repo[index+1]; let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
@@ -1701,7 +1840,7 @@ function showCameraErrorUI(err) {
                         <div class="col-12 col-md-6" id="card_${session.id}">
                             <div class="photo-card stitched shadow-sm position-relative border border-primary">
                                 <input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${session.id}" onchange="calculateSelection()">
-                                <img src="${session.dataUrl}" onclick="viewFullImage('${session.dataUrl}')">
+                                <img src="${session.dataUrl}" onclick="viewFullImage('${session.dataUrl}')">${mapButtonHtml(session, 'top-map')}
                                 <div class="p-2 bg-dark">
                                     <div class="small fw-bold text-primary text-break">${session.name}</div>
                                     <div class="text-secondary" style="font-size:10px;"><i class="fa-solid fa-images me-1"></i> Ảnh Chốt Phiên (Trước/Sau)</div>
@@ -1715,7 +1854,7 @@ function showCameraErrorUI(err) {
                         <div class="photo-card stitched shadow-sm position-relative border border-warning">
                             <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span>
                             <input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()">
-                            <img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')">
+                            <img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')">${mapButtonHtml(q, 'top-map')}
                             <div class="p-2 bg-dark">
                                     <div class="small fw-bold text-warning text-break">${q.name}</div>
                                     <div class="text-secondary" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> Thống kê tiến độ</div>
@@ -1733,7 +1872,7 @@ function showCameraErrorUI(err) {
                 orphanQts.sort((a, b) => (a.qtTimeMs || a.timestampMs) - (b.qtTimeMs || b.timestampMs));
                 html += `<div class="card bg-dark border-warning mb-4 p-2 shadow-sm w-100"><div class="card-header bg-black bg-opacity-50 text-warning border-0 p-2 rounded-top"><span class="fw-bold small text-uppercase"><i class="fa-solid fa-triangle-exclamation me-2"></i>Ảnh Quá Trình Chưa Ghép Cặp Phiên</span></div><div class="card-body p-2 bg-black bg-opacity-25 rounded-bottom"><div class="row g-3">`;
                 orphanQts.forEach(q => {
-                    html += `<div class="col-12 col-sm-6" id="card_${q.id}"><div class="photo-card stitched shadow-sm position-relative border border-warning"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span><input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()"><img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')"><div class="p-2 bg-dark"><div class="small fw-bold text-warning text-break">${q.name}</div><div class="text-secondary" style="font-size:11px;">${q.timestampStr}</div></div></div></div>`;
+                    html += `<div class="col-12 col-sm-6" id="card_${q.id}"><div class="photo-card stitched shadow-sm position-relative border border-warning"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span><input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()"><img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')">${mapButtonHtml(q, 'top-map')}<div class="p-2 bg-dark"><div class="small fw-bold text-warning text-break">${q.name}</div><div class="text-secondary" style="font-size:11px;">${q.timestampStr}</div></div></div></div>`;
                 });
                 html += `</div></div></div>`;
             }
