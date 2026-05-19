@@ -644,40 +644,105 @@ function showUpdateNotification() {
 
         <div class="tab-pane fade" id="help-content" role="tabpanel">
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm text-light" style="font-size: 13px; line-height: 1.6;">
-                <h6 class="text-info fw-bold border-bottom border-secondary pb-2 mb-3"><i class="fa-solid fa-book me-2"></i>HƯỚNG DẪN SỬ DỤNG NHANH</h6>
-                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> KHỞI ĐỘNG LA BÀN TRÊN IPHONE (SAFARI):</p>
+                <h6 class="text-info fw-bold border-bottom border-secondary pb-2 mb-3"><i class="fa-solid fa-book me-2"></i>HƯỚNG DẪN SỬ DỤNG CHI TIẾT</h6>
+
+                <div class="alert alert-info bg-info bg-opacity-10 border-info text-info small mb-3" style="font-size:12px;">
+                    <b>Nguyên tắc chung:</b> Ứng dụng ưu tiên chạy offline. Trước khi đi hiện trường nên mở app một lần khi có mạng, kiểm tra camera/GPS/la bàn, sau đó sử dụng bình thường ngoài hiện trường.
+                </div>
+
+                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-mobile-screen-button me-1"></i> 1. CÀI ĐẶT VÀ CẬP NHẬT PWA</p>
                 <ul class="text-secondary ps-3 mb-3">
-                    <li>Do cơ chế bảo mật nghiêm ngặt của Apple, la bàn không được tự động chạy. Anh em bắt buộc phải **chạm tay vào ô La bàn** (Góc phải chân trang tự động), một cửa sổ hệ thống sẽ hiện ra xin quyền truy cập cảm biến, chọn **Cho phép (Allow)** là la bàn hoạt động ngay lập tức.</li>
-                </ul>
-                <p class="text-danger fw-bold mb-1"><i class="fa-solid fa-microphone me-1"></i> BÓC BĂNG ĐỘC LẬP TRÊN ĐIỆN THOẠI:</p>
-                <ul class="text-secondary ps-3 mb-0">
-                    <li>Khi mở **Bóc băng độc lập**, màn hình Camera hiện trường sẽ tạm thời đóng luồng để nhường phần cứng thu âm hoàn toàn cho bộ nhận diện chữ AI. Khi bấm **DỪNG**, Camera sẽ tự động mở lại ngay.</li>
-                </ul>
-				<p class="text-warning fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> 1. LƯU Ý QUAN TRỌNG VỀ PWA (BẮT BUỘC):</p>
-                <ul class="text-secondary ps-3 mb-3">
-                    <li>Để ứng dụng hoạt động <b>Offline (không cần mạng)</b> và full màn hình, bắt buộc phải chọn <b>"Thêm vào màn hình chính" (Add to Home Screen)</b> trên Chrome/Safari.</li>
-                    <li>Khi có bản cập nhật mới, cần xóa biểu tượng app cũ ngoài màn hình, vào phần Cài đặt của trình duyệt xóa "Dữ liệu trang web", sau đó tải lại link và ghim lại ra màn hình.</li>
+                    <li>Để chạy toàn màn hình và dùng tốt khi mất mạng, mở trang bằng Chrome/Safari rồi chọn <b>Thêm vào màn hình chính</b>.</li>
+                    <li>Khi có phiên bản mới, vào tab <b>Đồng Bộ</b> và bấm <b>KIỂM TRA BẢN CẬP NHẬT MỚI</b>. Nếu trình duyệt vẫn giữ bản cũ, hãy xóa dữ liệu trang web rồi ghim lại app.</li>
+                    <li>Thanh <b>Bộ nhớ</b> ở góc trên giúp theo dõi dung lượng ảnh đang lưu trong trình duyệt.</li>
                 </ul>
 
-                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-hard-drive me-1"></i> 2. GIỚI HẠN DUNG LƯỢNG KHO LƯU TRỮ:</p>
-                <ul class="text-secondary ps-3 mb-3">
-                    <li>Trình duyệt (Chrome/Safari) cấp một dung lượng bộ nhớ giới hạn cho ứng dụng. Thanh trạng thái ở góc trên bên phải sẽ báo số % đã dùng.</li>
-                    <li>Khi báo <span class="text-danger fw-bold">Màu Đỏ (>80%)</span>, bộ nhớ sắp đầy. Anh em cần tải các ảnh ở tab "Đã Ghép" về máy, sau đó <b>XÓA ẢNH TRÊN APP</b> để giải phóng dung lượng. Nếu đầy 100%, app sẽ không thể lưu thêm ảnh.</li>
-                </ul>
-
-                <p class="text-info fw-bold mb-1"><i class="fa-solid fa-camera me-1"></i> 3. THAO TÁC CHỤP & GHÉP ẢNH:</p>
-                <ol class="text-secondary ps-3 mb-0">
-                    <li><b>Chuẩn bị:</b> Nhập Tên Tổ Đội và Mã Hiện Trường. Cài đặt các ảnh chân trang (Selfie, Bản đồ, La bàn) ở khung trên cùng.</li>
-                    <li><b>Chụp ảnh:</b> Bấm [Chụp TRƯỚC] và [Chụp SAU]. Hệ thống tự động đóng dấu Tọa độ, Thời gian và các ảnh phụ trợ vào chân trang (không đè lên ảnh gốc).</li>
-                    <li><b>Ghép ảnh:</b> Nhập "Ghi chú", bấm [GHÉP NGAY] nếu vừa chụp xong 1 cặp. Hoặc vào Tab "Chờ Ghép" để ghép tự động/thủ công nhiều ảnh. Dòng ghi chú sẽ tự động nằm ở tâm giao điểm giữa 2 bức ảnh ghép.</li>
-                    <li><b>Xuất báo cáo:</b> Vào Tab "Đã Ghép", chọn các ảnh hoàn thiện và bấm [CHIA SẺ / TẢI VỀ].</li>
+                <p class="text-info fw-bold mb-1"><i class="fa-solid fa-camera me-1"></i> 2. TAB MÁY ẢNH - CHỤP HIỆN TRƯỜNG</p>
+                <ol class="text-secondary ps-3 mb-3">
+                    <li><b>Chọn chất lượng:</b> chọn mức <b>Tiết kiệm / Chuẩn hiện trường / Nét cao / Gốc camera</b> ở ngay phía trên khung camera. Lựa chọn này được dùng chung cho ảnh chụp, ảnh upload xử lý lại, ảnh ghép và video.</li>
+                    <li><b>Bật/tắt camera:</b> nút hình camera dùng để bật/tắt luồng camera; nút xoay camera dùng để đổi camera trước/sau.</li>
+                    <li><b>Khung hiển thị camera:</b> khung camera dùng chế độ lấy đủ hình, hạn chế cắt mép trên điện thoại. Nếu thấy viền đen, đó là phần giữ đúng tỷ lệ camera để không mất nội dung.</li>
+                    <li><b>Thu phóng:</b> nếu thiết bị hỗ trợ zoom phần cứng, thanh <b>THU PHÓNG</b> sẽ hiện bên dưới camera.</li>
+                    <li><b>Chụp ảnh:</b> dùng các nút <b>TRƯỚC</b>, <b>Q.TRÌNH</b>, <b>SAU</b>. Ảnh sẽ tự lưu vào kho tương ứng để ghép sau.</li>
+                    <li><b>Ẩn/hiện Quá Trình:</b> dùng nút ẩn/hiện ảnh <b>Quá Trình</b> trong tab Máy Ảnh để thu gọn giao diện khi chỉ cần chụp Trước/Sau.</li>
+                    <li><b>Chọn ảnh để xem:</b> ở phía dưới khu vực lưu/ghép ảnh có mục chọn ảnh ngoài để xem nhanh, kiểm tra ảnh hoặc xem vị trí nếu ảnh có dữ liệu GPS.</li>
                 </ol>
 
-                <p class="text-danger fw-bold mb-1 mt-3"><i class="fa-solid fa-video me-1"></i> 4. QUAY VIDEO HIỆN TRƯỜNG:</p>
+                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-layer-group me-1"></i> 3. CHÂN TRANG TỰ ĐỘNG: SELFIE - BẢN ĐỒ - LA BÀN</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li><b>Người chụp:</b> bấm biểu tượng camera để chụp selfie hoặc bấm tải lên để chọn ảnh có sẵn.</li>
+                    <li><b>Bản đồ:</b> app tự vẽ vị trí GPS hiện tại khi có mạng bản đồ; nếu không có mạng, vẫn giữ tọa độ dạng chữ. Có thể tải ảnh bản đồ thủ công để thay thế.</li>
+                    <li><b>La bàn:</b> trên iPhone/Safari cần chạm vào ô La bàn và chọn <b>Cho phép</b> để cấp quyền cảm biến.</li>
+                    <li>Các ảnh phụ trợ này được đưa vào chân ảnh/ảnh ghép, không che mất vùng ảnh chính.</li>
+                </ul>
+
+                <p class="text-success fw-bold mb-1"><i class="fa-solid fa-location-dot me-1"></i> 4. TAG VỊ TRÍ VÀ MÃ QR BẢN ĐỒ</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li>Khi GPS hoạt động, mỗi ảnh chụp sẽ lưu kèm <b>tọa độ</b> và <b>link Google Maps</b>.</li>
+                    <li>Khi xem ảnh trong app, bấm nút <b>Vị trí</b> trên ảnh để mở bản đồ theo đúng tọa độ ảnh đó.</li>
+                    <li>Khi tạo ảnh ghép, app tạo thêm <b>dải QR vị trí riêng bên dưới ảnh ghép</b>. QR không đè lên ảnh chính nên không che thông tin hiện trường.</li>
+                    <li>Nếu ảnh ghép gồm nhiều ảnh nguồn, mỗi ảnh có GPS sẽ có một mã QR riêng tương ứng để người nhận quét và mở bản đồ.</li>
+                    <li>Nếu thiết bị chưa bắt được GPS, ảnh vẫn lưu bình thường nhưng nút/QR vị trí có thể không xuất hiện hoặc sẽ báo chưa có dữ liệu vị trí.</li>
+                </ul>
+
+                <p class="text-primary fw-bold mb-1"><i class="fa-solid fa-border-all me-1"></i> 5. GHÉP ẢNH NHANH TRONG TAB MÁY ẢNH</p>
+                <ol class="text-secondary ps-3 mb-3">
+                    <li>Nhập <b>Tổ đội / Người thực hiện</b>, <b>Tên hoặc mã hiện trường</b> và <b>Ghi chú</b>.</li>
+                    <li>Chọn chế độ <b>Ghép Q.Trình</b>: theo cặp 2 ảnh, nhóm 3 ảnh, nhóm 4 ảnh hoặc gộp chung một ảnh vuông.</li>
+                    <li>Dùng <b>CHỈ GHÉP T/S ĐỘC LẬP</b> nếu chỉ cần ảnh Trước/Sau.</li>
+                    <li>Dùng <b>GHÉP TẤT CẢ (T-QT-S)</b> để tạo một ảnh ghép gồm Trước, Quá Trình và Sau.</li>
+                    <li>Dùng <b>HOÀN THÀNH PHIÊN</b> để xuất bộ ảnh hoàn thiện: Trước/Sau và các ảnh Quá Trình riêng theo chế độ đã chọn.</li>
+                </ol>
+
+                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-box-open me-1"></i> 6. TAB CHỜ GHÉP - QUẢN LÝ ẢNH NGUỒN</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li>Tab này chia ảnh thành 3 kho: <b>Trước</b>, <b>Q.Trình</b>, <b>Sau</b>.</li>
+                    <li>Có thể bấm <b>Tải ảnh</b> ở từng cột để thêm ảnh ngoài vào kho chờ ghép. Ảnh upload sẽ được xử lý theo chất lượng đang chọn ở tab Máy Ảnh.</li>
+                    <li>Dùng nút <b>ẩn/hiện khu vực Quá Trình</b> để thu gọn cột Q.Trình. Khi ẩn, hai cột Trước/Sau sẽ rộng hơn để dễ kiểm tra.</li>
+                    <li>Có thể chọn từng ảnh rồi dùng các nút ghép thủ công: <b>CHỈ GHÉP T/S</b>, <b>CHỈ GHÉP QT</b>, <b>GHÉP FULL</b>, <b>PHIÊN</b>.</li>
+                    <li>Nút <b>TỰ ĐỘNG PHIÊN</b> hỗ trợ ghép theo thứ tự ảnh đã lưu trong các kho.</li>
+                    <li>Dùng <b>XÓA ĐÃ CHỌN</b> hoặc <b>XÓA TẤT CẢ KHO</b> để dọn ảnh nguồn sau khi đã xuất xong.</li>
+                </ul>
+
+                <p class="text-info fw-bold mb-1"><i class="fa-solid fa-images me-1"></i> 7. TAB ĐÃ GHÉP - XEM, CHỌN VÀ CHIA SẺ ẢNH HOÀN THIỆN</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li>Ảnh sau khi ghép sẽ nằm trong tab <b>Đã Ghép</b>.</li>
+                    <li>Có thể bật/tắt <b>Hiển thị/Gửi kèm Ảnh Quá Trình</b> để chỉ gửi ảnh chính hoặc gửi cả ảnh QT.</li>
+                    <li>Chọn từng ảnh hoặc <b>Chọn tất cả đang hiện</b>, sau đó bấm <b>CHIA SẺ / TẢI VỀ</b>.</li>
+                    <li>Ảnh trong tab này vẫn có nút <b>Vị trí</b> nếu ảnh/ảnh ghép có dữ liệu GPS.</li>
+                    <li>Sau khi đã tải hoặc chia sẻ xong, nên xóa ảnh không cần giữ để giảm dung lượng bộ nhớ trình duyệt.</li>
+                </ul>
+
+                <p class="text-danger fw-bold mb-1"><i class="fa-solid fa-video me-1"></i> 8. QUAY VIDEO HIỆN TRƯỜNG</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li>Mở công tắc <b>HIỂN THỊ TIỆN ÍCH MỞ RỘNG</b>, sau đó mở nhóm <b>Quay Video / Ghi Âm</b>.</li>
+                    <li>Thiết lập <b>Thời gian quay tối đa</b>. Hết thời gian, app tự dừng quay và mở cửa sổ tải xuống.</li>
+                    <li>Chất lượng video gồm kích thước canvas, FPS và bitrate được đồng bộ theo mức chất lượng đã chọn ở tab Máy Ảnh.</li>
+                    <li>Video có thể ghi âm hiện trường và đóng dấu thông tin thời gian, tọa độ, tổ đội ở dải chân video.</li>
+                    <li>Video không lưu lâu trong kho ảnh của app; sau khi quay nên tải ngay về máy để tránh đầy bộ nhớ.</li>
+                </ul>
+
+                <p class="text-secondary fw-bold mb-1"><i class="fa-solid fa-microphone me-1"></i> 9. GHI ÂM VÀ BÓC BĂNG</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li><b>Ghi âm offline:</b> dùng khi chỉ cần lưu âm thanh hiện trường, không quay hình.</li>
+                    <li><b>Phụ đề video:</b> nếu trình duyệt hỗ trợ nhận diện giọng nói, app có thể ghi phụ đề khi quay video.</li>
+                    <li><b>Bóc băng độc lập:</b> dùng cho nguồn phát ngoài như bộ đàm hoặc điện thoại thứ hai. Khi bật, camera hiện trường có thể tạm đóng để nhường micro cho chức năng nhận diện giọng nói.</li>
+                    <li>Sau khi dừng bóc băng độc lập, camera sẽ được mở lại nếu trước đó đang bật.</li>
+                </ul>
+
+                <p class="text-info fw-bold mb-1"><i class="fa-solid fa-file-sharing me-1"></i> 10. TAB ĐỒNG BỘ - CHUYỂN DỮ LIỆU OFFLINE</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li><b>Xuất / Nhập file offline:</b> dùng để chuyển gói ảnh/dữ liệu giữa các máy qua Quick Share, Bluetooth, Zalo file hoặc USB.</li>
+                    <li><b>Kết nối WebRTC P2P:</b> dùng khi hai máy cùng mạng Wi-Fi hoặc một máy phát hotspot. Máy A gửi, Máy B nhận, quét/dán mã liên kết để kết nối.</li>
+                    <li><b>QR động:</b> dùng để truyền nhanh dữ liệu chữ/cấu hình khi không có mạng nội bộ ổn định.</li>
+                </ul>
+
+                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-hard-drive me-1"></i> 11. QUẢN LÝ DUNG LƯỢNG VÀ LƯU Ý KHI DÙNG</p>
                 <ul class="text-secondary ps-3 mb-0">
-                    <li><b>Giới hạn 30s:</b> Để tránh treo máy và quá tải bộ nhớ, mỗi video chỉ được quay tối đa 30 giây. Hết giờ hệ thống tự ngắt và tự xuất file.</li>
-                    <li><b>Đóng dấu & Âm thanh:</b> Chức năng sẽ ghi lại toàn bộ <b>âm thanh hiện trường</b> (tiếng người nói, tiếng thiết bị) và tự động đóng dấu Tọa độ, Thời gian, Tổ đội ở một dải băng đen dưới đáy màn hình.</li>
-                    <li><b>Lưu trữ an toàn:</b> Khác với ảnh, video quay xong sẽ <b>KHÔNG</b> nằm trong kho của app mà <b>tự động tải thẳng xuống thư viện thiết bị (thư mục Downloads hoặc Ảnh)</b>. Cơ chế này đảm bảo app không bao giờ bị báo đầy bộ nhớ vì video.</li>
+                    <li>Khi bộ nhớ báo trên <span class="text-danger fw-bold">80%</span>, nên vào tab <b>Đã Ghép</b>, tải ảnh về máy rồi xóa khỏi app.</li>
+                    <li>Chọn chất lượng <b>Gốc camera</b> cho ảnh rất nét nhưng tốn bộ nhớ hơn; khi cần gửi nhanh qua mạng yếu nên chọn <b>Chuẩn hiện trường</b> hoặc <b>Tiết kiệm</b>.</li>
+                    <li>GPS cần thời gian bắt tín hiệu, nhất là khi vừa mở app hoặc đứng trong nhà. Nên chờ dòng GPS hiện tọa độ trước khi chụp ảnh cần tag vị trí.</li>
+                    <li>Nếu trình duyệt hỏi quyền Camera, Micro, Vị trí hoặc Cảm biến chuyển động, hãy chọn <b>Cho phép</b> để dùng đủ tính năng.</li>
                 </ul>
             </div>
         </div>
