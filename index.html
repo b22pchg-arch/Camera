@@ -1204,45 +1204,91 @@ function createQrCanvas(text, size) {
     });
 }
 
-async function drawLocationQrOnCanvas(ctx, canvas, gpsMeta) {
-    if (!hasValidGpsData(gpsMeta)) return;
-    const W = canvas.width, H = canvas.height;
-    const base = Math.max(1, Math.min(W, H) / 1000);
-    const qrSize = Math.max(86, Math.round(Math.min(W, H) * 0.12));
-    const pad = Math.max(10, Math.round(14 * base));
-    const panelW = Math.min(W - pad * 2, Math.round(qrSize + 420 * base));
-    const panelH = Math.round(qrSize + 2 * pad);
-    const x = W - panelW - pad;
-    const y = H - panelH - pad;
+function getGpsMetaListFromPhotos(items) {
+    return (items || [])
+        .filter(item => hasValidGpsData(item))
+        .map((item, index) => {
+            const lat = Number(item.lat);
+            const lng = Number(item.lng);
+            return {
+                lat,
+                lng,
+                gpsText: item.gpsText || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+                mapUrl: item.mapUrl || buildMapUrl(lat, lng),
+                label: item.type ? `${item.type} ${index + 1}` : `Ảnh ${index + 1}`
+            };
+        });
+}
 
+async function appendLocationQrStripToCanvas(canvas, sourceItems, caption = "QUÉT QR ĐỂ MỞ BẢN ĐỒ TỪNG ẢNH") {
+    const points = getGpsMetaListFromPhotos(sourceItems);
+    if (!points.length) return points;
+
+    const oldCanvas = document.createElement("canvas");
+    oldCanvas.width = canvas.width;
+    oldCanvas.height = canvas.height;
+    oldCanvas.getContext("2d").drawImage(canvas, 0, 0);
+
+    const W = oldCanvas.width;
+    const base = Math.max(1, W / 1600);
+    const pad = Math.max(14, Math.round(18 * base));
+    const gap = Math.max(10, Math.round(14 * base));
+    const titleH = Math.max(34, Math.round(44 * base));
+    const qrSize = Math.max(92, Math.min(Math.round(W * 0.12), Math.round(135 * base)));
+    const minCellW = qrSize + Math.max(90, Math.round(150 * base));
+    const perRow = Math.max(1, Math.min(points.length, Math.floor((W - pad * 2 + gap) / minCellW) || 1));
+    const rows = Math.ceil(points.length / perRow);
+    const rowH = qrSize + Math.max(52, Math.round(66 * base));
+    const stripH = pad + titleH + rows * rowH + pad;
+
+    canvas.width = W;
+    canvas.height = oldCanvas.height + stripH;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(oldCanvas, 0, 0);
+
+    const stripY = oldCanvas.height;
     ctx.save();
-    ctx.fillStyle = "rgba(0,0,0,0.82)";
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x, y, panelW, panelH, Math.round(12 * base)); else ctx.rect(x, y, panelW, panelH);
-    ctx.fill();
+    ctx.fillStyle = "#050505";
+    ctx.fillRect(0, stripY, W, stripH);
     ctx.strokeStyle = "#0dcaf0";
     ctx.lineWidth = Math.max(2, Math.round(3 * base));
-    ctx.stroke();
+    ctx.strokeRect(0, stripY, W, stripH);
 
-    const qrCanvas = await createQrCanvas(gpsMeta.mapUrl || buildMapUrl(gpsMeta.lat, gpsMeta.lng), qrSize);
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(x + pad, y + pad, qrSize, qrSize);
-    if (qrCanvas) ctx.drawImage(qrCanvas, x + pad, y + pad, qrSize, qrSize);
-
-    const textX = x + pad + qrSize + pad;
-    const textW = panelW - qrSize - pad * 3;
-    ctx.textAlign = "left";
+    ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#0dcaf0";
-    ctx.font = `bold ${Math.max(16, Math.round(24 * base))}px Arial`;
-    ctx.fillText("QUÉT QR MỞ BẢN ĐỒ", textX, y + pad + qrSize * 0.28, textW);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `bold ${Math.max(13, Math.round(18 * base))}px Arial`;
-    ctx.fillText(gpsMeta.gpsText || `${Number(gpsMeta.lat).toFixed(6)}, ${Number(gpsMeta.lng).toFixed(6)}`, textX, y + pad + qrSize * 0.58, textW);
-    ctx.fillStyle = "#ffc107";
-    ctx.font = `${Math.max(11, Math.round(15 * base))}px Arial`;
-    ctx.fillText("Google Maps", textX, y + pad + qrSize * 0.82, textW);
+    ctx.font = `bold ${Math.max(18, Math.round(25 * base))}px Arial`;
+    ctx.fillText(caption, W / 2, stripY + pad + titleH / 2, W - pad * 2);
+
+    const cellW = (W - pad * 2 - gap * (perRow - 1)) / perRow;
+    for (let i = 0; i < points.length; i++) {
+        const point = points[i];
+        const row = Math.floor(i / perRow);
+        const col = i % perRow;
+        const cellX = pad + col * (cellW + gap);
+        const cellY = stripY + pad + titleH + row * rowH;
+        const qrX = cellX + cellW / 2 - qrSize / 2;
+        const qrY = cellY;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8);
+        const qrCanvas = await createQrCanvas(point.mapUrl, qrSize);
+        if (qrCanvas) ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
+
+        ctx.fillStyle = "#ffc107";
+        ctx.font = `bold ${Math.max(12, Math.round(16 * base))}px Arial`;
+        ctx.fillText(point.label, cellX + cellW / 2, qrY + qrSize + Math.max(15, Math.round(20 * base)), cellW);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `${Math.max(11, Math.round(14 * base))}px Arial`;
+        ctx.fillText(point.gpsText, cellX + cellW / 2, qrY + qrSize + Math.max(34, Math.round(42 * base)), cellW);
+    }
     ctx.restore();
+    return points;
+}
+
+async function drawLocationQrOnCanvas(ctx, canvas, gpsMeta) {
+    // Giữ lại tên hàm cũ để tương thích, nhưng chuyển QR xuống dải riêng dưới ảnh.
+    return appendLocationQrStripToCanvas(canvas, gpsMeta ? [gpsMeta] : []);
 }
 
 
@@ -1484,7 +1530,7 @@ function showCameraErrorUI(err) {
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillText(noteText, noteX, noteY);
                 }
                 const stitchGpsMeta = getGpsMetaFromPhotos(imgObjs);
-                await drawLocationQrOnCanvas(ctx, stitchCanvas, stitchGpsMeta);
+                const stitchLocationPoints = await appendLocationQrStripToCanvas(stitchCanvas, imgObjs);
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT";
                 if (itemTypeMarker === "QT") filePrefix = "QT_" + filePrefix; else if (itemTypeMarker === "FULL") filePrefix = "FULL_" + filePrefix;
@@ -1501,6 +1547,7 @@ function showCameraErrorUI(err) {
                     timestampStr: new Date().toLocaleString("vi-VN"),
                     qtTimeMs: earliestTs 
                 }, stitchGpsMeta);
+                newItem.locationPoints = stitchLocationPoints || [];
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 let objIds = loaded.map(l => l.obj.id);
                 if (itemTypeMarker === "QT") repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
@@ -1537,7 +1584,7 @@ function showCameraErrorUI(err) {
                     if (lineCount === 2) { ctx.fillText(noteText, noteX, noteY - (noteSize / 2) - 2 * imgScale); ctx.fillText(qtText, noteX, noteY + (noteSize / 2) + 8 * imgScale); } else if (noteText) ctx.fillText(noteText, noteX, noteY); else if (showQTLine) ctx.fillText(qtText, noteX, noteY);
                 }
                 const stitchGpsMeta = getGpsMetaFromPhotos([bObj, aObj]);
-                await drawLocationQrOnCanvas(ctx, stitchCanvas, stitchGpsMeta);
+                const stitchLocationPoints = await appendLocationQrStripToCanvas(stitchCanvas, [bObj, aObj]);
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
                 let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || "HT"; if (isQT) filePrefix = "QT_" + filePrefix;
                 const formatTime = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; };
@@ -1555,6 +1602,7 @@ function showCameraErrorUI(err) {
                     sessionStartMs: sessionStartMs,
                     sessionEndMs: sessionEndMs
                 }, stitchGpsMeta);
+                newItem.locationPoints = stitchLocationPoints || [];
                 repoStitched.unshift(newItem); saveToDB(newItem);
                 if (isQT) repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id); else { repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id); }
                 deleteFromDB(bObj.id); deleteFromDB(aObj.id); updateUIState(); if (callback) callback(); if (showAlert) { renderPending(); renderGallery(); alert(`Đã ghép thành công:\n${newItem.name}`); } resolve();
