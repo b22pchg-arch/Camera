@@ -19,12 +19,13 @@ const ASSETS = [
     'webfonts/fa-regular-400.woff2' // <-- Khóa cứng file font icon hay dùng dưới hiện trường
 ];
 
-// Cài đặt và tải tài nguyên
+// Cài đặt và tải tài nguyên hoàn toàn mới từ Server
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            // Lệnh addAll khi chạy sẽ tự động kéo các file mới từ Server về ghi đè thẳng vào tên Cache cũ
-            return cache.addAll(ASSETS);
+            // 🚀 BẺ GÃY BẪY HTTP CACHE: Ép trình duyệt luôn tải bản mới nhất từ server mạng
+            const refreshRequests = ASSETS.map(asset => new Request(asset, { cache: 'reload' }));
+            return cache.addAll(refreshRequests);
         }).then(() => self.skipWaiting())
     );
 });
