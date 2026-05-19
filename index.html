@@ -522,19 +522,23 @@ function showUpdateNotification() {
     </button>
 </div>
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
-                <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-file-sharing me-2"></i>Giải pháp 1: Xuất / Nhập File Offline</h6>
-                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp để truyền tải gói lớn nhiều ảnh hiện trường. Máy A xuất file `.json` rồi dùng <b>Quick Share</b> hoặc <b>Bluetooth</b> bắn sang máy B để nhập vào.</p>
-                <div class="row g-2">
-                    <div class="col-6">
-                        <button class="btn btn-primary w-100 fw-bold py-2 small" onclick="exportSyncFile()"><i class="fa-solid fa-file-export me-1"></i> XUẤT FILE (.JSON)</button>
-                    </div>
-                    <div class="col-6">
-                        <label class="btn btn-success w-100 fw-bold py-2 small m-0 text-center cursor-pointer"><i class="fa-solid fa-file-import me-1"></i> NHẬP FILE NGOÀI
-                            <input type="file" class="d-none" accept=".json" onchange="importSyncFile(event)">
-                        </label>
-                    </div>
-                </div>
-            </div>
+    <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-file-sharing me-2"></i>Giải pháp 1: Xuất / Nhập File Offline</h6>
+    <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp để truyền tải gói lớn nhiều ảnh hiện trường. Máy A xuất file tự động bật cửa sổ chia sẻ qua <b>Quick Share</b> hoặc <b>Bluetooth</b> bắn sang máy B để nhập vào.</p>
+    
+    <div id="p2p-import-preview-box" class="d-none mb-2"></div>
+
+    <div class="row g-2">
+        <div class="col-6">
+            <button class="btn btn-primary w-100 fw-bold py-2 small" onclick="exportSyncFile()"><i class="fa-solid fa-file-export me-1"></i> XUẤT CHIA SẺ</button>
+        </div>
+        <div class="col-6">
+            <label class="btn btn-success w-100 fw-bold py-2 small m-0 text-center cursor-pointer">
+                <i class="fa-solid fa-file-import me-1"></i> NHẬP FILE JSON
+                <input type="file" class="d-none" accept=".json" multiple onchange="importSyncFileWithValidation(event)">
+            </label>
+        </div>
+    </div>
+</div>
 
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
                 <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-network-wired me-2"></i>Giải pháp 2: Kết nối WebRTC P2P (Mã QR cải tiến)</h6>
@@ -1697,28 +1701,178 @@ function showCameraErrorUI(err) {
     // =========================================================================
 
     // --- GIẢI PHÁP 1: XUẤT / NHẬP FILE OFFLINE (.JSON ĐÓNG GÓI) ---
-    function exportSyncFile() {
-        if (!db) return alert("Cơ sở dữ liệu chưa sẵn sàng!");
-        db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
-            const allData = e.target.result || []; if (allData.length === 0) return alert("Kho lưu trữ trống!");
-            const jsonStr = JSON.stringify(allData); const blob = new Blob([jsonStr], { type: "application/json" }); const url = URL.createObjectURL(blob);
-            const a = document.createElement("a"); const now = new Date(); a.href = url;
-            a.download = `PC_TQ_GSHT_SYNC_${now.toISOString().slice(0,10).replace(/-/g,"")}_${now.getHours()}${now.getMinutes()}.json`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-            alert(`Đã đóng gói ${allData.length} ảnh hiện trường!\nHãy chia sẻ file qua Quick Share hoặc Bluetooth sang Máy B.`);
-        };
-    }
-    function importSyncFile(event) {
-        const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const importedData = JSON.parse(e.target.result); if (!Array.isArray(importedData)) return alert("File sai định dạng chuẩn!");
-                let tx = db.transaction("photos", "readwrite"); let store = tx.objectStore("photos");
+    // --- GIẢI PHÁP 1: XUẤT VÀ TỰ ĐỘNG BẬT CỬA SỔ CHIA SẺ TIỆN LỢI ---
+function exportSyncFile() {
+    if (!db) return alert("Cơ sở dữ liệu chưa sẵn sàng!");
+    
+    db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
+        const allData = e.target.result || []; 
+        if (allData.length === 0) return alert("Kho lưu trữ trống, không có ảnh để đóng gói!");
+        
+        const jsonStr = JSON.stringify(allData); 
+        const blob = new Blob([jsonStr], { type: "application/json" }); 
+        const now = new Date(); 
+        
+        // Định dạng tên file chuyên nghiệp chuẩn hóa thời gian
+        const filePrefix = document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT";
+        const dateStr = now.toISOString().slice(0,10).replace(/-/g,"");
+        const timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+        const filename = `PC_TQ_SYNC_${filePrefix}_${dateStr}_${timeStr}.json`;
+        
+        // 🚀 CỐT LÕI: Chuyển đổi Blob thành đối tượng File để nạp vào hệ thống chia sẻ của hệ điều hành
+        const fileToShare = new File([blob], filename, { type: "application/json" });
+        
+        // Kiểm tra xem trình duyệt di động có hỗ trợ chia sẻ File trực tiếp hay không
+        if (navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
+            navigator.share({
+                files: [fileToShare],
+                title: 'Dữ liệu đồng bộ hiện trường',
+                text: `Gửi tệp dữ liệu PC Tuyên Quang (Tổng số: ${allData.length} ảnh)`
+            })
+            .then(() => {
+                console.log("✅ Anh em đã chia sẻ file thành công.");
+            })
+            .catch((err) => {
+                // Nếu anh em bấm nút thoát/hủy cửa sổ chia sẻ (AbortError), không báo lỗi. 
+                // Nếu là lỗi hệ thống khác, tự động kích hoạt luồng tải về truyền thống để dự phòng
+                if (err.name !== "AbortError") {
+                    console.warn("Thất bại khi gọi cửa sổ chia sẻ, chuyển hướng tải về:", err);
+                    triggerFallbackDownload(blob, filename, allData.length);
+                }
+            });
+        } else {
+            // Luồng dự phòng (Fallback) nếu chạy trên các trình duyệt máy tính cũ không có tính năng Share File
+            triggerFallbackDownload(blob, filename, allData.length);
+        }
+    };
+}
+
+// Hàm bổ trợ: Tự động tải xuống máy nếu thiết bị không hỗ trợ tính năng Web Share trực tiếp
+function triggerFallbackDownload(blob, filename, totalPhotos) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert(`Đã đóng gói thành công ${totalPhotos} ảnh hiện trường!\n\n💡 Trình duyệt này không hỗ trợ bật cửa sổ chia sẻ tự động. File đã được tải xuống thư mục Downloads của máy, anh hãy dùng Quick Share để gửi thủ công.`);
+}
+   // --- CẢI TIẾN: BỘ NHẬN DIỆN VÀ DUYỆT TRƯỚC DỮ LIỆU JSON CHUYÊN SÂU ---
+function importSyncFileWithValidation(event) {
+    const files = event.target.files;
+    if (!files.length) return;
+    
+    // Lấy file đầu tiên để phân tích (Nếu chọn nhiều file, có thể lặp qua, ở đây ưu tiên tối ưu hiển thị nhận diện từng file)
+    const file = files[0];
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            if (!Array.isArray(importedData)) {
+                return alert("❌ Tệp tin sai cấu trúc! Hệ thống chỉ chấp nhận file định dạng mảng dữ liệu chuẩn.");
+            }
+            
+            if (importedData.length === 0) {
+                return alert("⚠️ File JSON này trống rỗng, không chứa bất kỳ dữ liệu ảnh nào!");
+            }
+            
+            // 1. KIỂM TRA CHỮ KÝ PHẦN MỀM: Thử bốc ngẫu nhiên 1 bản ghi để check form cấu trúc
+            const sample = importedData[0];
+            if (!sample.id || !sample.type || !sample.dataUrl) {
+                return alert("❌ Từ chối nạp! Đây không phải là file dữ liệu xuất ra từ ứng dụng Giám Sát Hiện Trường.");
+            }
+            
+            // 2. PHÂN TÍCH METADATA NGẦM ĐỂ DIỄN GIẢI CHO ANH EM HIỆN TRƯỜNG
+            let countBefore = 0, countProcess = 0, countAfter = 0, countStitched = 0;
+            let detectedPrefix = "Không tên (Chưa nhập mã)";
+            
+            importedData.forEach(item => {
+                if (item.type === "TRƯỚC") countBefore++;
+                else if (item.type === "QUÁ TRÌNH") countProcess++;
+                else if (item.type === "SAU") countAfter++;
+                else if (item.type === "STITCHED" || item.type === "STITCHED_QT") countStitched++;
+                
+                // Thuật toán tự bốc tách Tên/Mã hiện trường từ thuộc tính tên file đã lưu
+                if (item.name && item.name.includes('_') && detectedPrefix === "Không tên (Chưa nhập mã)") {
+                    let parts = item.name.split('_');
+                    // Loại bỏ các tiền tố kỹ thuật để lấy tên gốc hiện trường do anh đặt
+                    if (parts[0] !== 'FULL' && parts[0] !== 'QT' && parts[0] !== 'HT') {
+                        detectedPrefix = parts[0];
+                    } else if (parts[1] && parts[1] !== 'SYNC') {
+                        detectedPrefix = parts[1];
+                    }
+                }
+            });
+            
+            // 3. ĐỰNG DASHBOARD MINI ĐỂ NGƯỜI DÙNG CHỦ ĐỘNG KIỂM SOÁT
+            const previewArea = document.getElementById("p2p-import-preview-box");
+            previewArea.classList.remove("d-none");
+            previewArea.innerHTML = `
+                <div class="border border-info rounded p-2 bg-info bg-opacity-10 small mb-2 text-start">
+                    <div class="fw-bold text-info border-bottom border-info border-opacity-20 pb-1 mb-1">
+                        <i class="fa-solid fa-file-magnifying-glass me-1"></i> BỘ NHẬN DIỆN PHÁT HIỆN DỮ LIỆU:
+                    </div>
+                    <div style="font-size:11px; line-height:1.5;">
+                        • Tên tệp ngoài: <span class="text-warning font-monospace text-break">${file.name}</span><br>
+                        • Vị trí/Hiện trường khớp: <span class="badge bg-primary text-white fw-bold">${detectedPrefix}</span><br>
+                        • Tổng dung lượng nạp: <span class="text-white fw-bold">${importedData.length} ảnh hiện trường</span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 my-2 p-1 bg-black bg-opacity-50 rounded text-center font-monospace" style="font-size:10px;">
+                        <div class="flex-fill text-primary">Trước: ${countBefore}</div>
+                        <div class="flex-fill text-warning">Q.Trình: ${countProcess}</div>
+                        <div class="flex-fill text-success">Sau: ${countAfter}</div>
+                        <div class="flex-fill text-info">Đã ghép: ${countStitched}</div>
+                    </div>
+                    <div class="row g-2 pt-1">
+                        <div class="col-7">
+                            <button id="btn-execute-import" class="btn btn-xs btn-success w-100 fw-bold py-1 small" style="font-size:11px;">
+                                <i class="fa-solid fa-cloud-arrow-up me-1"></i> ĐÚNG VỊ TRÍ, NẠP NGAY
+                            </button>
+                        </div>
+                        <div class="col-5">
+                            <button class="btn btn-xs btn-outline-secondary w-100 py-1 small" style="font-size:11px;" onclick="cancelImportFile()">
+                                HỦY FILE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Lắng nghe sự kiện người dùng nhấn nút xác nhận nạp thực sự
+            document.getElementById("btn-execute-import").onclick = () => {
+                let tx = db.transaction("photos", "readwrite");
+                let store = tx.objectStore("photos");
+                
                 importedData.forEach(item => store.put(item));
-                tx.oncomplete = () => { alert(`Đã nạp thành công ${importedData.length} ảnh từ file ngoài vào kho!`); loadDataFromDB(); setTimeout(calculateStorageQuota, 300); };
-            } catch (err) { alert("Lỗi nạp file: " + err.message); }
-        }; reader.readAsText(file); event.target.value = "";
+                
+                tx.oncomplete = () => {
+                    alert(`✅ Đồng bộ thành công!\nĐã nạp toàn bộ dữ liệu của hiện trường [${detectedPrefix}] vào bộ nhớ máy.`);
+                    previewArea.classList.add("d-none");
+                    loadDataFromDB(); // Tải lại toàn bộ giao diện các kho ảnh
+                    setTimeout(calculateStorageQuota, 300);
+                };
+            };
+            
+        } catch (err) {
+            alert("❌ Lỗi giải mã tệp tin JSON: File có thể đã bị hỏng hoặc lỗi font chữ.");
+        }
+    };
+    
+    reader.readAsText(file);
+    event.target.value = ""; // Reset input để có thể chọn lại chính file đó nếu muốn
+}
+
+function cancelImportFile() {
+    const previewArea = document.getElementById("p2p-import-preview-box");
+    if (previewArea) {
+        previewArea.classList.add("d-none");
+        previewArea.innerHTML = "";
     }
+}
 
     // --- GIẢI PHÁP 2: WEBRTC PEER-TO-PEER ĐỒNG BỘ TUẦN TỰ TRÁNH TRÀN BỘ ĐỆM DI ĐỘNG ---
     function initWebRTCP2P(isInitiator) {
