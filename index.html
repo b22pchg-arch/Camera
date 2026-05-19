@@ -903,26 +903,61 @@ function showUpdateNotification() {
     }
 
     // --- CAMERA POWER ENGINE ---
-    function initCamera() {
-        if (!isCameraOn) return;
-        if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; }
-        
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: currentFacingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }, 
-                audio: true 
-            })
-            .then(stream => {
-                localStream = stream;
-                stream.getAudioTracks().forEach(track => track.stop());
-                document.getElementById("video-preview").srcObject = stream;
-                document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
-            }).catch(err => {
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })
-                .then(s => { localStream = s; document.getElementById("video-preview").srcObject = s; });
-            });
-        }
+    // --- SỬA ĐỔI: HÀM KHỞI TẠO MÁY ẢNH CHUYÊN DỤNG CHO HIỆN TRƯỜNG ---
+function initCamera() {
+    if (!isCameraOn) return;
+    
+    // 1. Giải phóng luồng Render cũ triệt để khỏi RAM trước khi xin luồng mới
+    const video = document.getElementById("video-preview");
+    if (video) { 
+        video.srcObject = null; 
     }
+    
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            track.stop();
+            console.log(`🛑 Đã ngắt hẳn track cũ: ${track.kind}`);
+        });
+        localStream = null;
+    }
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        // 🚀 TỐI ƯU CỐT LÕI: Chỉ xin quyền Video (Máy ảnh). Tuyệt đối không xin quyền Audio ở đây để tránh nghẽn phần cứng di động.
+        const constraints = { 
+            video: { 
+                facingMode: currentFacingMode, 
+                width: { ideal: 1920 }, 
+                height: { ideal: 1080 } 
+            } 
+        };
+        
+        navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+            localStream = stream;
+            document.getElementById("video-preview").srcObject = stream;
+            document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
+        })
+        .catch(err => {
+            console.warn("⚠️ Không lấy được độ phân giải cao (Có thể máy cũ hoặc cam trước), thử cấu hình cơ bản:", err);
+            
+            // Giải pháp dự phòng cấp thấp (Fallback) nếu máy bị nghẽn lệnh hoặc cấu hình ideal quá cao
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })
+            .then(s => {
+                localStream = s;
+                document.getElementById("video-preview").srcObject = s;
+            })
+            .catch(e => {
+                console.error("❌ Thất bại hoàn toàn khi kết nối phần cứng Máy Ảnh:", e);
+                // Bắt lỗi an toàn, không để Uncaught in promise làm treo app
+                let gpsStatus = document.getElementById("gps-status");
+                if (gpsStatus) {
+                    gpsStatus.className = "badge bg-danger text-white small";
+                    gpsStatus.innerText = "⚠️ LỖI CAMERA CỨNG";
+                }
+            });
+        });
+    }
+}
     function initCameraZoom(stream) {
         const track = stream.getVideoTracks()[0]; const capabilities = track.getCapabilities(); const settings = track.getSettings();
         if ('zoom' in capabilities) {
