@@ -22,8 +22,9 @@
         .nav-tabs .nav-link.active { background-color: #212529; color: #0dcaf0; border-bottom: 3px solid #0dcaf0; }
         
         #camera-wrapper { background: #000; border-radius: 12px; overflow: hidden; max-width: 640px; margin: 0 auto; border: 1px solid #495057; }
-        #camera-container { position: relative; aspect-ratio: 4/3; width: 100%; }
-        #video-preview { width: 100%; height: 100%; object-fit: cover; }
+        #camera-container { position: relative; aspect-ratio: 16/9; width: 100%; background: #000; }
+        #video-preview { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+        #camera-frame-note { font-size: 10px; color: #adb5bd; line-height: 1.25; }
         
         .preview-box { background: #111; border: 2px dashed #495057; border-radius: 8px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
         .preview-box img { width: 100%; height: 100%; object-fit: contain; }
@@ -245,7 +246,7 @@ function showUpdateNotification() {
                 </span>
             </div>
 
-            <div id="camera-wrapper" class="shadow mb-3">
+            <div id="camera-wrapper" class="shadow mb-2">
                 <div id="camera-container">
                     <video id="video-preview" autoplay playsinline muted></video>
                 </div>
@@ -255,6 +256,25 @@ function showUpdateNotification() {
                         <span id="zoom-value-display" class="badge bg-secondary text-info fw-bold">1.0x</span>
                     </div>
                     <input type="range" id="camera-zoom-slider" class="form-range" style="accent-color: #0dcaf0;">
+                </div>
+            </div>
+
+            <div class="card bg-dark border-secondary p-2 mb-3 shadow-sm">
+                <div class="row g-2 align-items-center">
+                    <div class="col-12 col-sm-7">
+                        <label class="form-label text-info fw-bold small mb-1" for="photo-quality-select"><i class="fa-solid fa-sliders me-1"></i> CHẤT LƯỢNG ẢNH CHỤP:</label>
+                        <select id="photo-quality-select" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="applyCameraQualitySetting(true)">
+                            <option value="balanced" selected>Chuẩn hiện trường - rõ nét / dung lượng vừa</option>
+                            <option value="high">Nét cao - ưu tiên chi tiết</option>
+                            <option value="original">Gốc camera - tối đa theo máy</option>
+                            <option value="saving">Tiết kiệm - nhẹ máy, gửi nhanh</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-5">
+                        <div id="camera-frame-note" class="border border-secondary rounded p-2 bg-black bg-opacity-25">
+                            Khung camera đang dùng chế độ <b>lấy đủ hình</b>, không phóng cắt mép trên điện thoại.
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -818,6 +838,7 @@ function showUpdateNotification() {
     };
 
     document.addEventListener("DOMContentLoaded", () => {
+        applyCameraQualitySetting(false);
         initCamera();
         initGpsTracking();
         if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') {
@@ -836,6 +857,8 @@ function showUpdateNotification() {
         document.getElementById('tab2-note').addEventListener('input', (e) => document.getElementById('tab1-note').value = e.target.value);
         document.getElementById('qt-stitch-mode').addEventListener('change', (e) => document.getElementById('qt-stitch-mode-tab2').value = e.target.value);
         setInterval(drawCompassCanvas, 200);
+        window.addEventListener('orientationchange', () => setTimeout(updateCameraFrameRatio, 400));
+        window.addEventListener('resize', updateCameraFrameRatio);
     });
 
     // --- GEOLOCATION & COMPASS ---
@@ -912,6 +935,52 @@ function showUpdateNotification() {
 // --- 📷 MODULE KHỞI TẠO CAMERA CHỐNG NGHẼN MẠCH PHẦN CỨNG DI ĐỘNG ---
 // =========================================================================
 
+function getPhotoQualitySetting() {
+    const sel = document.getElementById("photo-quality-select");
+    const mode = sel ? sel.value : "balanced";
+    const presets = {
+        saving:   { width: 1280, height: 720,  jpeg: 0.72, label: "Tiết kiệm" },
+        balanced: { width: 1600, height: 900,  jpeg: 0.84, label: "Chuẩn hiện trường" },
+        high:     { width: 1920, height: 1080, jpeg: 0.92, label: "Nét cao" },
+        original: { width: 2560, height: 1440, jpeg: 0.96, label: "Gốc camera" }
+    };
+    return presets[mode] || presets.balanced;
+}
+
+function getCameraConstraints() {
+    const q = getPhotoQualitySetting();
+    return {
+        video: {
+            facingMode: currentFacingMode,
+            width: { ideal: q.width },
+            height: { ideal: q.height }
+        }
+    };
+}
+
+function getJpegQuality() {
+    return getPhotoQualitySetting().jpeg;
+}
+
+function updateCameraFrameRatio() {
+    const video = document.getElementById("video-preview");
+    const container = document.getElementById("camera-container");
+    const note = document.getElementById("camera-frame-note");
+    if (!video || !container || !video.videoWidth || !video.videoHeight) return;
+    container.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+    if (note) {
+        const q = getPhotoQualitySetting();
+        note.innerHTML = `Đang lấy đủ khung hình <b>${video.videoWidth}×${video.videoHeight}</b> - chế độ <b>${q.label}</b>.`;
+    }
+}
+
+function applyCameraQualitySetting(restartCamera = false) {
+    const note = document.getElementById("camera-frame-note");
+    const q = getPhotoQualitySetting();
+    if (note) note.innerHTML = `Đã chọn <b>${q.label}</b>. Ảnh sẽ nén JPEG mức <b>${Math.round(q.jpeg * 100)}%</b>.`;
+    if (restartCamera && isCameraOn) initCamera();
+}
+
 async function initCamera() {
     if (!isCameraOn) return;
     
@@ -936,14 +1005,8 @@ async function initCamera() {
     }
     
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        // Cấu hình tối ưu độ phân giải cao cho PC Tuyên Quang
-        const constraints = { 
-            video: { 
-                facingMode: currentFacingMode, 
-                width: { ideal: 1920 }, 
-                height: { ideal: 1080 } 
-            } 
-        };
+        // Cấu hình độ phân giải theo lựa chọn chất lượng ảnh của người dùng
+        const constraints = getCameraConstraints();
         
         try {
             console.log("⏳ Đang kết nối camera độ phân giải cao...");
@@ -951,7 +1014,7 @@ async function initCamera() {
             localStream = stream;
             if (video) {
                 video.srcObject = stream;
-                video.onloadedmetadata = () => initCameraZoom(stream);
+                video.onloadedmetadata = () => { updateCameraFrameRatio(); initCameraZoom(stream); };
             }
             console.log("✅ Kết nối camera độ phân giải cao thành công.");
         } catch (err) {
@@ -967,7 +1030,7 @@ async function initCamera() {
                     localStream = backupStream;
                     if (video) {
                         video.srcObject = backupStream;
-                        try { initCameraZoom(backupStream); } catch(e){}
+                        video.onloadedmetadata = () => { updateCameraFrameRatio(); try { initCameraZoom(backupStream); } catch(e){} };
                     }
                     console.log("✅ Kích hoạt thành công camera bằng luồng dự phòng cơ bản.");
                 } catch (fallbackErr) {
@@ -1042,7 +1105,7 @@ function showCameraErrorUI(err) {
         canvas.width = 640; canvas.height = 640; const ctx = canvas.getContext("2d");
         if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
         ctx.drawImage(video, (video.videoWidth - size) / 2, (video.videoHeight - size) / 2, size, size, 0, 0, 640, 640);
-        let dataUrl = canvas.toDataURL("image/jpeg", 0.85); globalExtras[key] = dataUrl;
+        let dataUrl = canvas.toDataURL("image/jpeg", getJpegQuality()); globalExtras[key] = dataUrl;
         document.getElementById(`img-${key}`).src = dataUrl; document.getElementById(`img-${key}`).classList.remove('d-none');
         document.getElementById(`btn-grp-${key}`).classList.add('d-none'); document.getElementById(`clear-${key}`).classList.remove('d-none');
         if(key==='map') document.getElementById('canvas-map').classList.add('d-none');
@@ -1057,7 +1120,7 @@ function showCameraErrorUI(err) {
                 const canvas = document.createElement("canvas"); let size = Math.min(img.width, img.height);
                 canvas.width = 640; canvas.height = 640; const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, (img.width - size) / 2, (img.height - size) / 2, size, size, 0, 0, 640, 640);
-                let dataUrl = canvas.toDataURL("image/jpeg", 0.85); globalExtras[key] = dataUrl;
+                let dataUrl = canvas.toDataURL("image/jpeg", getJpegQuality()); globalExtras[key] = dataUrl;
                 document.getElementById(`img-${key}`).src = dataUrl; document.getElementById(`img-${key}`).classList.remove('d-none');
                 if(key==='selfie') { document.getElementById(`btn-grp-${key}`).classList.add('d-none'); document.getElementById(`clear-${key}`).classList.remove('d-none'); } 
                 else { document.getElementById(`canvas-${key}`).classList.add('d-none'); }
@@ -1113,7 +1176,7 @@ function showCameraErrorUI(err) {
         ctx.fillText(`THỜI GIAN: ${timeStr}`, textX, startY + lineGap, maxTextW); ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, textX, startY + lineGap * 2, maxTextW);
         if (teamText) { ctx.fillStyle = "#ffc107"; ctx.fillText(`TỔ ĐỘI: ${teamText}`, textX, startY + lineGap * 3, maxTextW); }
 
-        const photoObj = { id: "img_" + Date.now(), type: type, dataUrl: canvas.toDataURL("image/jpeg", 0.85), timestampMs: now.getTime() };
+        const photoObj = { id: "img_" + Date.now(), type: type, dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()), timestampMs: now.getTime() };
         if (type === "TRƯỚC") { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}">`; } 
         else if (type === "SAU") { 
             repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}">`; 
@@ -1160,7 +1223,7 @@ function showCameraErrorUI(err) {
                     id: "stitched_" + Date.now() + Math.floor(Math.random()*100), 
                     type: itemTypeMarker === "QT" ? "STITCHED_QT" : "STITCHED", 
                     name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_GRP_${Date.now()}.jpg`, 
-                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), 
+                    dataUrl: stitchCanvas.toDataURL("image/jpeg", getJpegQuality()), 
                     timestampMs: Date.now(), 
                     timestampStr: new Date().toLocaleString("vi-VN"),
                     qtTimeMs: earliestTs 
@@ -1207,7 +1270,7 @@ function showCameraErrorUI(err) {
                     id: "stitched_" + bObj.timestampMs + Math.floor(Math.random()*10), 
                     type: isQT ? "STITCHED_QT" : "STITCHED", 
                     name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`, 
-                    dataUrl: stitchCanvas.toDataURL("image/jpeg", 0.85), 
+                    dataUrl: stitchCanvas.toDataURL("image/jpeg", getJpegQuality()), 
                     timestampMs: Date.now(), 
                     timestampStr: new Date().toLocaleString("vi-VN"),
                     sessionStartMs: sessionStartMs,
@@ -1348,7 +1411,7 @@ function showCameraErrorUI(err) {
                     const canvas = document.createElement("canvas"); let w = img.width; let h = img.height; const maxDim = 1920;
                     if (w > maxDim || h > maxDim) { const ratio = Math.min(maxDim/w, maxDim/h); w = w * ratio; h = h * ratio; }
                     canvas.width = w; canvas.height = h; const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
-                    const photoObj = { id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: canvas.toDataURL("image/jpeg", 0.85), timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined, sessionStartMs: Date.now() - 2000, sessionEndMs: Date.now(), qtTimeMs: Date.now() };
+                    const photoObj = { id: "uploaded_" + Date.now() + Math.floor(Math.random()*1000), type: type, dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()), timestampMs: Date.now(), name: type === "STITCHED" ? file.name : undefined, sessionStartMs: Date.now() - 2000, sessionEndMs: Date.now(), qtTimeMs: Date.now() };
                     if (type === "TRƯỚC") repoBefore.unshift(photoObj); else if (type === "SAU") repoAfter.unshift(photoObj); else if (type === "QUÁ TRÌNH") repoProcess.unshift(photoObj); else repoStitched.unshift(photoObj);
                     saveToDB(photoObj); updateUIState(); renderPending(); if (type === "STITCHED") renderGallery();
                 }; img.src = e.target.result;
