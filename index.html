@@ -335,6 +335,15 @@ function showUpdateNotification() {
                         <option value="all">Gộp chung 1 ảnh (Vuông)</option>
                     </select>
                 </div>
+
+                <div class="form-check form-switch border border-secondary rounded p-2 mb-2 d-flex align-items-center justify-content-between bg-black bg-opacity-25">
+                    <label class="form-check-label text-success small fw-bold ms-1 cursor-pointer" for="toggle-location-qr">
+                        <i class="fa-solid fa-qrcode me-1"></i> CHÈN QR VỊ TRÍ VÀO ẢNH GHÉP
+                        <span class="d-block text-secondary fw-normal" style="font-size:10px; line-height:1.25;">Tắt mục này nếu muốn ảnh ghép gọn hơn, không thêm dải QR bên dưới.</span>
+                    </label>
+                    <input class="form-check-input me-1 cursor-pointer" type="checkbox" role="switch" id="toggle-location-qr" checked onchange="setLocationQrPreference(this.checked)">
+                </div>
+
                 <div class="row g-2 mb-2">
                     <div class="col-6">
                         <button id="btn-stitch-ts-only" class="btn btn-primary w-100 fw-bold py-2" style="font-size:11px;" disabled onclick="quickStitchTSOnly()">CHỈ GHÉP T/S ĐỘC LẬP</button>
@@ -680,8 +689,9 @@ function showUpdateNotification() {
                 <ul class="text-secondary ps-3 mb-3">
                     <li>Khi GPS hoạt động, mỗi ảnh chụp sẽ lưu kèm <b>tọa độ</b> và <b>link Google Maps</b>.</li>
                     <li>Khi xem ảnh trong app, bấm nút <b>Vị trí</b> trên ảnh để mở bản đồ theo đúng tọa độ ảnh đó.</li>
-                    <li>Khi tạo ảnh ghép, app tạo thêm <b>dải QR vị trí riêng bên dưới ảnh ghép</b>. QR không đè lên ảnh chính nên không che thông tin hiện trường.</li>
+                    <li>Khi tạo ảnh ghép, nếu bật <b>CHÈN QR VỊ TRÍ VÀO ẢNH GHÉP</b>, app tạo thêm <b>dải QR vị trí riêng bên dưới ảnh ghép</b>. QR không đè lên ảnh chính nên không che thông tin hiện trường.</li>
                     <li>Nếu ảnh ghép gồm nhiều ảnh nguồn, mỗi ảnh có GPS sẽ có một mã QR riêng tương ứng để người nhận quét và mở bản đồ.</li>
+                    <li>Có thể tắt công tắc QR vị trí trong khu vực ghép ảnh của tab <b>Máy Ảnh</b> khi cần ảnh ghép gọn hơn hoặc không muốn gửi kèm QR ra bên ngoài. Nút <b>Vị trí</b> trong app vẫn hoạt động nếu ảnh còn dữ liệu GPS.</li>
                     <li>Nếu thiết bị chưa bắt được GPS, ảnh vẫn lưu bình thường nhưng nút/QR vị trí có thể không xuất hiện hoặc sẽ báo chưa có dữ liệu vị trí.</li>
                 </ul>
 
@@ -689,6 +699,7 @@ function showUpdateNotification() {
                 <ol class="text-secondary ps-3 mb-3">
                     <li>Nhập <b>Tổ đội / Người thực hiện</b>, <b>Tên hoặc mã hiện trường</b> và <b>Ghi chú</b>.</li>
                     <li>Chọn chế độ <b>Ghép Q.Trình</b>: theo cặp 2 ảnh, nhóm 3 ảnh, nhóm 4 ảnh hoặc gộp chung một ảnh vuông.</li>
+                    <li>Bật/tắt <b>CHÈN QR VỊ TRÍ VÀO ẢNH GHÉP</b> để quyết định ảnh xuất ra có thêm dải QR bản đồ bên dưới hay không.</li>
                     <li>Dùng <b>CHỈ GHÉP T/S ĐỘC LẬP</b> nếu chỉ cần ảnh Trước/Sau.</li>
                     <li>Dùng <b>GHÉP TẤT CẢ (T-QT-S)</b> để tạo một ảnh ghép gồm Trước, Quá Trình và Sau.</li>
                     <li>Dùng <b>HOÀN THÀNH PHIÊN</b> để xuất bộ ảnh hoàn thiện: Trước/Sau và các ảnh Quá Trình riêng theo chế độ đã chọn.</li>
@@ -948,6 +959,7 @@ function showUpdateNotification() {
         document.getElementById('tab1-note').addEventListener('input', (e) => document.getElementById('tab2-note').value = e.target.value);
         document.getElementById('tab2-note').addEventListener('input', (e) => document.getElementById('tab1-note').value = e.target.value);
         document.getElementById('qt-stitch-mode').addEventListener('change', (e) => document.getElementById('qt-stitch-mode-tab2').value = e.target.value);
+        initLocationQrPreference();
         setInterval(drawCompassCanvas, 200);
         window.addEventListener('orientationchange', () => setTimeout(updateCameraFrameRatio, 400));
         window.addEventListener('resize', updateCameraFrameRatio);
@@ -1237,6 +1249,23 @@ function mapButtonHtml(item, extraClass = "") {
     return `<button type="button" class="btn btn-sm btn-info text-dark map-tag-btn ${extraClass}" title="${title}" onclick="event.stopPropagation(); openMap(${Number(item.lat)}, ${Number(item.lng)});"><i class="fa-solid fa-location-dot me-1"></i>Vị trí</button>`;
 }
 
+function isLocationQrEnabled() {
+    const el = document.getElementById("toggle-location-qr");
+    if (el) return el.checked;
+    return localStorage.getItem("showLocationQrOnStitched") !== "0";
+}
+
+function setLocationQrPreference(enabled) {
+    try { localStorage.setItem("showLocationQrOnStitched", enabled ? "1" : "0"); } catch(e) {}
+}
+
+function initLocationQrPreference() {
+    const el = document.getElementById("toggle-location-qr");
+    if (!el) return;
+    const saved = localStorage.getItem("showLocationQrOnStitched");
+    el.checked = saved === null ? true : saved === "1";
+}
+
 function loadImageFromDataUrl(dataUrl) {
     return new Promise(resolve => {
         const img = new Image();
@@ -1288,6 +1317,7 @@ function getGpsMetaListFromPhotos(items) {
 async function appendLocationQrStripToCanvas(canvas, sourceItems, caption = "QUÉT QR ĐỂ MỞ BẢN ĐỒ TỪNG ẢNH") {
     const points = getGpsMetaListFromPhotos(sourceItems);
     if (!points.length) return points;
+    if (!isLocationQrEnabled()) return points;
 
     const oldCanvas = document.createElement("canvas");
     oldCanvas.width = canvas.width;
