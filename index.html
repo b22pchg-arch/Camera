@@ -53,45 +53,101 @@
     </style>
     
     <script>
-        // Tích hợp giải pháp kiểm soát cập nhật thông minh PWA qua tham số định danh phiên bản
-        const APP_VERSION = '53.2';
-        let newWorker;
+       let newWorker;
 
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register(`sw.js?v=${APP_VERSION}`)
-                    .then(reg => {
-                        console.log(`✅ Hệ thống PWA chạy phiên bản: ${APP_VERSION}`);
-                        if (reg.waiting) { newWorker = reg.waiting; showUpdateNotification(); }
-                        reg.addEventListener('updatefound', () => {
-                            const installingWorker = reg.installing;
-                            installingWorker.addEventListener('statechange', () => {
-                                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    newWorker = installingWorker; showUpdateNotification();
-                                }
-                            });
-                        });
-                    })
-                    .catch(err => console.error('❌ Lỗi khởi động PWA:', err));
+// 1. Đăng ký Service Worker tĩnh, ưu tiên Offline hoàn toàn
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js') // Giữ nguyên đường dẫn tĩnh, không đổi tham số
+            .then(reg => {
+                console.log('✅ Hệ thống PWA sẵn sàng.');
 
-                let refreshing = false;
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    if (refreshing) return; refreshing = true; window.location.reload();
+                // Lắng nghe xem có bản cập nhật nào đang chờ kích hoạt hay không
+                if (reg.waiting) {
+                    newWorker = reg.waiting;
+                    showUpdateNotification();
+                }
+
+                reg.addEventListener('updatefound', () => {
+                    const installingWorker = reg.installing;
+                    installingWorker.addEventListener('statechange', () => {
+                        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            newWorker = installingWorker;
+                            showUpdateNotification();
+                        }
+                    });
                 });
             });
-        }
 
-        function showUpdateNotification() {
-            const banner = document.createElement('div');
-            banner.innerHTML = `<div style="position:fixed;bottom:25px;left:50%;transform:translateX(-50%);background:#ffc107;color:#111;padding:12px 20px;border-radius:8px;z-index:99999;display:flex;gap:15px;align-items:center;font-weight:bold;font-size:13px;border:2px solid #fff;box-shadow:0 4px 15px rgba(0,0,0,0.5);">
-                <span><i class="fa-solid fa-bell-exclamation fa-bounce me-1"></i> PHÁT HIỆN PHIÊN BẢN MỚI (${APP_VERSION})!</span>
-                <button id="pwa-update-btn" style="background:#dc3545;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;">CẬP NHẬT NGAY</button>
-            </div>`;
-            document.body.appendChild(banner);
-            document.getElementById('pwa-update-btn').addEventListener('click', () => {
-                if (newWorker) newWorker.postMessage({ action: 'skipWaiting' });
-            });
-        }
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            window.location.reload(); // Tự động làm mới màn hình khi nhận được mã nguồn mới
+        });
+    });
+}
+
+// 2. 🚀 HÀM CHỦ ĐỘNG ÉP TRÌNH DUYỆT LÊN MẠNG SĂN FILE MỚI KHI ẤN NÚT
+function checkUpdateManually() {
+    if (!navigator.onLine) return alert("❌ Thiết bị đang ngoại tuyến! Vui lòng kết nối Wifi hoặc 4G để kiểm tra cập nhật.");
+    
+    const btn = document.getElementById("btn-manual-update");
+    const icon = document.getElementById("update-icon");
+    
+    btn.setAttribute("disabled", "true");
+    icon.classList.add("fa-spin");
+    btn.innerText = "⏳ ĐANG KẾT NỐI MÁY CHỦ KIỂM TRA...";
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(reg => {
+            if (reg) {
+                // Lệnh tối cao ép trình duyệt bỏ qua bộ nhớ đệm, lên thẳng Server tải file sw.js về so sánh byte
+                reg.update().then(() => {
+                    setTimeout(() => {
+                        btn.removeAttribute("disabled");
+                        icon.classList.remove("fa-spin");
+                        btn.innerHTML = `<i class="fa-solid fa-rotate me-1" id="update-icon"></i> KIỂM TRA BẢN CẬP NHẬT MỚI`;
+                        
+                        // Nếu sau khi ép check mạng mà không có Service Worker nào rơi vào trạng thái cài đặt/chờ
+                        if (!reg.waiting && !reg.installing) {
+                            alert("✅ Ứng dụng hiện tại đã là phiên bản mới nhất trên máy chủ!");
+                        }
+                    }, 2000);
+                }).catch(err => {
+                    btn.removeAttribute("disabled");
+                    icon.classList.remove("fa-spin");
+                    btn.innerHTML = `<i class="fa-solid fa-rotate me-1" id="update-icon"></i> KIỂM TRA BẢN CẬP NHẬT MỚI`;
+                    alert("❌ Lỗi kết nối máy chủ: " + err.message);
+                });
+            }
+        });
+    }
+}
+
+function showUpdateNotification() {
+    // Hiện banner màu vàng báo có tính năng mới (giữ nguyên cấu trúc giao diện cũ)
+    const oldBanner = document.getElementById('pwa-update-banner');
+    if (oldBanner) oldBanner.remove();
+    
+    const updateBanner = document.createElement('div');
+    updateBanner.id = 'pwa-update-banner';
+    updateBanner.style.cssText = `
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        background-color: #ffc107; color: #111; padding: 12px 20px;
+        border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        z-index: 99999; display: flex; align-items: center; justify-content: space-between;
+        gap: 15px; width: 90%; max-width: 450px; border: 2px solid #fff;
+    `;
+    updateBanner.innerHTML = `
+        <div style="font-size: 13px; font-weight: bold;"><i class="fa-solid fa-bell-exclamation fa-bounce me-2"></i> PHÁT HIỆN BẢN CẬP NHẬT MỚI THÀNH CÔNG!</div>
+        <button id="pwa-update-btn" style="background-color: #dc3545; color: white; border: none; padding: 6px 12px; font-weight: bold; border-radius: 4px; font-size: 11px;">NÂNG CẤP NGAY</button>
+    `;
+    document.body.appendChild(updateBanner);
+    document.getElementById('pwa-update-btn').addEventListener('click', () => {
+        if (newWorker) newWorker.postMessage({ action: 'skipWaiting' });
+    });
+}
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -453,6 +509,17 @@
         </div>
 
         <div class="tab-pane fade" id="sync-content" role="tabpanel">
+			<div class="card bg-dark border-warning p-3 mb-3 shadow-sm">
+    <h6 class="text-warning fw-bold mb-2 text-uppercase" style="font-size: 13px;">
+        <i class="fa-solid fa-cloud-arrow-down me-2"></i>Kiểm soát cập nhật phần mềm
+    </h6>
+    <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">
+        Ứng dụng mặc định ưu tiên chạy <b>Offline (Cache-First)</b> giúp mở máy ảnh tức thì. Khi ở văn phòng hoặc nơi sóng khỏe, anh hãy bấm nút dưới đây để chủ động kiểm tra và tải về các tính năng mới từ máy chủ.
+    </p>
+    <button id="btn-manual-update" class="btn btn-warning text-dark w-100 fw-bold py-2 small" onclick="checkUpdateManually()">
+        <i class="fa-solid fa-rotate me-1" id="update-icon"></i> KIỂM TRA BẢN CẬP NHẬT MỚI
+    </button>
+</div>
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
                 <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-file-sharing me-2"></i>Giải pháp 1: Xuất / Nhập File Offline</h6>
                 <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp để truyền tải gói lớn nhiều ảnh hiện trường. Máy A xuất file `.json` rồi dùng <b>Quick Share</b> hoặc <b>Bluetooth</b> bắn sang máy B để nhập vào.</p>
