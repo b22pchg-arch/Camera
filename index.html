@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V52.3)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V53.2)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1d20">
@@ -53,53 +53,45 @@
     </style>
     
     <script>
-       const APP_VERSION = '52.3'; // <--- Khi có bản mới, anh CHỈ CẦN đổi số này ở đây!
-let newWorker;
+        // Tích hợp giải pháp kiểm soát cập nhật thông minh PWA qua tham số định danh phiên bản
+        const APP_VERSION = '53.2';
+        let newWorker;
 
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        // Truyền biến version vào URL của sw.js
-        navigator.serviceWorker.register(`sw.js?v=${APP_VERSION}`)
-            .then(reg => {
-                console.log(`✅ Hệ thống PWA chạy phiên bản: ${APP_VERSION}`);
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(`sw.js?v=${APP_VERSION}`)
+                    .then(reg => {
+                        console.log(`✅ Hệ thống PWA chạy phiên bản: ${APP_VERSION}`);
+                        if (reg.waiting) { newWorker = reg.waiting; showUpdateNotification(); }
+                        reg.addEventListener('updatefound', () => {
+                            const installingWorker = reg.installing;
+                            installingWorker.addEventListener('statechange', () => {
+                                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    newWorker = installingWorker; showUpdateNotification();
+                                }
+                            });
+                        });
+                    })
+                    .catch(err => console.error('❌ Lỗi khởi động PWA:', err));
 
-                if (reg.waiting) {
-                    newWorker = reg.waiting;
-                    showUpdateNotification();
-                }
-
-                reg.addEventListener('updatefound', () => {
-                    const installingWorker = reg.installing;
-                    installingWorker.addEventListener('statechange', () => {
-                        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            newWorker = installingWorker;
-                            showUpdateNotification();
-                        }
-                    });
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshing) return; refreshing = true; window.location.reload();
                 });
             });
+        }
 
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (refreshing) return;
-            refreshing = true;
-            window.location.reload();
-        });
-    });
-}
-
-function showUpdateNotification() {
-    // Giao diện Banner thông báo (giữ nguyên như hướng dẫn trước)
-    const banner = document.createElement('div');
-    banner.innerHTML = `<div style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#ffc107;color:#111;padding:12px;border-radius:8px;z-index:9999;display:flex;gap:15px;align-items:center;font-weight:bold;font-size:13px;border:2px solid #fff;box-shadow:0 4px 15px rgba(0,0,0,0.5);">
-        <span><i class="fa-solid fa-bell fa-bounce me-1"></i> CÓ PHIÊN BẢN MỚI (${APP_VERSION})!</span>
-        <button id="pwa-update-btn" style="background:#dc3545;color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;">CẬP NHẬT</button>
-    </div>`;
-    document.body.appendChild(banner);
-    document.getElementById('pwa-update-btn').addEventListener('click', () => {
-        if (newWorker) newWorker.postMessage({ action: 'skipWaiting' });
-    });
-}
+        function showUpdateNotification() {
+            const banner = document.createElement('div');
+            banner.innerHTML = `<div style="position:fixed;bottom:25px;left:50%;transform:translateX(-50%);background:#ffc107;color:#111;padding:12px 20px;border-radius:8px;z-index:99999;display:flex;gap:15px;align-items:center;font-weight:bold;font-size:13px;border:2px solid #fff;box-shadow:0 4px 15px rgba(0,0,0,0.5);">
+                <span><i class="fa-solid fa-bell-exclamation fa-bounce me-1"></i> PHÁT HIỆN PHIÊN BẢN MỚI (${APP_VERSION})!</span>
+                <button id="pwa-update-btn" style="background:#dc3545;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:11px;font-weight:bold;cursor:pointer;">CẬP NHẬT NGAY</button>
+            </div>`;
+            document.body.appendChild(banner);
+            document.getElementById('pwa-update-btn').addEventListener('click', () => {
+                if (newWorker) newWorker.postMessage({ action: 'skipWaiting' });
+            });
+        }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -477,32 +469,51 @@ function showUpdateNotification() {
             </div>
 
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
-                <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-network-wired me-2"></i>Giải pháp 2: Kết nối WebRTC P2P (Mã QR)</h6>
-                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Hai máy kết nối chung một mạng Wifi nội bộ (hoặc Máy A bật Phát Hotspot cho Máy B kết nối). Đưa camera quét mã QR của nhau để thông luồng bắn ảnh trực tiếp giữa 2 trình duyệt di động.</p>
+                <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-network-wired me-2"></i>Giải pháp 2: Kết nối WebRTC P2P (Mã QR cải tiến)</h6>
+                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Hai máy kết nối chung một mạng Wifi nội bộ (hoặc một máy phát Hotspot). Trao đổi mã liên kết để tạo đường truyền nội bộ bắn ảnh siêu tốc.</p>
                 <div class="d-flex gap-2 mb-3">
                     <button class="btn btn-sm btn-outline-info flex-fill fw-bold py-2" onclick="startP2PHandshake(true)"><i class="fa-solid fa-paper-plane me-1"></i> MÁY A (GỬI)</button>
                     <button class="btn btn-sm btn-outline-warning flex-fill fw-bold py-2" onclick="startP2PHandshake(false)"><i class="fa-solid fa-inbox me-1"></i> MÁY B (NHẬN)</button>
                 </div>
+                
                 <div id="p2p-handshake-panel" class="border border-secondary rounded p-2 bg-black bg-opacity-25 d-none">
-    <div class="small fw-bold text-warning mb-2" id="p2p-status-lbl">Trạng thái: Đang chờ thao tác...</div>
-    
-    <div id="p2p-video-scan-container" class="d-none my-2 border border-info rounded overflow-hidden position-relative mx-auto" style="max-width: 320px; aspect-ratio: 4/3; background: #000;">
-        <video id="p2p-scanner-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
-        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 65%; height: 65%; border: 2px dashed #0dcaf0; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
-    </div>
+                    <div class="small fw-bold text-warning mb-2" id="p2p-status-lbl">Trạng thái: Đang chờ thao tác...</div>
+                    
+                    <div id="p2p-video-scan-container" class="d-none my-2 border border-info rounded overflow-hidden position-relative mx-auto" style="max-width: 320px; aspect-ratio: 4/3; background: #000;">
+                        <video id="p2p-scanner-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 65%; height: 65%; border: 2px dashed #0dcaf0; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
+                    </div>
 
-    <div id="p2p-qr-box" class="text-center my-2 p-2 bg-white rounded d-none mx-auto" style="width: 200px; height: 200px;">
-        <div id="p2p-qrcode-canvas" style="display: inline-block;"></div>
-    </div>
-    <textarea id="p2p-sdp-text" class="form-control form-control-sm bg-dark text-light small mb-2 text-center" rows="2" readonly placeholder="Chuỗi ký tự bắt tay WebRTC..."></textarea>
-    <button id="btn-p2p-scan" class="btn btn-sm btn-info text-dark w-100 fw-bold mb-2" onclick="scanP2PPartnerQR()"><i class="fa-solid fa-camera me-1"></i> BẮT ĐẦU QUÉT MÃ MÁY ĐỐI DIỆN</button>
-    <button id="btn-p2p-send-data" class="btn btn-sm btn-success w-100 fw-bold d-none py-2" onclick="sendDataOverP2P()"><i class="fa-solid fa-bolt me-1"></i> BẮN TOÀN BỘ ẢNH SANG MÁY B</button>
-</div>
+                    <div id="p2p-qr-box" class="text-center my-2 p-2 bg-white rounded d-none mx-auto" style="width: 200px; height: 200px;">
+                        <div id="p2p-qrcode-canvas" style="display: inline-block;"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="small text-info fw-bold mb-1"><i class="fa-solid fa-key me-1"></i> Mã liên kết máy này (Chạm vào ô chữ để copy):</label>
+                        <textarea id="p2p-sdp-text" class="form-control form-control-sm bg-dark text-info small mb-1 text-center cursor-pointer fw-bold" style="font-size: 11px;" rows="2" readonly onclick="copyMySDP()" placeholder="Mã bắt tay liên kết..."></textarea>
+                        <div id="p2p-copy-status" class="small text-success text-center d-none fw-bold" style="font-size:11px;"><i class="fa-solid fa-circle-check"></i> Đã sao chép mã thành công!</div>
+                    </div>
+
+                    <div class="border-top border-secondary pt-2 mt-2">
+                        <label class="small text-warning fw-bold mb-1"><i class="fa-solid fa-link me-1"></i> Nạp mã liên kết của máy đối diện:</label>
+                        <textarea id="p2p-remote-sdp-text" class="form-control form-control-sm bg-secondary text-white small mb-2 text-center" rows="2" placeholder="Dán mã bắt tay nhận được từ máy đối diện vào đây hoặc dùng nút quét..."></textarea>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <button id="btn-p2p-scan" class="btn btn-sm btn-info text-dark w-100 fw-bold" onclick="scanP2PPartnerQR()"><i class="fa-solid fa-camera me-1"></i> BẬT CAMERA QUÉT</button>
+                            </div>
+                            <div class="col-6">
+                                <button id="btn-p2p-connect-manual" class="btn btn-sm btn-warning text-dark w-100 fw-bold" onclick="connectP2PManual()"><i class="fa-solid fa-plug me-1"></i> KẾT NỐI BẰNG MÃ DÁN</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="btn-p2p-send-data" class="btn btn-sm btn-success w-100 fw-bold d-none py-3 mt-2 shadow" onclick="sendDataOverP2P()"><i class="fa-solid fa-bolt me-1"></i> BẮN TOÀN BỘ ẢNH SANG MÁY B</button>
+                </div>
             </div>
 
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
                 <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-qrcode me-2"></i>Giải pháp 3: Phát Vòng Lặp QR Động</h6>
-                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp chuyển nhanh ghi chú text, danh mục metadata hoặc cấu hình hiện trường khi hai thiết bị cách ly mạng tuyệt đối.</p>
+                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp chuyển nhanh ghi chú text hoặc danh mục cấu hình hiện trường khi hai thiết bị cách ly mạng tuyệt đối.</p>
                 <div class="row g-2">
                     <div class="col-6"><button class="btn btn-sm btn-outline-info w-100 fw-bold py-2" onclick="startAnimatedQREmitter()"><i class="fa-solid fa-play me-1"></i> PHÁT QR ĐỘNG</button></div>
                     <div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold py-2" onclick="startAnimatedQRReceiver()"><i class="fa-solid fa-expand me-1"></i> QUÉT NHẬN CHUỖI</button></div>
@@ -646,10 +657,10 @@ function showUpdateNotification() {
     let currentStoragePercent = 0;
     let globalExtras = { selfie: null, map: null, compass: null };
 
-    // BIẾN CHO WEBRTC P2P & QR ĐỘNG
     let p2pConnection = null;
     let p2pDataChannel = null;
     let animatedQrTimer = null;
+    let p2pIncomingBuffer = [];
 
     // --- VANILLA UI FALLBACK ENGINE ---
     document.addEventListener("click", function(e) {
@@ -708,7 +719,7 @@ function showUpdateNotification() {
         document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
     }
 
-    // --- HÀM ẨN/HIỆN CỤM TIỆN ÍCH MỞ RỘNG (V52.1) ---
+    // --- HÀM ẨN/HIỆN TIỆN ÍCH MỞ RỘNG ---
     function toggleExtendedUtilities(checkbox) {
         const wrapper = document.getElementById("extended-utilities-wrapper");
         if (checkbox.checked) {
@@ -1070,7 +1081,7 @@ function showUpdateNotification() {
         if (!captureBuffer.TRƯỚC || !captureBuffer.SAU) return;
         let customNote = document.getElementById("tab1-note").value.trim();
         let minT = Math.min(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
-        let maxT = Math.max(captureBuffer.TRƯỚC ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
+        let maxT = Math.max(captureBuffer.TRƯRIG ? captureBuffer.TRƯỚC.timestampMs : Date.now(), captureBuffer.SAU ? captureBuffer.SAU.timestampMs : Date.now());
         let sessionQts = repoProcess.filter(q => q.timestampMs >= minT && q.timestampMs <= maxT).sort((x,y) => x.timestampMs - y.timestampMs);
         let allObjs = [captureBuffer.TRƯỚC, ...sessionQts, captureBuffer.SAU];
         await processMultiStitching(allObjs, "FULL", customNote, () => {
@@ -1236,14 +1247,8 @@ function showUpdateNotification() {
         if (confirm("Anh có chắc chắn muốn XÓA SẠCH TOÀN BỘ ảnh trong 3 kho chờ ghép (Trước, Quá trình, Sau)?\nHành động này sẽ xóa dữ liệu trên bộ nhớ Offline của máy và không thể khôi phục!")) {
             const allPendingItems = [...repoBefore, ...repoProcess, ...repoAfter];
             allPendingItems.forEach(item => deleteFromDB(item.id));
-            
-            repoBefore = [];
-            repoProcess = [];
-            repoAfter = [];
-            
-            renderPending();
-            updateUIState();
-            alert("Đã giải phóng hoàn toàn các kho ảnh chờ ghép!");
+            repoBefore = []; repoProcess = []; repoAfter = [];
+            renderPending(); updateUIState(); alert("Đã giải phóng hoàn toàn các kho ảnh chờ ghép!");
         }
     }
 
@@ -1270,7 +1275,7 @@ function showUpdateNotification() {
         } else { triggerBatchDownloads(itemsToShare); }
     }
     function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
-    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style=\"margin:0; background:#000; display:flex; align-items:center; justify-content:center;\"><img src=\"${url}\" style=\"max-width:100%; max-height:100%;\"></body>`); }
+    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
     
     function renderPending() {
         const GAP_MS = 15 * 60 * 1000;
@@ -1282,17 +1287,11 @@ function showUpdateNotification() {
                 listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')"><div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
                 
                 if (index < repo.length - 1) {
-                    const nextItem = repo[index+1];
-                    let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
-                    
+                    const nextItem = repo[index+1]; let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
                     if (!isNewSession) {
-                        if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') {
-                            isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs);
-                        } else if (typeStr === 'SAU') {
-                            isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs);
-                        }
+                        if (typeStr === 'TRƯỚC' || typeStr === 'QUÁ TRÌNH') { isNewSession = repoAfter.some(a => a.timestampMs < item.timestampMs && a.timestampMs > nextItem.timestampMs); } 
+                        else if (typeStr === 'SAU') { isNewSession = repoBefore.some(b => b.timestampMs < item.timestampMs && b.timestampMs > nextItem.timestampMs); }
                     }
-                    
                     if (isNewSession) {
                         listHtml += `<div class="w-100 text-center my-2 position-relative" style="height: 20px;">
                                 <div class="position-absolute w-100 border-bottom border-${color}" style="top: 10px; border-style: dashed !important; opacity: 0.4;"></div>
@@ -1303,38 +1302,25 @@ function showUpdateNotification() {
             });
             return listHtml;
         };
-
-        const boxB = document.getElementById("list-before"); 
-        const boxP = document.getElementById("list-process"); 
-        const boxA = document.getElementById("list-after");
-        
-        boxB.innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
-        boxP.innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
-        boxA.innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
+        document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
+        document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
+        document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
     }
     
     function renderGallery() {
-        const grid = document.getElementById("gallery-grid"); 
-        const emptyMsg = document.getElementById("gallery-empty-msg");
-        document.getElementById("select-all-checkbox").checked = false; 
-        document.getElementById("selected-counter").innerText = "Đã chọn: 0";
+        const grid = document.getElementById("gallery-grid"); const emptyMsg = document.getElementById("gallery-empty-msg");
+        document.getElementById("select-all-checkbox").checked = false; document.getElementById("selected-counter").innerText = "Đã chọn: 0";
         const showQT = document.getElementById("toggle-show-qt").checked; 
         if (repoStitched.length === 0) { grid.innerHTML = ""; emptyMsg.classList.remove("d-none"); return; }
         emptyMsg.classList.add("d-none");
 
         const tsSessions = repoStitched.filter(x => x.type === "STITCHED");
         const qtImages = repoStitched.filter(x => x.type === "STITCHED_QT");
-
-        tsSessions.sort((a, b) => {
-            const timeA = a.sessionStartMs || a.timestampMs || 0;
-            const timeB = b.sessionStartMs || b.timestampMs || 0;
-            return timeA - timeB; 
-        });
+        tsSessions.sort((a, b) => (a.sessionStartMs || a.timestampMs || 0) - (b.sessionStartMs || b.timestampMs || 0));
 
         let html = ""; let matchedQtIds = new Set();
         tsSessions.forEach((session, index) => {
-            let startRange = session.sessionStartMs || (session.timestampMs - 1000);
-            let endRange = session.sessionEndMs || session.timestampMs;
+            let startRange = session.sessionStartMs || (session.timestampMs - 1000); let endRange = session.sessionEndMs || session.timestampMs;
             let sessionQts = qtImages.filter(q => { let qTime = q.qtTimeMs || q.timestampMs; return qTime >= startRange && qTime <= endRange; });
             sessionQts.sort((a, b) => (a.qtTimeMs || a.timestampMs) - (b.qtTimeMs || b.timestampMs));
             sessionQts.forEach(q => matchedQtIds.add(q.id));
@@ -1404,40 +1390,23 @@ function showUpdateNotification() {
         if (mapSrc) { let i = new Image(); i.src = mapSrc; cachedVideoExtras.map = i; }
         if (selfieSrc) { let i = new Image(); i.src = selfieSrc; cachedVideoExtras.selfie = i; }
         
-        const mimeType = getSupportedMimeType();
-        isRecording = true; recordingTime = 0; currentSubtitle = ""; drawVideoFrame();
-        const btn = document.getElementById("btn-record-video");
-        btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm"; btn.innerHTML = `<i class=\"fa-solid fa-stop me-1\"></i> ĐANG KHỞI TẠO LUỒNG...`;
+        const mimeType = getSupportedMimeType(); isRecording = true; recordingTime = 0; currentSubtitle = ""; drawVideoFrame();
+        const btn = document.getElementById("btn-record-video"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm"; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`;
         
         try {
-            try { 
-                dynamicAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); 
-            } catch(errMic) { 
-                console.warn("Thiết bị từ chối cấp âm thanh. Chuyển sang quay video không tiếng."); 
-                dynamicAudioStream = null;
-            }
-
-            const canvasStream = canvas.captureStream(25); 
-            const combinedStream = new MediaStream();
-            
+            try { dynamicAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(errMic) { dynamicAudioStream = null; }
+            const canvasStream = canvas.captureStream(25); const combinedStream = new MediaStream();
             if (canvasStream && canvasStream.getVideoTracks().length > 0) { combinedStream.addTrack(canvasStream.getVideoTracks()[0]); }
             if (dynamicAudioStream && dynamicAudioStream.getAudioTracks().length > 0) { combinedStream.addTrack(dynamicAudioStream.getAudioTracks()[0]); }
             
             recordedChunks = [];
-            try {
-                if (mimeType !== '') { mediaRecorder = new MediaRecorder(combinedStream, { mimeType: mimeType }); } 
-                else { mediaRecorder = new MediaRecorder(combinedStream); }
-            } catch (eAllocation) {
-                console.error("Lỗi đồng bộ mã hóa cứng. Kích hoạt chế độ quay dự phòng.");
-                const pureCanvas = new MediaStream([canvasStream.getVideoTracks()[0]]);
-                mediaRecorder = new MediaRecorder(pureCanvas);
-            }
+            try { if (mimeType !== '') { mediaRecorder = new MediaRecorder(combinedStream, { mimeType: mimeType }); } else { mediaRecorder = new MediaRecorder(combinedStream); } } 
+            catch (eAllocation) { const pureCanvas = new MediaStream([canvasStream.getVideoTracks()[0]]); mediaRecorder = new MediaRecorder(pureCanvas); }
             
             mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
             mediaRecorder.onstop = () => {
                 if (recordedChunks.length === 0 || recordingTime < 1) return;
-                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
-                const ext = (mediaRecorder.mimeType && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
+                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' }); const ext = (mediaRecorder.mimeType && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
                 currentMediaFilename = `VIDEO_${document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT"}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.${ext}`;
                 currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'video'; showMediaPreview();
                 if (dynamicAudioStream) { dynamicAudioStream.getTracks().forEach(t => t.stop()); dynamicAudioStream = null; }
@@ -1445,14 +1414,11 @@ function showUpdateNotification() {
             
             mediaRecorder.start(500);
             recordingInterval = setInterval(() => { 
-                recordingTime++; 
-                let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30; 
-                btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s)`; 
-                if (recordingTime >= dynamicMax) stopRecording(); 
+                recordingTime++; let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30; 
+                btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s)`; if (recordingTime >= dynamicMax) stopRecording(); 
             }, 1000);
-            
             if (document.getElementById("toggle-subtitle").checked) initLiveSubtitle();
-        } catch (gErr) { stopRecording(); alert("Trình duyệt không tương thích cơ chế đóng gói Canvas stream."); }
+        } catch (gErr) { stopRecording(); alert("Trình duyệt không hỗ trợ Canvas stream."); }
     }
     
     function stopRecording() {
@@ -1496,16 +1462,12 @@ function showUpdateNotification() {
 
     function toggleAudioRecording() { if (isAudioRecording) stopAudioRecording(); else startAudioRecording(); }
     async function startAudioRecording() {
-        let audioStream = null;
-        try { audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(e) { return alert("Không kích hoạt được Micro!"); }
-        let mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-        try { audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType }); } catch(e) { return; }
+        let audioStream = null; try { audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(e) { return alert("Không bật được Micro!"); }
+        let mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'; try { audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType }); } catch(e) { return; }
         audioChunks = []; audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
         audioRecorder.onstop = () => { 
-            if (audioChunks.length === 0 || audioRecordingTime < 1) return; 
-            currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`; 
-            currentMediaBlobUrl = URL.createObjectURL(new Blob(audioChunks, { type: mimeType })); 
-            currentMediaType = 'audio'; showMediaPreview(); audioStream.getTracks().forEach(t => t.stop());
+            if (audioChunks.length === 0 || audioRecordingTime < 1) return; currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`; 
+            currentMediaBlobUrl = URL.createObjectURL(new Blob(audioChunks, { type: mimeType })); currentMediaType = 'audio'; showMediaPreview(); audioStream.getTracks().forEach(t => t.stop());
         };
         isAudioRecording = true; audioRecordingTime = 0; const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm";
         audioRecorder.start(); audioInterval = setInterval(() => { audioRecordingTime++; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`; }, 1000);
@@ -1514,12 +1476,9 @@ function showUpdateNotification() {
 
     // --- MODULE BÓC BĂNG ĐỘC LẬP TẬP TRUNG ---
     function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
-    
     function startStandaloneTranscribe() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; 
-        if (!SpeechRecognition) return alert("Hệ điều hành di động không hỗ trợ lõi Speech-to-Text!");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) return alert("Thiết bị không hỗ trợ Speech-to-Text!");
         if (localStream) { document.getElementById("video-preview").srcObject = null; localStream.getTracks().forEach(track => track.stop()); localStream = null; }
-        
         isStandaloneTranscribing = true; const btn = document.getElementById("btn-standalone-stt"); btn.classList.replace("btn-warning", "btn-danger"); btn.classList.add("storage-alarm"); 
         document.getElementById("stt-btn-text").innerText = "ĐANG KẾT NỐI MICRO NỘI BỘ VÀO BỘ DỊCH AI...";
         if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e){} standaloneRecognition = null; }
@@ -1537,13 +1496,11 @@ function showUpdateNotification() {
         standaloneRecognition.onend = () => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } };
         try { standaloneRecognition.start(); } catch(e) { setTimeout(() => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err){} } }, 300); }
     }
-
     function stopStandaloneTranscribe() {
         isStandaloneTranscribing = false; if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
         const btn = document.getElementById("btn-standalone-stt"); btn.classList.remove("storage-alarm"); btn.classList.replace("btn-danger", "btn-warning"); document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
         if (isCameraOn) { initCamera(); }
     }
-
     function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản!"); }
     function clearStandaloneSTT() { if(confirm("Xóa bảng nội dung?")) document.getElementById("standalone-stt-result").value = ""; }
     function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width:100%; max-height:400px;"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width:90%; margin:20px 0;"></audio>`; transcribeBox.classList.remove("d-none"); } openModal('mediaPreviewModal'); }
@@ -1571,7 +1528,6 @@ function showUpdateNotification() {
             try { recognition.start(); } catch(e) {}
         }
     }
-
     function getSupportedMimeType() {
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         let types = isIOS ? ['video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/quicktime'] : ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/mp4', 'video/webm'];
@@ -1579,96 +1535,76 @@ function showUpdateNotification() {
     }
 
     // =========================================================================
-    // --- 🛠️ MÃ NGUỒN PHÁT TRIỂN: HỆ THỐNG ĐỒNG BỘ MÁY-MÁY NGOẠI TUYẾN (PWA V53) ---
+    // --- 🛠️ HỆ THỐNG ĐỒNG BỘ MÁY - MÁY CHUYÊN SÂU NÂNG CẤP LUỒNG STREAM (V53.2) ---
     // =========================================================================
 
     // --- GIẢI PHÁP 1: XUẤT / NHẬP FILE OFFLINE (.JSON ĐÓNG GÓI) ---
     function exportSyncFile() {
-        if (!db) return alert("Hệ thống lưu trữ cơ sở dữ liệu chưa sẵn sàng!");
+        if (!db) return alert("Cơ sở dữ liệu chưa sẵn sàng!");
         db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
-            const allData = e.target.result || [];
-            if (allData.length === 0) return alert("Kho lưu trữ trống, không có dữ liệu để xuất!");
-            const jsonStr = JSON.stringify(allData);
-            const blob = new Blob([jsonStr], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            const now = new Date();
-            a.href = url;
+            const allData = e.target.result || []; if (allData.length === 0) return alert("Kho lưu trữ trống!");
+            const jsonStr = JSON.stringify(allData); const blob = new Blob([jsonStr], { type: "application/json" }); const url = URL.createObjectURL(blob);
+            const a = document.createElement("a"); const now = new Date(); a.href = url;
             a.download = `PC_TQ_GSHT_SYNC_${now.toISOString().slice(0,10).replace(/-/g,"")}_${now.getHours()}${now.getMinutes()}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            alert(`Đã xuất thành công gói tệp chứa ${allData.length} ảnh hiện trường!\nHãy mở Quick Share hoặc Bluetooth để gửi file này sang máy B.`);
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            alert(`Đã đóng gói ${allData.length} ảnh hiện trường!\nHãy chia sẻ file qua Quick Share hoặc Bluetooth sang Máy B.`);
         };
     }
-
     function importSyncFile(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
+        const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                const importedData = JSON.parse(e.target.result);
-                if (!Array.isArray(importedData)) return alert("Cấu trúc file dữ liệu không đúng định dạng chuẩn!");
-                let tx = db.transaction("photos", "readwrite");
-                let store = tx.objectStore("photos");
+                const importedData = JSON.parse(e.target.result); if (!Array.isArray(importedData)) return alert("File sai định dạng chuẩn!");
+                let tx = db.transaction("photos", "readwrite"); let store = tx.objectStore("photos");
                 importedData.forEach(item => store.put(item));
-                tx.oncomplete = () => {
-                    alert(`Đồng bộ thành công! Đã nạp thêm ${importedData.length} bản ghi hiện trường vào ứng dụng.`);
-                    loadDataFromDB();
-                    setTimeout(calculateStorageQuota, 300);
-                };
-            } catch (err) { alert("Lỗi phân tích file: " + err.message); }
-        };
-        reader.readAsText(file);
-        event.target.value = "";
+                tx.oncomplete = () => { alert(`Đã nạp thành công ${importedData.length} ảnh từ file ngoài vào kho!`); loadDataFromDB(); setTimeout(calculateStorageQuota, 300); };
+            } catch (err) { alert("Lỗi nạp file: " + err.message); }
+        }; reader.readAsText(file); event.target.value = "";
     }
 
-    // --- GIẢI PHÁP 2: WEBRTC PEER-TO-PEER ĐỒNG BỘ TRỰC TIẾP QUA MẠNG NỘI BỘ ---
+    // --- GIẢI PHÁP 2: WEBRTC PEER-TO-PEER ĐỒNG BỘ TUẦN TỰ TRÁNH TRÀN BỘ ĐỆM DI ĐỘNG ---
     function initWebRTCP2P(isInitiator) {
-        p2pConnection = new RTCPeerConnection({ iceServers: [] }); // Không cần STUN khi bắt tay thủ công cùng mạng LAN/Hotspot
-        
-        if (isInitiator) {
-            p2pDataChannel = p2pConnection.createDataChannel("syncChannel");
-            setupDataChannelHandlers(p2pDataChannel);
-        } else {
-            p2pConnection.ondatachannel = (event) => {
-                p2pDataChannel = event.channel;
-                setupDataChannelHandlers(p2pDataChannel);
-            };
-        }
-
-        p2pConnection.onicecandidate = (e) => {
-            if (!e.candidate) {
-                // Toàn bộ ICE đã hội tụ xong, SDP đóng gói hoàn chỉnh
-                let localSdp = JSON.stringify(p2pConnection.localDescription);
-                displayLocalSDPQR(localSdp);
-            }
-        };
+        p2pConnection = new RTCPeerConnection({ iceServers: [] });
+        if (isInitiator) { p2pDataChannel = p2pConnection.createDataChannel("syncChannel"); setupDataChannelHandlers(p2pDataChannel); } 
+        else { p2pConnection.ondatachannel = (event) => { p2pDataChannel = event.channel; setupDataChannelHandlers(p2pDataChannel); }; }
+        p2pConnection.onicecandidate = (e) => { if (!e.candidate) { displayLocalSDPQR(JSON.stringify(p2pConnection.localDescription)); } };
     }
 
     function setupDataChannelHandlers(channel) {
         channel.onopen = () => {
             document.getElementById("p2p-status-lbl").className = "small fw-bold text-success";
-            document.getElementById("p2p-status-lbl").innerText = "Trạng thái: ĐÃ THÔNG LUỒNG KẾT NỐI! Sẵn sàng đồng bộ.";
+            document.getElementById("p2p-status-lbl").innerText = "Trạng thái: ĐÃ THÔNG LUỒNG KẾT NỐI P2P! Sẵn sàng bắn dữ liệu.";
             document.getElementById("btn-p2p-send-data").classList.remove("d-none");
             document.getElementById("p2p-qr-box").classList.add("d-none");
         };
+        
+        // 🛠️ NÂNG CẤP: Lắng nghe và gom mảnh dữ liệu ảnh tuần tự theo mô hình Streaming Pacing
         channel.onmessage = (event) => {
             try {
                 const packet = JSON.parse(event.data);
-                if (packet.type === "P2P_SYNC" && Array.isArray(packet.payload)) {
+                const statusLbl = document.getElementById("p2p-status-lbl");
+                
+                if (packet.type === "P2P_START") {
+                    p2pIncomingBuffer = [];
+                    statusLbl.className = "small fw-bold text-info animate-pulse";
+                    statusLbl.innerText = `⏳ Đang nhận luồng ảnh trực tiếp... (Tổng số: ${packet.total} ảnh)`;
+                } 
+                else if (packet.type === "P2P_ITEM") {
+                    p2pIncomingBuffer.push(packet.item);
+                    statusLbl.innerText = `⏳ Đang nạp gói ảnh vào bộ đệm... (${p2pIncomingBuffer.length} ảnh đã nhận)`;
+                } 
+                else if (packet.type === "P2P_END") {
                     let tx = db.transaction("photos", "readwrite");
                     let store = tx.objectStore("photos");
-                    packet.payload.forEach(item => store.put(item));
+                    p2pIncomingBuffer.forEach(item => store.put(item));
                     tx.oncomplete = () => {
-                        alert(`Máy B nhận thành công ${packet.payload.length} ảnh trực tiếp qua kết nối P2P!`);
-                        loadDataFromDB();
-                        setTimeout(calculateStorageQuota, 300);
+                        statusLbl.className = "small fw-bold text-success";
+                        statusLbl.innerText = `✅ Đồng bộ thành công! Đã nạp ${p2pIncomingBuffer.length} bản ghi vào thiết bị.`;
+                        alert(`Máy B nhận thành công toàn bộ ${p2pIncomingBuffer.length} ảnh trực tiếp từ Máy A!`);
+                        loadDataFromDB(); setTimeout(calculateStorageQuota, 300); p2pIncomingBuffer = [];
                     };
                 }
-            } catch(e) { console.error("Lỗi xử lý luồng nhận P2P:", e); }
+            } catch(e) { console.error("Lỗi luồng nhận P2P:", e); }
         };
     }
 
@@ -1676,153 +1612,149 @@ function showUpdateNotification() {
         document.getElementById("p2p-handshake-panel").classList.remove("d-none");
         document.getElementById("p2p-qr-box").classList.add("d-none");
         document.getElementById("p2p-sdp-text").value = "";
+        document.getElementById("p2p-remote-sdp-text").value = "";
         document.getElementById("btn-p2p-send-data").classList.add("d-none");
         
         if (isInitiator) {
-            document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy A): Đang sinh khóa cấu hình (Offer)...";
-            initWebRTCP2P(true);
-            p2pConnection.createOffer().then(offer => p2pConnection.setLocalDescription(offer));
+            document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy A): Đang sinh khóa Offer...";
+            initWebRTCP2P(true); p2pConnection.createOffer().then(offer => p2pConnection.setLocalDescription(offer));
         } else {
-            document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy B): Đang chờ quét mã Offer từ Máy A...";
+            document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy B): Hãy dán mã hoặc quét mã Offer từ Máy A...";
             initWebRTCP2P(false);
         }
     }
 
     function displayLocalSDPQR(sdpText) {
         document.getElementById("p2p-sdp-text").value = sdpText;
-        const qrBox = document.getElementById("p2p-qr-box");
-        const canvasContainer = document.getElementById("p2p-qrcode-canvas");
-        canvasContainer.innerHTML = "";
-        qrBox.classList.remove("d-none");
-        
-        if (window.QRCode) {
-            new QRCode(canvasContainer, { text: sdpText, width: 184, height: 184, correctLevel: QRCode.CorrectLevel.L });
-        } else {
-            canvasContainer.innerHTML = "<span class='text-dark small p-2 d-block'>Chưa nạp thư viện QR. Hãy copy chuỗi ký tự!</span>";
-        }
+        const qrBox = document.getElementById("p2p-qr-box"); const canvasContainer = document.getElementById("p2p-qrcode-canvas");
+        canvasContainer.innerHTML = ""; qrBox.classList.remove("d-none");
+        if (window.QRCode) { new QRCode(canvasContainer, { text: sdpText, width: 184, height: 184, correctLevel: QRCode.CorrectLevel.L }); }
+    }
+
+    // 🛠️ NÂNG CẤP: Chức năng chạm tay vào ô là Copy luôn mã liên kết nội bộ công nghiệp
+    function copyMySDP() {
+        const textarea = document.getElementById("p2p-sdp-text"); if (!textarea.value) return;
+        textarea.select();
+        navigator.clipboard.writeText(textarea.value).then(() => {
+            const status = document.getElementById("p2p-copy-status"); status.classList.remove("d-none");
+            setTimeout(() => status.classList.add("d-none"), 2000);
+        }).catch(() => {
+            document.execCommand("copy");
+            const status = document.getElementById("p2p-copy-status"); status.classList.remove("d-none");
+            setTimeout(() => status.classList.add("d-none"), 2000);
+        });
+    }
+
+    // 🛠️ NÂNG CẤP: Cho phép dán văn bản để chủ động nhấn nút "Kết nối bằng mã dán"
+    function connectP2PManual() {
+        const remoteStr = document.getElementById("p2p-remote-sdp-text").value.trim();
+        if (!remoteStr) return alert("Vui lòng dán chuỗi mã bắt tay nhận được từ máy đối diện vào ô nhập trước!");
+        applyRemoteSDP(remoteStr);
     }
 
     async function scanP2PPartnerQR() {
-    const scanContainer = document.getElementById("p2p-video-scan-container");
-    const scanVideo = document.getElementById("p2p-scanner-video");
-    
-    // Nếu trình duyệt hoặc WebView (như Zalo) bị cắt lõi nhận diện mã
-    if (!window.BarcodeDetector) {
-        let inputSdp = prompt("Trình duyệt không hỗ trợ camera quét trực tiếp.\nAnh hãy sao chép 'Chuỗi ký tự bắt tay' từ máy đối diện và dán vào ô dưới đây:");
-        if (inputSdp) applyRemoteSDP(inputSdp);
-        return;
-    }
-
-    // Mở khung ngắm phụ tại Tab đồng bộ và ẩn mã QR của mình đi để lấy chỗ hiển thị
-    scanContainer.classList.remove("d-none");
-    document.getElementById("p2p-qr-box").classList.add("d-none");
-    
-    // Gắn trực tiếp luồng camera đang chạy ngầm vào kính ngắm phụ này
-    if (localStream) {
-        scanVideo.srcObject = localStream;
-    } else {
-        try {
-            // Nếu camera chưa được bật ở Tab 1, xin cấp luồng mới tại đây
-            let s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            localStream = s;
-            scanVideo.srcObject = s;
-        } catch(err) {
-            alert("Không thể kết nối phần cứng Camera: " + err.message);
-            scanContainer.classList.add("d-none");
-            return;
+        const scanContainer = document.getElementById("p2p-video-scan-container"); const scanVideo = document.getElementById("p2p-scanner-video");
+        if (!window.BarcodeDetector) {
+            let sdp = prompt("Thiết bị không hỗ trợ quét trực tiếp. Hãy dán chuỗi mã bắt tay vào đây:");
+            if (sdp) applyRemoteSDP(sdp); return;
         }
-    }
+        scanContainer.classList.remove("d-none"); document.getElementById("p2p-qr-box").classList.add("d-none");
+        if (localStream) { scanVideo.srcObject = localStream; } else {
+            try { let s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }); localStream = s; scanVideo.srcObject = s; } 
+            catch(e) { alert("Không bật được camera quét phụ: " + e.message); scanContainer.classList.add("d-none"); return; }
+        }
 
-    const detector = new BarcodeDetector({ formats: ['qr_code'] });
-    document.getElementById("p2p-status-lbl").className = "small fw-bold text-info animate-pulse";
-    document.getElementById("p2p-status-lbl").innerText = "Trạng thái: 📷 HÃY NGẮM CAMERA VÀO MÃ QR CỦA MÁY ĐỐI DIỆN...";
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        document.getElementById("p2p-status-lbl").className = "small fw-bold text-info animate-pulse";
+        document.getElementById("p2p-status-lbl").innerText = "Trạng thái: 📷 ĐANG QUÉT MÃ QR CỦA MÁY ĐỐI DIỆN...";
 
-    // Khởi động bộ quét chuỗi lặp lại tốc độ cao (250ms/lần)
-    let timer = setInterval(async () => {
-        try {
-            // Chỉ quét khi camera đã có luồng hình ảnh thực tế truyền về
-            if (scanVideo.readyState === scanVideo.HAVE_CURRENT_DATA || scanVideo.readyState === scanVideo.HAVE_ENOUGH_DATA) {
-                const barcodes = await detector.detect(scanVideo);
-                if (barcodes.length > 0) {
-                    clearInterval(timer);
-                    
-                    // Quét trúng đích -> Ngắt camera phụ và đóng khung kính ngắm
-                    scanVideo.srcObject = null;
-                    scanContainer.classList.add("d-none");
-                    
-                    // Nạp chuỗi cấu hình bắt tay mạng
-                    applyRemoteSDP(barcodes[0].rawValue);
+        let timer = setInterval(async () => {
+            try {
+                if (scanVideo.readyState === scanVideo.HAVE_CURRENT_DATA || scanVideo.readyState === scanVideo.HAVE_ENOUGH_DATA) {
+                    const barcodes = await detector.detect(scanVideo);
+                    if (barcodes.length > 0) {
+                        clearInterval(timer); scanVideo.srcObject = null; scanContainer.classList.add("d-none");
+                        applyRemoteSDP(barcodes[0].rawValue);
+                    }
                 }
-            }
-        } catch(e) { console.error("Lỗi phân tích frame quét:", e); }
-    }, 250);
-
-    // Chế độ tự động hủy (Timeout) sau 30 giây nếu anh em không đưa mã vào ngắm để tránh nóng máy
-    setTimeout(() => {
-        clearInterval(timer);
-        if (!scanContainer.classList.contains("d-none")) {
-            scanVideo.srcObject = null;
-            scanContainer.classList.add("d-none");
-            document.getElementById("p2p-status-lbl").className = "small fw-bold text-danger";
-            document.getElementById("p2p-status-lbl").innerText = "Trạng thái: Đã hết thời gian chờ quét mã QR.";
-            
-            // Kích hoạt giải pháp dự phòng cuối cùng: Cho phép nhập chuỗi chữ bằng tay
-            let inputSdp = prompt("Không quét được mã QR tự động. Anh có thể sao chép chuỗi mã hóa bắt tay từ máy đối diện và dán vào đây:");
-            if (inputSdp) applyRemoteSDP(inputSdp);
-        }
-    }, 30000);
-}
+            } catch(e) {}
+        }, 250);
+        setTimeout(() => { clearInterval(timer); scanVideo.srcObject = null; scanContainer.classList.add("d-none"); }, 30000);
+    }
 
     function applyRemoteSDP(scannedSdp) {
         try {
             let sdpObj = JSON.parse(scannedSdp);
             p2pConnection.setRemoteDescription(new RTCSessionDescription(sdpObj)).then(() => {
                 if (sdpObj.type === "offer") {
-                    document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy B): Đang phản hồi khóa (Answer)...";
+                    document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy B): Đang tính toán chuỗi phản hồi (Answer)...";
                     p2pConnection.createAnswer().then(answer => p2pConnection.setLocalDescription(answer));
                 } else if (sdpObj.type === "answer") {
-                    document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy A): Đang thiết lập kênh truyền thông suốt...";
+                    document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy A): Cấu hình khớp! Kênh truyền đang thông mạch...";
                 }
             });
-        } catch(err) { alert("Mã bắt tay không hợp lệ hoặc lỗi phân tích chuỗi: " + err.message); }
+        } catch(err) { alert("Mã bắt tay không đúng cấu trúc: " + err.message); }
     }
 
+    // 🛠️ NÂNG CẤP: Thuật toán bắn ảnh tuần tự phân đoạn (Streaming Pacing) chống sập luồng truyền dữ liệu di động
     function sendDataOverP2P() {
-        if (!p2pDataChannel || p2pDataChannel.readyState !== "open") return alert("Luồng truyền trực tiếp chưa thông mạch!");
+        if (!p2pDataChannel || p2pDataChannel.readyState !== "open") return alert("Kênh truyền trực tiếp chưa thông suốt!");
+        const btn = document.getElementById("btn-p2p-send-data"); btn.setAttribute("disabled", "true");
+        
         db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
             const allData = e.target.result || [];
-            if (allData.length === 0) return alert("Không có dữ liệu ảnh hiện trường để gửi!");
+            if (allData.length === 0) { btn.removeAttribute("disabled"); return alert("Kho lưu trữ trống, không có ảnh hiện trường để gửi!"); }
+            
             try {
-                p2pDataChannel.send(JSON.stringify({ type: "減_SYNC", payload: allData }));
-                alert(`Đã truyền dữ liệu thành công gói ${allData.length} bản ghi sang Máy B!`);
-            } catch(err) { alert("Dung lượng chuỗi vượt hạn mức DataChannel. Vui lòng dùng Giải pháp 1 (Xuất file .json) nếu ảnh quá nặng."); }
+                // Đẩy gói tín hiệu mở màn báo tổng số lượng ảnh sắp truyền
+                p2pDataChannel.send(JSON.stringify({ type: "P2P_START", total: allData.length }));
+                
+                let currentIndex = 0;
+                function streamNextItem() {
+                    if (currentIndex < allData.length) {
+                        btn.innerText = `⏳ ĐANG TRUYỀN TẢI... (${currentIndex + 1}/${allData.length} ẢNH)`;
+                        
+                        p2pDataChannel.send(JSON.stringify({
+                            type: "P2P_ITEM",
+                            item: allData[currentIndex],
+                            index: currentIndex
+                        }));
+                        
+                        currentIndex++;
+                        setTimeout(streamNextItem, 100); // Khoảng giãn cách 100ms an toàn tuyệt đối cho phần cứng di động
+                    } else {
+                        // Đẩy gói tín hiệu kết thúc luồng truyền để ép máy B lưu kho IndexedDB
+                        p2pDataChannel.send(JSON.stringify({ type: "P2P_END" }));
+                        btn.removeAttribute("disabled");
+                        btn.className = "btn btn-sm btn-outline-success w-100 fw-bold py-3 mt-2";
+                        btn.innerHTML = `<i class="fa-solid fa-check-double me-1"></i> ĐÃ GỬI XONG ${allData.length} ẢNH`;
+                        alert(`Đã truyền tải thành công toàn bộ ${allData.length} ảnh hiện trường sang Máy B an toàn!`);
+                    }
+                }
+                streamNextItem();
+                
+            } catch(err) {
+                btn.removeAttribute("disabled"); btn.innerText = "BẮN TOÀN BỘ ẢNH SANG MÁY B";
+                alert("Lỗi luồng truyền: " + err.message + "\nHãy thử lại hoặc chọn Giải pháp 1 (Xuất file JSON).");
+            }
         };
     }
 
-    // --- GIẢI PHÁP 3: KHUNG SƯỜN VÒNG LẶP QR ĐỘNG CHUYỂN METADATA OFFLINE ---
+    // --- GIẢI PHÁP 3: PHÁT VÒNG LẶP QR ĐỘNG CHUYỂN METADATA OFFLINE ---
     function startAnimatedQREmitter() {
-        const panel = document.getElementById("animated-qr-panel");
-        const display = document.getElementById("animated-qr-display");
-        panel.classList.remove("d-none");
-        display.innerHTML = "";
-        
+        const panel = document.getElementById("animated-qr-panel"); const display = document.getElementById("animated-qr-display");
+        panel.classList.remove("d-none"); display.innerHTML = "";
         if (!db) return;
         db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
             const allData = e.target.result || [];
-            // Thu nhỏ tối giản tệp tin cấu trúc chỉ lấy Text nhật ký hiện trường để nén vừa mã QR
             let simplified = allData.map(x => ({ t: x.type, n: document.getElementById("tab1-prefix").value || "HT", m: x.timestampMs }));
-            let rawString = JSON.stringify(simplified).slice(0, 400); // Cắt ngắn để kiểm thử luồng phát nhanh
-            
-            if(!window.QRCode) { display.innerHTML = "<span class='text-dark small'>Lỗi nạp Core QR</span>"; return;}
-            display.innerHTML = "";
+            let rawString = JSON.stringify(simplified).slice(0, 400);
+            if(!window.QRCode) return; display.innerHTML = "";
             new QRCode(display, { text: rawString, width: 160, height: 160 });
             document.getElementById("animated-qr-title").innerText = "Đang phát vòng lặp Metadata...";
         };
     }
-
-    function startAnimatedQRReceiver() {
-        alert("Tính năng quét chuỗi liên tục yêu cầu Camera xử lý thời gian thực cường độ cao. Khuyến khích sử dụng Giải pháp 1 và 2 để đạt độ ổn định tối đa.");
-    }
+    function startAnimatedQRReceiver() { alert("Hãy ưu tiên sử dụng Giải pháp 1 và Giải pháp 2 để đạt độ ổn định và dung lượng tối đa."); }
 </script>
 </body>
 </html>
