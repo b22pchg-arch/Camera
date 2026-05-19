@@ -904,10 +904,18 @@ function showUpdateNotification() {
 
     // --- CAMERA POWER ENGINE ---
     // --- SỬA ĐỔI: HÀM KHỞI TẠO MÁY ẢNH CHUYÊN DỤNG CHO HIỆN TRƯỜNG ---
-function initCamera() {
+// =========================================================================
+// --- 📷 MODULE KHỞI TẠO CAMERA CHỐNG NGHẼN MẠCH PHẦN CỨNG DI ĐỘNG ---
+// =========================================================================
+
+async function initCamera() {
     if (!isCameraOn) return;
     
-    // 1. Giải phóng luồng Render cũ triệt để khỏi RAM trước khi xin luồng mới
+    // Xóa bỏ thông báo lỗi cũ nếu có trên màn hình
+    const existingError = document.getElementById("camera-error-msg");
+    if (existingError) existingError.remove();
+    
+    // 1. Dọn dẹp triệt để luồng hiển thị cũ khỏi RAM
     const video = document.getElementById("video-preview");
     if (video) { 
         video.srcObject = null; 
@@ -916,13 +924,15 @@ function initCamera() {
     if (localStream) {
         localStream.getTracks().forEach(track => {
             track.stop();
-            console.log(`🛑 Đã ngắt hẳn track cũ: ${track.kind}`);
+            console.log(`🛑 Đã ngắt track: ${track.kind}`);
         });
         localStream = null;
+        // 🚀 MẸO CỐT LÕI 1: Nghỉ 300ms để hệ điều hành kịp đóng cảm biến vật lý
+        await new Promise(resolve => setTimeout(resolve, 300));
     }
     
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        // 🚀 TỐI ƯU CỐT LÕI: Chỉ xin quyền Video (Máy ảnh). Tuyệt đối không xin quyền Audio ở đây để tránh nghẽn phần cứng di động.
+        // Cấu hình tối ưu độ phân giải cao cho PC Tuyên Quang
         const constraints = { 
             video: { 
                 facingMode: currentFacingMode, 
@@ -931,31 +941,76 @@ function initCamera() {
             } 
         };
         
-        navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
+        try {
+            console.log("⏳ Đang kết nối camera độ phân giải cao...");
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             localStream = stream;
-            document.getElementById("video-preview").srcObject = stream;
-            document.getElementById("video-preview").onloadedmetadata = () => initCameraZoom(stream);
-        })
-        .catch(err => {
-            console.warn("⚠️ Không lấy được độ phân giải cao (Có thể máy cũ hoặc cam trước), thử cấu hình cơ bản:", err);
+            if (video) {
+                video.srcObject = stream;
+                video.onloadedmetadata = () => initCameraZoom(stream);
+            }
+            console.log("✅ Kết nối camera độ phân giải cao thành công.");
+        } catch (err) {
+            console.warn("⚠️ Luồng cao cấp bị nghẽn hoặc thiết bị bận, chuẩn bị thử lại luồng cơ bản...", err);
             
-            // Giải pháp dự phòng cấp thấp (Fallback) nếu máy bị nghẽn lệnh hoặc cấu hình ideal quá cao
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })
-            .then(s => {
-                localStream = s;
-                document.getElementById("video-preview").srcObject = s;
-            })
-            .catch(e => {
-                console.error("❌ Thất bại hoàn toàn khi kết nối phần cứng Máy Ảnh:", e);
-                // Bắt lỗi an toàn, không để Uncaught in promise làm treo app
-                let gpsStatus = document.getElementById("gps-status");
-                if (gpsStatus) {
-                    gpsStatus.className = "badge bg-danger text-white small";
-                    gpsStatus.innerText = "⚠️ LỖI CAMERA CỨNG";
+            // 🚀 MẸO CỐT LÕI 2: Ép hoãn luồng 1 giây (1000ms) để driver điện thoại kịp reset giải phóng khóa phần cứng
+            setTimeout(async () => {
+                try {
+                    // Yêu cầu luồng cơ bản nhất, để trình duyệt tự phối hợp với hệ điều hành lấy cấu hình an toàn
+                    const backupStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: currentFacingMode } 
+                    });
+                    localStream = backupStream;
+                    if (video) {
+                        video.srcObject = backupStream;
+                        try { initCameraZoom(backupStream); } catch(e){}
+                    }
+                    console.log("✅ Kích hoạt thành công camera bằng luồng dự phòng cơ bản.");
+                } catch (fallbackErr) {
+                    console.error("❌ Thất bại hoàn toàn cả 2 luồng do khóa cứng OS:", fallbackErr);
+                    showCameraErrorUI(fallbackErr);
                 }
-            });
-        });
+            }, 1000);
+        }
+    }
+}
+
+// Hàm vẽ giao diện hướng dẫn xử lý lỗi trực quan cho anh em hiện trường
+function showCameraErrorUI(err) {
+    let gpsStatus = document.getElementById("gps-status");
+    if (gpsStatus) {
+        gpsStatus.className = "badge bg-danger text-white small";
+        gpsStatus.innerText = "⚠️ LỖI PHẦN CỨNG CAMERA";
+    }
+    
+    const videoContainer = document.getElementById("camera-container");
+    if (videoContainer && !document.getElementById("camera-error-msg")) {
+        const errorDiv = document.createElement("div");
+        errorDiv.id = "camera-error-msg";
+        errorDiv.style.cssText = `
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.9); color: #ffc107; display: flex; 
+            flex-direction: column; align-items: center; justify-content: center; 
+            padding: 15px; text-align: center; font-size: 12px; z-index: 100;
+        `;
+        errorDiv.innerHTML = `
+            <i class="fa-solid fa-triangle-exclamation display-5 text-danger mb-2"></i>
+            <b class="text-danger text-uppercase" style="font-size:13px;">Không thể kết nối Máy Ảnh</b>
+            <span class="text-secondary small my-2" style="line-height:1.4;">
+                Hệ thống báo lỗi: <b>${err.name}</b> (Hết thời gian chờ phần cứng).<br>
+                ĐIỆN THOẠI ĐANG BỊ KẸT KHÓA CAMERA DO NẠP TRANG QUÁ NHANH.
+            </span>
+            <div class="text-start text-light bg-black bg-opacity-50 p-2 rounded border border-secondary mb-3" style="font-size:11px; line-height:1.5; width:95%;">
+                <b>💡 Mẹo xử lý nhanh cho anh em:</b><br>
+                1. Vuốt đóng hoàn toàn các app ngầm đang dùng Cam (Zalo, Messenger, Facebook, Cam gốc).<br>
+                2. Bấm nút <b>Thử lại</b> dưới đây hoặc tắt hẳn tab trình duyệt mở lại.<br>
+                3. Nếu vẫn không được, hãy khởi động lại điện thoại để ép hệ điều hành nhả khóa phần cứng.
+            </div>
+            <button class="btn btn-sm btn-warning text-dark fw-bold px-3 py-2" onclick="initCamera()">
+                <i class="fa-solid fa-rotate-right me-1"></i> THỬ LẠI NGAY
+            </button>
+        `;
+        videoContainer.appendChild(errorDiv);
     }
 }
     function initCameraZoom(stream) {
