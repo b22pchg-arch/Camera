@@ -84,7 +84,11 @@
         .camera-tools-shell { border: 1px solid #495057; border-radius: 12px; overflow: hidden; background: #111820; }
         .camera-tools-header { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:8px 10px; background:#0b1117; border-bottom:1px solid #343a40; }
         .camera-tools-body { padding: 10px; }
-        .ios-image-modal-img { max-width: 100%; max-height: 74vh; object-fit: contain; background: #000; }
+         .ios-image-modal-img { max-width: 100%; max-height: 74vh; object-fit: contain; background: #000; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; transform-origin: center center; transition: transform 0.08s ease-out; }
+        .image-zoom-stage { width: 100%; height: 74vh; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; background: #000; border-radius: 8px; }
+        .image-zoom-toolbar { gap: 6px; flex-wrap: wrap; }
+        .image-zoom-hint { font-size: 10.5px; line-height: 1.25; color: #adb5bd; }
+        @media (max-width: 430px) { .image-zoom-stage { height: 76vh; } .ios-image-modal-img { max-height: 76vh; } }
         .footer-toggle-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
         @media (max-width: 430px) {
             .camera-capture-overlay { padding: 7px; gap: 5px; }
@@ -828,7 +832,7 @@ function showUpdateNotification() {
                     <li><b>Ẩn/hiện Quá Trình:</b> dùng nút ẩn/hiện ảnh <b>Quá Trình</b> trong tab Máy Ảnh để thu gọn giao diện khi chỉ cần chụp Trước/Sau.</li>
                     <li><b>Nút chụp trong khung camera:</b> ba nút <b>TRƯỚC / Q.TRÌNH / SAU</b> nằm ngay dưới khung hình camera để thao tác nhanh khi cầm điện thoại dọc.</li>
                     <li><b>Ẩn/hiện khu vực cấu hình:</b> các phần Chân trang tự động, Chất lượng, Thông tin ghép, Chọn ảnh xem và Tiện ích mở rộng được gom vào một khung có nút <b>HIỆN/ẨN</b>, giúp dành tối đa màn hình cho camera.</li>
-                    <li><b>Chọn ảnh để xem:</b> trong khung cấu hình có mục chọn ảnh ngoài để xem nhanh, kiểm tra ảnh hoặc xem vị trí nếu ảnh có dữ liệu GPS. Khi xem trên iOS, dùng nút <b>QUAY LẠI/ĐÓNG ẢNH</b> để về trang chính mà không phải tắt app.</li>
+                    <li><b>Chọn ảnh để xem:</b> trong khung cấu hình có mục chọn ảnh ngoài để xem nhanh, kiểm tra ảnh hoặc xem vị trí nếu ảnh có dữ liệu GPS. Khi xem trên iOS, dùng nút <b>QUAY LẠI/ĐÓNG ẢNH</b> để về trang chính mà không phải tắt app; có thể chụm 2 ngón, kéo ảnh, hoặc dùng nút +/- để phóng to kiểm tra chi tiết.</li>
                 </ol>
 
                 <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-layer-group me-1"></i> 3. CHÂN TRANG TỰ ĐỘNG: SELFIE - BẢN ĐỒ - LA BÀN</p>
@@ -2421,14 +2425,110 @@ function showCameraErrorUI(err) {
         } else { triggerBatchDownloads(itemsToShare); }
     }
     function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
+    let imageViewerZoomState = { scale: 1, x: 0, y: 0, pointers: new Map(), lastDistance: 0, lastCenter: null, lastTap: 0, dragStart: null };
+    function applyImageViewerTransform() {
+        const img = document.getElementById("image-viewer-img");
+        if (!img) return;
+        const st = imageViewerZoomState;
+        img.style.transform = `translate(${st.x}px, ${st.y}px) scale(${st.scale})`;
+    }
+    function resetImageViewerZoom() {
+        imageViewerZoomState.scale = 1;
+        imageViewerZoomState.x = 0;
+        imageViewerZoomState.y = 0;
+        imageViewerZoomState.lastDistance = 0;
+        imageViewerZoomState.lastCenter = null;
+        imageViewerZoomState.dragStart = null;
+        applyImageViewerTransform();
+    }
+    function zoomImageViewer(factor, cx, cy) {
+        const st = imageViewerZoomState;
+        const oldScale = st.scale;
+        const nextScale = Math.max(1, Math.min(6, oldScale * factor));
+        if (nextScale === 1) { resetImageViewerZoom(); return; }
+        if (cx !== undefined && cy !== undefined) {
+            st.x = cx - (cx - st.x) * (nextScale / oldScale);
+            st.y = cy - (cy - st.y) * (nextScale / oldScale);
+        }
+        st.scale = nextScale;
+        applyImageViewerTransform();
+    }
+    function setupImageViewerZoomOnce() {
+        const stage = document.getElementById("image-zoom-stage");
+        const img = document.getElementById("image-viewer-img");
+        if (!stage || !img || stage.dataset.zoomReady === "1") return;
+        stage.dataset.zoomReady = "1";
+        const centerOf = (pts) => ({ x: (pts[0].clientX + pts[1].clientX) / 2, y: (pts[0].clientY + pts[1].clientY) / 2 });
+        const distanceOf = (pts) => Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+        const localPoint = (clientX, clientY) => {
+            const r = stage.getBoundingClientRect();
+            return { x: clientX - r.left - r.width / 2, y: clientY - r.top - r.height / 2 };
+        };
+        stage.addEventListener("pointerdown", (e) => {
+            stage.setPointerCapture?.(e.pointerId);
+            imageViewerZoomState.pointers.set(e.pointerId, e);
+            const now = Date.now();
+            if (now - imageViewerZoomState.lastTap < 280 && imageViewerZoomState.pointers.size === 1) {
+                if (imageViewerZoomState.scale > 1) resetImageViewerZoom();
+                else zoomImageViewer(2.2, 0, 0);
+            }
+            imageViewerZoomState.lastTap = now;
+            if (imageViewerZoomState.pointers.size === 1) {
+                imageViewerZoomState.dragStart = { clientX: e.clientX, clientY: e.clientY, x: imageViewerZoomState.x, y: imageViewerZoomState.y };
+            } else if (imageViewerZoomState.pointers.size === 2) {
+                const pts = Array.from(imageViewerZoomState.pointers.values());
+                imageViewerZoomState.lastDistance = distanceOf(pts);
+                imageViewerZoomState.lastCenter = centerOf(pts);
+            }
+        }, { passive: false });
+        stage.addEventListener("pointermove", (e) => {
+            if (!imageViewerZoomState.pointers.has(e.pointerId)) return;
+            e.preventDefault();
+            imageViewerZoomState.pointers.set(e.pointerId, e);
+            const pts = Array.from(imageViewerZoomState.pointers.values());
+            if (pts.length === 2) {
+                const dist = distanceOf(pts);
+                if (imageViewerZoomState.lastDistance > 0) {
+                    const c = centerOf(pts);
+                    const p = localPoint(c.clientX ?? c.x, c.clientY ?? c.y);
+                    zoomImageViewer(dist / imageViewerZoomState.lastDistance, p.x, p.y);
+                    imageViewerZoomState.lastCenter = c;
+                }
+                imageViewerZoomState.lastDistance = dist;
+            } else if (pts.length === 1 && imageViewerZoomState.scale > 1 && imageViewerZoomState.dragStart) {
+                const ds = imageViewerZoomState.dragStart;
+                imageViewerZoomState.x = ds.x + (e.clientX - ds.clientX);
+                imageViewerZoomState.y = ds.y + (e.clientY - ds.clientY);
+                applyImageViewerTransform();
+            }
+        }, { passive: false });
+        ["pointerup", "pointercancel", "pointerleave"].forEach(evt => stage.addEventListener(evt, (e) => {
+            imageViewerZoomState.pointers.delete(e.pointerId);
+            imageViewerZoomState.lastDistance = 0;
+            imageViewerZoomState.lastCenter = null;
+            if (imageViewerZoomState.pointers.size === 0) imageViewerZoomState.dragStart = null;
+        }));
+        stage.addEventListener("wheel", (e) => {
+            e.preventDefault();
+            const p = localPoint(e.clientX, e.clientY);
+            zoomImageViewer(e.deltaY < 0 ? 1.12 : 0.88, p.x, p.y);
+        }, { passive: false });
+    }
     function viewFullImage(url) {
         const img = document.getElementById("image-viewer-img");
-        if (img) { img.src = url; openModal('imageViewerModal'); return; }
+        if (img) {
+            setupImageViewerZoomOnce();
+            resetImageViewerZoom();
+            img.src = url;
+            openModal('imageViewerModal');
+            return;
+        }
         const w = window.open();
         if (w) w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`);
     }
     function closeImageViewer() {
         const img = document.getElementById("image-viewer-img");
+        resetImageViewerZoom();
         if (img) img.src = "";
         closeModal('imageViewerModal');
     }
