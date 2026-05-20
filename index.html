@@ -361,7 +361,7 @@ function showUpdateNotification() {
                         <button id="btn-stitch-ts-only" class="btn btn-primary w-100 fw-bold py-2" style="font-size:11px;" disabled onclick="quickStitchTSOnly()">CHỈ GHÉP T/S ĐỘC LẬP</button>
                     </div>
                     <div class="col-6">
-                        <button id="btn-stitch-full" class="btn btn-success w-100 fw-bold py-2" style="font-size:11px;" disabled onclick="quickStitchFull()"><i class="fa-solid fa-border-all"></i> GHÉP TẤT CẢ (T-QT-S)</button>
+                        <button id="btn-stitch-full" class="btn btn-success w-100 fw-bold py-2" style="font-size:11px;" disabled onclick="quickStitchFull()"><i class="fa-solid fa-border-all"></i>GHÉP TẤT CẢ(T.QT.S)</button>
                     </div>
                 </div>
                 <div class="row g-2">
@@ -374,12 +374,12 @@ function showUpdateNotification() {
             <div class="card bg-dark border-secondary p-2 mb-3 shadow-sm">
                 <div class="d-flex gap-2 align-items-center justify-content-between flex-wrap">
                     <label class="btn btn-sm btn-outline-info fw-bold mb-0 cursor-pointer">
-                        <i class="fa-solid fa-image me-1"></i> CHỌN ẢNH XEM
+                        <i class="fa-solid fa-image me-1"></i>CHỌN ẢNH XEM
                         <input type="file" class="d-none" accept="image/*" multiple onchange="handleCameraViewFiles(event)">
                     </label>
-                    <button class="btn btn-sm btn-outline-secondary fw-bold" onclick="clearCameraViewImages()"><i class="fa-solid fa-broom me-1"></i> XÓA ẢNH</button>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" onclick="clearCameraViewImages()"><i class="fa-solid fa-broom me-1"></i>XÓA ẢNH</button>
                     <button id="btn-toggle-qt-camera" class="btn btn-sm btn-outline-warning fw-bold ms-auto" onclick="toggleQtArea('camera')">
-                        <i class="fa-solid fa-eye-slash me-1"></i> ẨN ẢNH Q.Trình
+                        <i class="fa-solid fa-eye-slash me-1"></i>ẨN ẢNH Q.Trình
                     </button>
                 </div>
                 <div id="camera-viewer-grid" class="row g-2 mt-2 d-none"></div>
@@ -476,7 +476,7 @@ function showUpdateNotification() {
                     </select>
                 </div>
                 <button id="btn-toggle-qt-pending" class="btn btn-sm btn-outline-warning w-100 fw-bold mb-2" onclick="toggleQtArea('pending')">
-                    <i class="fa-solid fa-eye-slash me-1"></i> ẨN KHU VỰC ẢNH QUÁ TRÌNH TRONG CHỜ GHÉP
+                    <i class="fa-solid fa-eye-slash me-1"></i> ẨN KHU VỰC ẢNH QUÁ TRÌNH
                 </button>
                 <div class="row g-2 mb-2">
                     <div class="col-4">
@@ -653,7 +653,7 @@ function showUpdateNotification() {
                 <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp chuyển nhanh ghi chú text hoặc danh mục cấu hình hiện trường khi hai thiết bị cách ly mạng tuyệt đối.</p>
                 <div class="row g-2">
                     <div class="col-6"><button class="btn btn-sm btn-outline-info w-100 fw-bold py-2" onclick="startAnimatedQREmitter()"><i class="fa-solid fa-play me-1"></i> PHÁT QR ĐỘNG</button></div>
-                    <div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold py-2" onclick="startAnimatedQRReceiver()"><i class="fa-solid fa-expand me-1"></i> QUÉT NHẬN CHUỖI</button></div>
+                    <div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold py-2" onclick="startAnimatedQRReceiver()"><i class="fa-solid fa-expand me-1"></i> QUÉT QR</button></div>
                 </div>
                 <div id="animated-qr-panel" class="text-center p-2 mt-3 border border-secondary rounded bg-black d-none">
                     <div id="animated-qr-title" class="small text-warning mb-2 fw-bold">Đang phát dữ liệu mã hóa...</div>
