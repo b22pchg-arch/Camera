@@ -71,6 +71,28 @@
         
         .collapse { display: none; }
         .collapse.show { display: block; }
+
+        /* --- BỔ SUNG V56: tối ưu màn hình chụp, nút chụp trong khung camera, modal xem ảnh iOS --- */
+        #camera-container { overflow: hidden; }
+        .camera-capture-overlay {
+            position: absolute; left: 0; right: 0; bottom: 0; z-index: 20;
+            padding: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            background: linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0.42), rgba(0,0,0,0));
+            pointer-events: none;
+        }
+        .camera-capture-overlay button { pointer-events: auto; border-width: 2px; box-shadow: 0 2px 10px rgba(0,0,0,0.55); }
+        .camera-tools-shell { border: 1px solid #495057; border-radius: 12px; overflow: hidden; background: #111820; }
+        .camera-tools-header { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:8px 10px; background:#0b1117; border-bottom:1px solid #343a40; }
+        .camera-tools-body { padding: 10px; }
+        .ios-image-modal-img { max-width: 100%; max-height: 74vh; object-fit: contain; background: #000; }
+        .footer-toggle-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        @media (max-width: 430px) {
+            .camera-capture-overlay { padding: 7px; gap: 5px; }
+            .camera-capture-overlay button { font-size: 11px !important; padding: 8px 2px !important; }
+            .camera-tools-body { padding: 8px; }
+            .footer-toggle-grid { grid-template-columns: 1fr; }
+        }
+
     </style>
     
     <script>
@@ -506,6 +528,9 @@ function showUpdateNotification() {
                         <button class="btn btn-sm btn-danger w-100 fw-bold shadow border border-2 border-danger" style="height:36px; font-size:11px;" onclick="clearAllPending()"><i class="fa-solid fa-dumpster-fire me-1"></i> XÓA TẤT CẢ KHO</button>
                     </div>
                 </div>
+                <button class="btn btn-sm btn-info text-dark w-100 fw-bold mt-2 shadow" style="height:38px; font-size:11px;" onclick="shareAllPendingPhotos()">
+                    <i class="fa-solid fa-share-nodes me-1"></i> CHIA SẺ / TẢI VỀ TOÀN BỘ ẢNH TRONG 3 KHO
+                </button>
             </div>
 
             <div class="row g-2">
@@ -774,7 +799,9 @@ function showUpdateNotification() {
                     <li><b>Thu phóng:</b> nếu thiết bị hỗ trợ zoom phần cứng, thanh <b>THU PHÓNG</b> sẽ hiện bên dưới camera.</li>
                     <li><b>Chụp ảnh:</b> dùng các nút <b>TRƯỚC</b>, <b>Q.TRÌNH</b>, <b>SAU</b>. Ảnh sẽ tự lưu vào kho tương ứng để ghép sau.</li>
                     <li><b>Ẩn/hiện Quá Trình:</b> dùng nút ẩn/hiện ảnh <b>Quá Trình</b> trong tab Máy Ảnh để thu gọn giao diện khi chỉ cần chụp Trước/Sau.</li>
-                    <li><b>Chọn ảnh để xem:</b> ở phía dưới khu vực lưu/ghép ảnh có mục chọn ảnh ngoài để xem nhanh, kiểm tra ảnh hoặc xem vị trí nếu ảnh có dữ liệu GPS.</li>
+                    <li><b>Nút chụp trong khung camera:</b> ba nút <b>TRƯỚC / Q.TRÌNH / SAU</b> nằm ngay dưới khung hình camera để thao tác nhanh khi cầm điện thoại dọc.</li>
+                    <li><b>Ẩn/hiện khu vực cấu hình:</b> các phần Chân trang tự động, Chất lượng, Thông tin ghép, Chọn ảnh xem và Tiện ích mở rộng được gom vào một khung có nút <b>HIỆN/ẨN</b>, giúp dành tối đa màn hình cho camera.</li>
+                    <li><b>Chọn ảnh để xem:</b> trong khung cấu hình có mục chọn ảnh ngoài để xem nhanh, kiểm tra ảnh hoặc xem vị trí nếu ảnh có dữ liệu GPS. Khi xem trên iOS, dùng nút <b>QUAY LẠI/ĐÓNG ẢNH</b> để về trang chính mà không phải tắt app.</li>
                 </ol>
 
                 <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-layer-group me-1"></i> 3. CHÂN TRANG TỰ ĐỘNG: SELFIE - BẢN ĐỒ - LA BÀN</p>
@@ -782,7 +809,8 @@ function showUpdateNotification() {
                     <li><b>Người chụp:</b> bấm biểu tượng camera để chụp selfie hoặc bấm tải lên để chọn ảnh có sẵn.</li>
                     <li><b>Bản đồ:</b> app tự vẽ vị trí GPS hiện tại khi có mạng bản đồ; nếu không có mạng, vẫn giữ tọa độ dạng chữ. Có thể tải ảnh bản đồ thủ công để thay thế.</li>
                     <li><b>La bàn:</b> trên iPhone/Safari cần chạm vào ô La bàn và chọn <b>Cho phép</b> để cấp quyền cảm biến.</li>
-                    <li>Các ảnh phụ trợ này được đưa vào chân ảnh/ảnh ghép, không che mất vùng ảnh chính.</li>
+                    <li>Có thể bật/tắt riêng việc chèn <b>ảnh tự sướng</b>, <b>ảnh bản đồ</b>, <b>ảnh la bàn</b> trong khung cấu hình Máy Ảnh. Khi tắt, ảnh vẫn chụp bình thường nhưng không vẽ ảnh phụ trợ đó vào dải chân ảnh.</li>
+                    <li>Dải chân ảnh hiện trường có đủ loại ảnh <b>TRƯỚC/SAU/QUÁ TRÌNH</b>, thời gian, ngày, thứ, tọa độ, địa chỉ bản đồ nếu lấy được, tên/mã hiện trường, tổ đội/đơn vị/người thực hiện và ghi chú.</li>
                 </ul>
 
                 <p class="text-success fw-bold mb-1"><i class="fa-solid fa-location-dot me-1"></i> 4. TAG VỊ TRÍ VÀ MÃ QR BẢN ĐỒ</p>
@@ -812,6 +840,7 @@ function showUpdateNotification() {
                     <li>Dùng nút <b>ẩn/hiện khu vực Quá Trình</b> để thu gọn cột Q.Trình. Khi ẩn, hai cột Trước/Sau sẽ rộng hơn để dễ kiểm tra.</li>
                     <li>Có thể chọn từng ảnh rồi dùng các nút ghép thủ công: <b>CHỈ GHÉP T/S</b>, <b>CHỈ GHÉP QT</b>, <b>GHÉP FULL</b>, <b>PHIÊN</b>.</li>
                     <li>Nút <b>TỰ ĐỘNG PHIÊN</b> hỗ trợ ghép theo thứ tự ảnh đã lưu trong các kho.</li>
+                    <li>Dùng <b>CHIA SẺ / TẢI VỀ TOÀN BỘ ẢNH TRONG 3 KHO</b> để xuất nhanh toàn bộ ảnh Trước, Quá Trình, Sau. Trước khi xuất, app tự đặt tên từng ảnh theo cú pháp chuẩn gồm loại ảnh, mã hiện trường, tổ đội, ghi chú và thời gian.</li>
                     <li>Dùng <b>XÓA ĐÃ CHỌN</b> hoặc <b>XÓA TẤT CẢ KHO</b> để dọn ảnh nguồn sau khi đã xuất xong.</li>
                 </ul>
 
@@ -887,6 +916,24 @@ function showUpdateNotification() {
   </div>
 </div>
 
+
+<div class="modal fade" id="imageViewerModal" style="display:none;" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content bg-black text-light border-secondary">
+      <div class="modal-header border-secondary p-2">
+        <h6 class="modal-title text-info"><i class="fa-solid fa-image me-2"></i>XEM ẢNH</h6>
+        <button type="button" class="btn btn-sm btn-outline-light" onclick="closeImageViewer()"><i class="fa-solid fa-arrow-left me-1"></i>QUAY LẠI</button>
+      </div>
+      <div class="modal-body p-2 text-center d-flex align-items-center justify-content-center">
+        <img id="image-viewer-img" src="" class="ios-image-modal-img" alt="Ảnh xem lớn">
+      </div>
+      <div class="modal-footer border-secondary p-2 justify-content-center">
+        <button type="button" class="btn btn-secondary btn-sm fw-bold" onclick="closeImageViewer()"><i class="fa-solid fa-xmark me-1"></i>ĐÓNG ẢNH / VỀ TRANG CHÍNH</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="autoStitchModal" style="display:none;" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content bg-dark text-light border-secondary">
@@ -950,6 +997,7 @@ function showUpdateNotification() {
     let windowAutoMatches = [];
     let currentStoragePercent = 0;
     let globalExtras = { selfie: null, map: null, compass: null };
+    let extraInsertPrefs = { selfie: true, map: true, compass: true };
     let isQtCameraVisible = true;
     let isQtPendingVisible = true;
     let cameraViewImages = [];
@@ -1073,6 +1121,8 @@ function showUpdateNotification() {
         document.getElementById('tab2-note').addEventListener('input', (e) => document.getElementById('tab1-note').value = e.target.value);
         document.getElementById('qt-stitch-mode').addEventListener('change', (e) => document.getElementById('qt-stitch-mode-tab2').value = e.target.value);
         initLocationQrPreference();
+        initExtraInsertPreferences();
+        reorganizeCameraCaptureLayout();
         setInterval(drawCompassCanvas, 200);
         window.addEventListener('orientationchange', () => setTimeout(updateCameraFrameRatio, 400));
         window.addEventListener('resize', updateCameraFrameRatio);
@@ -1655,60 +1705,307 @@ function showCameraErrorUI(err) {
         if(key==='compass') document.getElementById('canvas-compass').classList.remove('d-none');
     }
 
+
+
+    // --- BỔ SUNG V56: thông tin chân ảnh, địa chỉ, tùy chọn chèn ảnh phụ, giao diện chụp gọn ---
+    function getExtraInsertPref(key) {
+        const saved = localStorage.getItem('insertExtra_' + key);
+        if (saved === null) return true;
+        return saved === '1';
+    }
+    function setExtraInsertPref(key, enabled) {
+        extraInsertPrefs[key] = !!enabled;
+        try { localStorage.setItem('insertExtra_' + key, enabled ? '1' : '0'); } catch(e) {}
+    }
+    function initExtraInsertPreferences() {
+        ['selfie','map','compass'].forEach(key => {
+            extraInsertPrefs[key] = getExtraInsertPref(key);
+            const el = document.getElementById('toggle-extra-' + key);
+            if (el) el.checked = extraInsertPrefs[key];
+        });
+    }
+    function getVietnamWeekday(date) {
+        try { return new Intl.DateTimeFormat('vi-VN', { weekday: 'long' }).format(date); } catch(e) { return ''; }
+    }
+    function sanitizeFilePart(text) {
+        return String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g,'d').replace(/Đ/g,'D').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 80);
+    }
+    function formatDateForFile(ts) {
+        const d = new Date(ts || Date.now());
+        return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`;
+    }
+    function buildStandardPhotoName(item, fallbackType) {
+        const type = sanitizeFilePart(fallbackType || item.type || 'ANH');
+        const prefix = sanitizeFilePart(document.getElementById('tab1-prefix')?.value || document.getElementById('tab2-prefix')?.value || 'HIEN_TRUONG');
+        const team = sanitizeFilePart(document.getElementById('tab1-team')?.value || document.getElementById('tab2-team')?.value || 'TO_DOI');
+        const note = sanitizeFilePart(document.getElementById('tab1-note')?.value || document.getElementById('tab2-note')?.value || '');
+        return [type, prefix, team, note, formatDateForFile(item.timestampMs)].filter(Boolean).join('_') + '.jpg';
+    }
+    function getCachedAddress(lat, lng) {
+        try { return localStorage.getItem(`addr_${Number(lat).toFixed(5)}_${Number(lng).toFixed(5)}`) || ''; } catch(e) { return ''; }
+    }
+    function setCachedAddress(lat, lng, address) {
+        try { localStorage.setItem(`addr_${Number(lat).toFixed(5)}_${Number(lng).toFixed(5)}`, address || ''); } catch(e) {}
+    }
+    async function getAddressForGps(gpsMeta) {
+        if (!hasValidGpsData(gpsMeta)) return 'Chưa có dữ liệu địa chỉ';
+        const cached = getCachedAddress(gpsMeta.lat, gpsMeta.lng);
+        if (cached) return cached;
+        if (!navigator.onLine) return 'Chưa xác định địa chỉ (thiết bị đang offline)';
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(gpsMeta.lat)}&lon=${encodeURIComponent(gpsMeta.lng)}&zoom=18&addressdetails=1`;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4500);
+            const res = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
+            clearTimeout(timeoutId);
+            const data = await res.json();
+            const address = data.display_name || 'Không tìm được địa chỉ từ bản đồ';
+            setCachedAddress(gpsMeta.lat, gpsMeta.lng, address);
+            return address;
+        } catch(e) {
+            return 'Chưa xác định địa chỉ từ bản đồ';
+        }
+    }
+    function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+        const words = String(text || '').split(/\s+/).filter(Boolean);
+        let line = '', lines = [];
+        for (const word of words) {
+            const test = line ? line + ' ' + word : word;
+            if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; }
+            else line = test;
+            if (lines.length >= maxLines) break;
+        }
+        if (line && lines.length < maxLines) lines.push(line);
+        lines.forEach((ln, idx) => ctx.fillText(ln, x, y + idx * lineHeight, maxWidth));
+        return lines.length * lineHeight;
+    }
+    function getCaptureContext(type, now, gpsMeta, address) {
+        const prefix = document.getElementById('tab1-prefix')?.value.trim() || document.getElementById('tab2-prefix')?.value.trim() || '';
+        const team = document.getElementById('tab1-team')?.value.trim() || document.getElementById('tab2-team')?.value.trim() || '';
+        const note = document.getElementById('tab1-note')?.value.trim() || document.getElementById('tab2-note')?.value.trim() || '';
+        return {
+            type: type || 'ẢNH',
+            dateLine: `${getVietnamWeekday(now)}, ngày ${now.toLocaleDateString('vi-VN')} - ${now.toLocaleTimeString('vi-VN')}`,
+            gpsLine: hasValidGpsData(gpsMeta) ? (gpsMeta.gpsText || `${Number(gpsMeta.lat).toFixed(6)}, ${Number(gpsMeta.lng).toFixed(6)}`) : 'Chưa có tọa độ',
+            address: address || 'Chưa xác định địa chỉ',
+            prefix: prefix || 'Chưa nhập tên/mã hiện trường',
+            team: team || 'Chưa nhập tổ đội/đơn vị/người thực hiện',
+            note: note || 'Không có ghi chú'
+        };
+    }
+    async function appendInfoStripToCanvas(canvas, type, sourceItems, noteOverride) {
+        const gpsMeta = getGpsMetaFromPhotos(sourceItems || []);
+        const now = new Date();
+        const address = await getAddressForGps(gpsMeta);
+        const old = document.createElement('canvas'); old.width = canvas.width; old.height = canvas.height; old.getContext('2d').drawImage(canvas, 0, 0);
+        const W = old.width, base = Math.max(1, W/1600), pad = Math.round(20*base), lineH = Math.round(28*base);
+        const stripH = Math.round(230*base);
+        canvas.width = W; canvas.height = old.height + stripH;
+        const ctx = canvas.getContext('2d'); ctx.drawImage(old, 0, 0);
+        const y0 = old.height; ctx.fillStyle = '#080808'; ctx.fillRect(0, y0, W, stripH); ctx.strokeStyle = '#0dcaf0'; ctx.lineWidth = Math.max(2, Math.round(3*base)); ctx.strokeRect(0, y0, W, stripH);
+        const info = getCaptureContext(type, now, gpsMeta, address); if (noteOverride) info.note = noteOverride;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.fillStyle = '#0dcaf0'; ctx.font = `bold ${Math.round(28*base)}px Arial`; ctx.fillText(`${info.type}`, pad, y0 + pad, W-pad*2);
+        ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(22*base)}px Arial`;
+        let y = y0 + pad + Math.round(38*base);
+        [`Thời gian: ${info.dateLine}`, `Tọa độ: ${info.gpsLine}`, `Địa chỉ: ${info.address}`, `Hiện trường: ${info.prefix}`, `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, `Ghi chú: ${info.note}`].forEach((ln, idx) => {
+            ctx.fillStyle = idx === 5 ? '#ffc107' : '#fff';
+            y += drawWrappedText(ctx, ln, pad, y, W-pad*2, lineH, idx === 2 ? 2 : 1);
+        });
+    }
+    function reorganizeCameraCaptureLayout() {
+        const capture = document.getElementById('capture-content');
+        const cameraWrapper = document.getElementById('camera-wrapper');
+        const cameraContainer = document.getElementById('camera-container');
+        if (!capture || !cameraWrapper || !cameraContainer || document.getElementById('camera-capture-overlay')) return;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'camera-capture-overlay';
+        overlay.className = 'camera-capture-overlay';
+        overlay.innerHTML = `
+            <button class="btn btn-primary fw-bold" style="font-size:13px;" onclick="capturePhoto('TRƯỚC')"><i class="fa-solid fa-circle-dot d-block mb-1"></i>TRƯỚC</button>
+            <button class="btn btn-warning text-dark fw-bold" style="font-size:13px;" onclick="capturePhoto('QUÁ TRÌNH')"><i class="fa-solid fa-circle-dot d-block mb-1"></i>Q.TRÌNH</button>
+            <button class="btn btn-success fw-bold" style="font-size:13px;" onclick="capturePhoto('SAU')"><i class="fa-solid fa-circle-dot d-block mb-1"></i>SAU</button>`;
+        cameraContainer.appendChild(overlay);
+        const originalBtnRow = cameraWrapper.nextElementSibling;
+        if (originalBtnRow && originalBtnRow.classList.contains('row')) originalBtnRow.classList.add('d-none');
+
+        const shell = document.createElement('div');
+        shell.id = 'camera-tools-shell';
+        shell.className = 'camera-tools-shell mb-3';
+        shell.innerHTML = `
+            <div class="camera-tools-header">
+                <div class="small text-info fw-bold"><i class="fa-solid fa-sliders me-1"></i> KHU VỰC CẤU HÌNH / GHÉP / TIỆN ÍCH</div>
+                <button id="btn-toggle-camera-tools" class="btn btn-sm btn-outline-info fw-bold" type="button" onclick="toggleCameraToolsPanel()"><i class="fa-solid fa-eye me-1"></i>HIỆN/ẨN</button>
+            </div>
+            <div id="camera-tools-body" class="camera-tools-body show"></div>`;
+        cameraWrapper.insertAdjacentElement('afterend', shell);
+        const body = document.getElementById('camera-tools-body');
+
+        const allCards = Array.from(capture.children);
+        const footerCard = allCards.find(el => el.classList?.contains('card') && el.textContent.includes('CHÂN TRANG TỰ ĐỘNG'));
+        const qualityCard = allCards.find(el => el.classList?.contains('card') && el.textContent.includes('CHẤT LƯỢNG ẢNH'));
+        const infoCard = Array.from(capture.querySelectorAll('.card')).find(el => el.querySelector('#tab1-prefix'));
+        const viewerCard = Array.from(capture.querySelectorAll('.card')).find(el => el.querySelector('#camera-viewer-grid'));
+        const extSwitch = document.getElementById('toggle-extended-utilities')?.closest('.form-check');
+        const extWrap = document.getElementById('extended-utilities-wrapper');
+        [footerCard, qualityCard, infoCard, viewerCard, extSwitch, extWrap].filter(Boolean).forEach(el => body.appendChild(el));
+
+        const footerLabel = footerCard?.querySelector('label.form-label');
+        if (footerLabel && !document.getElementById('footer-extra-toggle-box')) {
+            const box = document.createElement('div');
+            box.id = 'footer-extra-toggle-box';
+            box.className = 'footer-toggle-grid mb-2';
+            box.innerHTML = ['selfie|Ảnh tự sướng|warning','map|Ảnh bản đồ|success','compass|Ảnh la bàn|danger'].map(v => { const [key, txt, color] = v.split('|'); return `
+                <div class="form-check form-switch border border-secondary rounded p-1 bg-black bg-opacity-25">
+                    <input class="form-check-input ms-1" type="checkbox" id="toggle-extra-${key}" checked onchange="setExtraInsertPref('${key}', this.checked)">
+                    <label class="form-check-label small text-${color} fw-bold" for="toggle-extra-${key}" style="font-size:10px; padding-top:2px;">Chèn ${txt}</label>
+                </div>`; }).join('');
+            footerLabel.insertAdjacentElement('afterend', box);
+            initExtraInsertPreferences();
+        }
+    }
+    function toggleCameraToolsPanel() {
+        const body = document.getElementById('camera-tools-body');
+        if (!body) return;
+        body.classList.toggle('d-none');
+        try { localStorage.setItem('cameraToolsHidden', body.classList.contains('d-none') ? '1' : '0'); } catch(e) {}
+    }
+
     async function capturePhoto(type) {
         if (currentStoragePercent > 95) return alert(`Bộ nhớ thiết bị đầy!`);
-        const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
-        const canvas = document.createElement("canvas"); const ctx = canvas.getContext("2d");
+        const video = document.getElementById("video-preview");
+        if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
+
+        const now = new Date();
+        const gpsMeta = getCurrentGpsMeta();
+        const address = await getAddressForGps(gpsMeta);
+        const info = getCaptureContext(type, now, gpsMeta, address);
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
         const out = getCaptureOutputDimensions(video.videoWidth, video.videoHeight);
-        const scale = out.width / 1000;
-        const imgBoxSize = Math.min(280 * scale, out.width * 0.18); const footerH = imgBoxSize + 40 * scale; 
-        canvas.width = out.width; canvas.height = out.height + footerH; 
-        ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, out.height); ctx.restore();
-        const fY = out.height; ctx.fillStyle = "#111111"; ctx.fillRect(0, fY, canvas.width, footerH);
-        const now = new Date(); const timeStr = `${now.toLocaleTimeString("vi-VN")} - ${now.toLocaleDateString("vi-VN")}`;
-        const teamText = document.getElementById("tab1-team").value.trim(); const pad = 20 * scale;
-        let maxTextW = canvas.width - (3 * imgBoxSize) - (5 * pad);
-        let textX, selfieX, mapX, compassX;
-        if (type === "SAU") { compassX = pad; mapX = compassX + imgBoxSize + pad; selfieX = mapX + imgBoxSize + pad; textX = canvas.width - pad; } 
-        else { textX = pad; selfieX = textX + maxTextW + pad; mapX = selfieX + imgBoxSize + pad; compassX = mapX + imgBoxSize + pad; }
+        const scale = Math.max(0.75, out.width / 1000);
+        const enabledExtras = ['selfie','map','compass'].filter(key => getExtraInsertPref(key));
+        const imgBoxSize = enabledExtras.length ? Math.min(240 * scale, out.width * 0.16) : 0;
+        const pad = 20 * scale;
+        const lineH = Math.max(25 * scale, 22);
+        const footerH = Math.max((enabledExtras.length ? imgBoxSize + 48 * scale : 0), lineH * 8 + 34 * scale);
+
+        canvas.width = out.width;
+        canvas.height = out.height + footerH;
+        ctx.save();
+        if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(video, 0, 0, canvas.width, out.height);
+        ctx.restore();
+
+        const fY = out.height;
+        ctx.fillStyle = "#090909";
+        ctx.fillRect(0, fY, canvas.width, footerH);
+        ctx.strokeStyle = type === "TRƯỚC" ? "#0d6efd" : (type === "QUÁ TRÌNH" ? "#ffc107" : "#20c997");
+        ctx.lineWidth = Math.max(2, 3 * scale);
+        ctx.strokeRect(0, fY, canvas.width, footerH);
 
         const drawExtraSync = (sourceDataUrl, canvasSourceId, labelText, xPos) => {
             return new Promise((resolve) => {
+                if (!imgBoxSize) return resolve();
                 let sourceToDraw = sourceDataUrl;
                 if (!sourceToDraw && canvasSourceId) {
                     let c = document.getElementById(canvasSourceId);
-                    if (c && !c.classList.contains('d-none') && isCompassPermissionGranted) { try { sourceToDraw = c.toDataURL("image/jpeg", getJpegQuality()); } catch(e) {} }
+                    if (c && !c.classList.contains('d-none')) {
+                        try { sourceToDraw = c.toDataURL("image/jpeg", getJpegQuality()); } catch(e) {}
+                    }
                 }
                 if (!sourceToDraw) { resolve(); return; }
                 let img = new Image();
                 img.onload = () => {
-                    ctx.fillStyle = "#000"; ctx.fillRect(xPos, fY + 20 * scale, imgBoxSize, imgBoxSize); ctx.drawImage(img, xPos, fY + 20 * scale, imgBoxSize, imgBoxSize);
-                    let labelH = imgBoxSize * 0.18; ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(xPos, fY + 20 * scale + imgBoxSize - labelH, imgBoxSize, labelH);
-                    ctx.fillStyle = "#0dcaf0"; ctx.font = `bold ${labelH * 0.6}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-                    ctx.fillText(labelText, xPos + imgBoxSize/2, fY + 20 * scale + imgBoxSize - labelH/2); resolve();
-                }; img.onerror = resolve; img.src = sourceToDraw;
+                    const yPos = fY + 22 * scale;
+                    ctx.fillStyle = "#000";
+                    ctx.fillRect(xPos, yPos, imgBoxSize, imgBoxSize);
+                    drawImageContain(ctx, img, xPos, yPos, imgBoxSize, imgBoxSize);
+                    let labelH = Math.max(20 * scale, imgBoxSize * 0.17);
+                    ctx.fillStyle = "rgba(0,0,0,0.75)";
+                    ctx.fillRect(xPos, yPos + imgBoxSize - labelH, imgBoxSize, labelH);
+                    ctx.fillStyle = "#0dcaf0";
+                    ctx.font = `bold ${Math.max(10, labelH * 0.55)}px Arial`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(labelText, xPos + imgBoxSize/2, yPos + imgBoxSize - labelH/2, imgBoxSize - 4);
+                    resolve();
+                };
+                img.onerror = resolve;
+                img.src = sourceToDraw;
             });
         };
-        await Promise.all([ drawExtraSync(globalExtras.compass, 'canvas-compass', "LA BÀN", compassX), drawExtraSync(globalExtras.map, 'canvas-map', "BẢN ĐỒ", mapX), drawExtraSync(globalExtras.selfie, null, "NGƯỜI CHỤP", selfieX) ]);
 
-        let startY = fY + 40 * scale; let lineGap = (footerH - 60 * scale) / 3;
-        ctx.textAlign = type === "SAU" ? "right" : "left"; ctx.textBaseline = "middle";
-        ctx.fillStyle = type === "TRƯỚC" ? "#0d6efd" : (type === "QUÁ TRÌNH" ? "#ffc107" : "#20c997");
-        ctx.font = `bold ${lineGap * 0.7}px Arial`; ctx.fillText(`${type}`, textX, startY, maxTextW);
-        ctx.fillStyle = "#ffffff"; ctx.font = `bold ${lineGap * 0.55}px Arial`;
-        ctx.fillText(`THỜI GIAN: ${timeStr}`, textX, startY + lineGap, maxTextW); ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, textX, startY + lineGap * 2, maxTextW);
-        if (teamText) { ctx.fillStyle = "#ffc107"; ctx.fillText(`TỔ ĐỘI: ${teamText}`, textX, startY + lineGap * 3, maxTextW); }
+        const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + (enabledExtras.length - 1) * pad + pad) : 0;
+        const textX = pad;
+        const maxTextW = canvas.width - extrasTotalW - pad * 2;
+        let extraX = canvas.width - pad - (enabledExtras.length * imgBoxSize + Math.max(0, enabledExtras.length - 1) * pad);
+        const drawTasks = [];
+        enabledExtras.forEach(key => {
+            if (key === 'selfie') drawTasks.push(drawExtraSync(globalExtras.selfie, null, "NGƯỜI CHỤP", extraX));
+            if (key === 'map') drawTasks.push(drawExtraSync(globalExtras.map, 'canvas-map', "BẢN ĐỒ", extraX));
+            if (key === 'compass') drawTasks.push(drawExtraSync(globalExtras.compass, 'canvas-compass', "LA BÀN", extraX));
+            extraX += imgBoxSize + pad;
+        });
+        await Promise.all(drawTasks);
 
-        const photoObj = applyGpsMeta({ id: "img_" + Date.now(), type: type, dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()), timestampMs: now.getTime() }, getCurrentGpsMeta());
-        if (type === "TRƯỚC") { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">${mapButtonHtml(photoObj)}`; } 
-        else if (type === "SAU") { 
-            repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">${mapButtonHtml(photoObj)}`; 
+        let y = fY + 18 * scale;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = type === "TRƯỚC" ? "#5aa0ff" : (type === "QUÁ TRÌNH" ? "#ffc107" : "#20c997");
+        ctx.font = `bold ${Math.max(22, 30 * scale)}px Arial`;
+        ctx.fillText(`${info.type}`, textX, y, maxTextW);
+        y += lineH * 1.25;
+        ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        const lines = [
+            `Thời gian: ${info.dateLine}`,
+            `Tọa độ: ${info.gpsLine}`,
+            `Địa chỉ: ${info.address}`,
+            `Tên/Mã hiện trường: ${info.prefix}`,
+            `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`,
+            `Ghi chú: ${info.note}`
+        ];
+        lines.forEach((ln, idx) => {
+            ctx.fillStyle = idx === 5 ? "#ffc107" : "#ffffff";
+            y += drawWrappedText(ctx, ln, textX, y, maxTextW, lineH, idx === 2 ? 2 : 1);
+        });
+
+        const photoObj = applyGpsMeta({
+            id: "img_" + Date.now(),
+            type: type,
+            dataUrl: canvas.toDataURL("image/jpeg", getJpegQuality()),
+            timestampMs: now.getTime(),
+            timestampStr: now.toLocaleString("vi-VN"),
+            addressText: info.address,
+            fieldName: info.prefix,
+            teamText: info.team,
+            noteText: info.note
+        }, gpsMeta);
+        photoObj.name = buildStandardPhotoName(photoObj, type);
+
+        if (type === "TRƯỚC") {
+            repoBefore.unshift(photoObj);
+            captureBuffer.TRƯỚC = photoObj;
+            document.getElementById("preview-before").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">${mapButtonHtml(photoObj)}`;
+        } else if (type === "SAU") {
+            repoAfter.unshift(photoObj);
+            captureBuffer.SAU = photoObj;
+            document.getElementById("preview-after").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')">${mapButtonHtml(photoObj)}`;
             captureBuffer.QUÁ_TRÌNH = [];
             document.getElementById("preview-process").innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
-        } 
-        else if (type === "QUÁ TRÌNH") { repoProcess.unshift(photoObj); captureBuffer.QUÁ_TRÌNH.push(photoObj); document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>${mapButtonHtml(photoObj)}`; }
+        } else if (type === "QUÁ TRÌNH") {
+            repoProcess.unshift(photoObj);
+            captureBuffer.QUÁ_TRÌNH.push(photoObj);
+            document.getElementById("preview-process").innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImage('${photoObj.dataUrl}')"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>${mapButtonHtml(photoObj)}`;
+        }
         saveToDB(photoObj);
-        if (captureBuffer.TRƯỚC && captureBuffer.SAU) { document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled"); document.getElementById("btn-stitch-ts-only").removeAttribute("disabled"); document.getElementById("btn-stitch-full").removeAttribute("disabled"); }
+        if (captureBuffer.TRƯỚC && captureBuffer.SAU) {
+            document.getElementById("btn-stitch-fast-ts").removeAttribute("disabled");
+            document.getElementById("btn-stitch-ts-only").removeAttribute("disabled");
+            document.getElementById("btn-stitch-full").removeAttribute("disabled");
+        }
         updateUIState();
     }
 
@@ -1737,6 +2034,7 @@ function showCameraErrorUI(err) {
                     ctx.roundRect ? ctx.roundRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight, 15*imgScale) : ctx.strokeRect(noteX - noteWidth/2 - 40*imgScale, noteY - noteHeight/2, noteWidth + 80*imgScale, noteHeight); ctx.stroke();
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillText(noteText, noteX, noteY);
                 }
+                await appendInfoStripToCanvas(stitchCanvas, itemTypeMarker === "QT" ? "QUÁ TRÌNH" : (itemTypeMarker === "FULL" ? "TRƯỚC / QUÁ TRÌNH / SAU" : "ẢNH GHÉP"), imgObjs, rawNote);
                 const stitchGpsMeta = getGpsMetaFromPhotos(imgObjs);
                 const stitchLocationPoints = await appendLocationQrStripToCanvas(stitchCanvas, imgObjs);
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
@@ -1791,6 +2089,7 @@ function showCameraErrorUI(err) {
                     ctx.fillStyle = "#0dcaf0"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
                     if (lineCount === 2) { ctx.fillText(noteText, noteX, noteY - (noteSize / 2) - 2 * imgScale); ctx.fillText(qtText, noteX, noteY + (noteSize / 2) + 8 * imgScale); } else if (noteText) ctx.fillText(noteText, noteX, noteY); else if (showQTLine) ctx.fillText(qtText, noteX, noteY);
                 }
+                await appendInfoStripToCanvas(stitchCanvas, isQT ? "QUÁ TRÌNH" : "TRƯỚC / SAU", [bObj, aObj], rawNote);
                 const stitchGpsMeta = getGpsMetaFromPhotos([bObj, aObj]);
                 const stitchLocationPoints = await appendLocationQrStripToCanvas(stitchCanvas, [bObj, aObj]);
                 let nameParts = []; if (document.getElementById("tab1-prefix").value.trim()) nameParts.push(document.getElementById("tab1-prefix").value.trim()); if (document.getElementById("tab1-team").value.trim()) nameParts.push(document.getElementById("tab1-team").value.trim()); if (rawNote) nameParts.push(rawNote);
@@ -2022,6 +2321,32 @@ function showCameraErrorUI(err) {
             repoStitched = repoStitched.filter(item => !ids.includes(item.id)); renderGallery(); updateUIState();
         }
     }
+    function dataUrlToFile(dataUrl, filename) {
+        let arr = dataUrl.split(','), mime = (arr[0].match(/:(.*?);/) || [,'image/jpeg'])[1], bstr = atob(arr[1]), n = bstr.length, u8 = new Uint8Array(n);
+        while(n--) u8[n] = bstr.charCodeAt(n);
+        return new File([new Blob([u8], {type:mime})], filename, { type: mime || "image/jpeg" });
+    }
+    async function shareAllPendingPhotos() {
+        const itemsToShare = [...repoBefore, ...repoProcess, ...repoAfter]
+            .sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+        if (!itemsToShare.length) return alert("Không có ảnh nào trong 3 kho Chờ Ghép để chia sẻ/tải về.");
+        itemsToShare.forEach(item => {
+            if (!item.name || !/\.jpe?g$/i.test(item.name)) item.name = buildStandardPhotoName(item, item.type);
+            saveToDB(item);
+        });
+        if (navigator.share && navigator.canShare) {
+            try {
+                const filesArray = itemsToShare.map(item => dataUrlToFile(item.dataUrl, item.name));
+                if (navigator.canShare({ files: filesArray })) {
+                    await navigator.share({ files: filesArray, title: 'Ảnh chờ ghép PC Tuyên Quang' });
+                    return;
+                }
+            } catch (err) {
+                if (err.name === "AbortError") return;
+            }
+        }
+        triggerBatchDownloads(itemsToShare);
+    }
     async function shareSelectedPhotos() {
         const checkedBoxes = document.querySelectorAll(".gallery-item-check:checked"); if (checkedBoxes.length === 0) return alert("Vui lòng chọn ảnh!");
         const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute("data-id")); const itemsToShare = repoStitched.filter(item => selectedIds.includes(item.id));
@@ -2036,7 +2361,17 @@ function showCameraErrorUI(err) {
         } else { triggerBatchDownloads(itemsToShare); }
     }
     function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
-    function viewFullImage(url) { const w = window.open(); w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`); }
+    function viewFullImage(url) {
+        const img = document.getElementById("image-viewer-img");
+        if (img) { img.src = url; openModal('imageViewerModal'); return; }
+        const w = window.open();
+        if (w) w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`);
+    }
+    function closeImageViewer() {
+        const img = document.getElementById("image-viewer-img");
+        if (img) img.src = "";
+        closeModal('imageViewerModal');
+    }
     
     function renderPending() {
         const GAP_MS = 15 * 60 * 1000;
