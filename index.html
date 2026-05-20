@@ -837,7 +837,7 @@ function showUpdateNotification() {
                     <li><b>Bản đồ:</b> app tự vẽ vị trí GPS hiện tại khi có mạng bản đồ; nếu không có mạng, vẫn giữ tọa độ dạng chữ. Có thể tải ảnh bản đồ thủ công để thay thế.</li>
                     <li><b>La bàn:</b> trên iPhone/Safari cần chạm vào ô La bàn và chọn <b>Cho phép</b> để cấp quyền cảm biến.</li>
                     <li>Có thể bật/tắt riêng việc chèn <b>ảnh tự sướng</b>, <b>ảnh bản đồ</b>, <b>ảnh la bàn</b> trong khung cấu hình Máy Ảnh. Khi tắt, ảnh vẫn chụp bình thường nhưng không vẽ ảnh phụ trợ đó vào dải chân ảnh.</li>
-                    <li>Dải chân ảnh hiện trường có đủ loại ảnh <b>TRƯỚC/SAU/QUÁ TRÌNH</b>, thời gian, ngày, thứ, tọa độ, địa chỉ bản đồ nếu lấy được, tên/mã hiện trường, tổ đội/đơn vị/người thực hiện và ghi chú.</li>
+                    <li>Dải chân ảnh hiện trường có đủ loại ảnh <b>TRƯỚC/SAU/QUÁ TRÌNH</b>, thời gian có đủ giờ/phút/giây, ngày, thứ, tọa độ, địa chỉ bản đồ nếu lấy được, tên/mã hiện trường, tổ đội/đơn vị/người thực hiện và ghi chú. Các dòng dài sẽ tự xuống dòng và dải chân ảnh tự tăng chiều cao để không che ảnh tự sướng, bản đồ, la bàn.</li>
                 </ul>
 
                 <p class="text-success fw-bold mb-1"><i class="fa-solid fa-location-dot me-1"></i> 4. TAG VỊ TRÍ VÀ MÃ QR BẢN ĐỒ</p>
@@ -1793,16 +1793,29 @@ function showCameraErrorUI(err) {
             return 'Chưa xác định địa chỉ từ bản đồ';
         }
     }
-    function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+    function getWrappedTextLines(ctx, text, maxWidth, maxLines) {
         const words = String(text || '').split(/\s+/).filter(Boolean);
+        const limit = Number.isFinite(maxLines) && maxLines > 0 ? maxLines : 999;
         let line = '', lines = [];
         for (const word of words) {
             const test = line ? line + ' ' + word : word;
-            if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; }
-            else line = test;
-            if (lines.length >= maxLines) break;
+            if (ctx.measureText(test).width > maxWidth && line) {
+                lines.push(line);
+                line = word;
+                if (lines.length >= limit) break;
+            } else {
+                line = test;
+            }
         }
-        if (line && lines.length < maxLines) lines.push(line);
+        if (line && lines.length < limit) lines.push(line);
+        if (!lines.length) lines.push('');
+        return lines;
+    }
+    function measureWrappedTextHeight(ctx, text, maxWidth, lineHeight, maxLines) {
+        return getWrappedTextLines(ctx, text, maxWidth, maxLines).length * lineHeight;
+    }
+    function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+        const lines = getWrappedTextLines(ctx, text, maxWidth, maxLines);
         lines.forEach((ln, idx) => ctx.fillText(ln, x, y + idx * lineHeight, maxWidth));
         return lines.length * lineHeight;
     }
@@ -1826,18 +1839,30 @@ function showCameraErrorUI(err) {
         const address = await getAddressForGps(gpsMeta);
         const old = document.createElement('canvas'); old.width = canvas.width; old.height = canvas.height; old.getContext('2d').drawImage(canvas, 0, 0);
         const W = old.width, base = Math.max(1, W/1600), pad = Math.round(20*base), lineH = Math.round(28*base);
-        const stripH = Math.round(230*base);
+        const info = getCaptureContext(type, now, gpsMeta, address); if (noteOverride) info.note = noteOverride;
+        const infoLines = [
+            { text: `Thời gian: ${info.dateLine}`, max: 2, color: '#fff' },
+            { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: '#fff' },
+            { text: `Địa chỉ: ${info.address}`, max: 3, color: '#fff' },
+            { text: `Hiện trường: ${info.prefix}`, max: 2, color: '#fff' },
+            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 2, color: '#fff' },
+            { text: `Ghi chú: ${info.note}`, max: 3, color: '#ffc107' }
+        ];
+        const measureCtx = document.createElement('canvas').getContext('2d');
+        measureCtx.font = `bold ${Math.round(22*base)}px Arial`;
+        const textW = W - pad * 2;
+        const textBlockH = infoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, textW, lineH, row.max), 0);
+        const stripH = Math.max(Math.round(230*base), pad + Math.round(38*base) + textBlockH + pad);
         canvas.width = W; canvas.height = old.height + stripH;
         const ctx = canvas.getContext('2d'); ctx.drawImage(old, 0, 0);
         const y0 = old.height; ctx.fillStyle = '#080808'; ctx.fillRect(0, y0, W, stripH); ctx.strokeStyle = '#0dcaf0'; ctx.lineWidth = Math.max(2, Math.round(3*base)); ctx.strokeRect(0, y0, W, stripH);
-        const info = getCaptureContext(type, now, gpsMeta, address); if (noteOverride) info.note = noteOverride;
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
         ctx.fillStyle = '#0dcaf0'; ctx.font = `bold ${Math.round(28*base)}px Arial`; ctx.fillText(`${info.type}`, pad, y0 + pad, W-pad*2);
-        ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(22*base)}px Arial`;
+        ctx.font = `bold ${Math.round(22*base)}px Arial`;
         let y = y0 + pad + Math.round(38*base);
-        [`Thời gian: ${info.dateLine}`, `Tọa độ: ${info.gpsLine}`, `Địa chỉ: ${info.address}`, `Hiện trường: ${info.prefix}`, `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, `Ghi chú: ${info.note}`].forEach((ln, idx) => {
-            ctx.fillStyle = idx === 5 ? '#ffc107' : '#fff';
-            y += drawWrappedText(ctx, ln, pad, y, W-pad*2, lineH, idx === 2 ? 2 : 1);
+        infoLines.forEach(row => {
+            ctx.fillStyle = row.color;
+            y += drawWrappedText(ctx, row.text, pad, y, textW, lineH, row.max);
         });
     }
     function reorganizeCameraCaptureLayout() {
@@ -1918,7 +1943,25 @@ function showCameraErrorUI(err) {
         const imgBoxSize = enabledExtras.length ? Math.min(240 * scale, out.width * 0.16) : 0;
         const pad = 20 * scale;
         const lineH = Math.max(25 * scale, 22);
-        const footerH = Math.max((enabledExtras.length ? imgBoxSize + 48 * scale : 0), lineH * 8 + 34 * scale);
+        const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + (enabledExtras.length - 1) * pad + pad) : 0;
+        const textX = pad;
+        const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 2);
+        const footerInfoLines = [
+            { text: `Thời gian: ${info.dateLine}`, max: 2, color: "#ffffff" },
+            { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: "#ffffff" },
+            { text: `Địa chỉ: ${info.address}`, max: 3, color: "#ffffff" },
+            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 2, color: "#ffffff" },
+            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 2, color: "#ffffff" },
+            { text: `Ghi chú: ${info.note}`, max: 3, color: "#ffc107" }
+        ];
+        const measureCtx = document.createElement('canvas').getContext('2d');
+        measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        const textBlockH = footerInfoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max), 0);
+        const titleH = lineH * 1.25;
+        const footerH = Math.ceil(Math.max(
+            (enabledExtras.length ? imgBoxSize + 48 * scale : 0),
+            18 * scale + titleH + textBlockH + 22 * scale
+        ));
 
         canvas.width = out.width;
         canvas.height = out.height + footerH;
@@ -1966,9 +2009,6 @@ function showCameraErrorUI(err) {
             });
         };
 
-        const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + (enabledExtras.length - 1) * pad + pad) : 0;
-        const textX = pad;
-        const maxTextW = canvas.width - extrasTotalW - pad * 2;
         let extraX = canvas.width - pad - (enabledExtras.length * imgBoxSize + Math.max(0, enabledExtras.length - 1) * pad);
         const drawTasks = [];
         enabledExtras.forEach(key => {
@@ -1987,17 +2027,9 @@ function showCameraErrorUI(err) {
         ctx.fillText(`${info.type}`, textX, y, maxTextW);
         y += lineH * 1.25;
         ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
-        const lines = [
-            `Thời gian: ${info.dateLine}`,
-            `Tọa độ: ${info.gpsLine}`,
-            `Địa chỉ: ${info.address}`,
-            `Tên/Mã hiện trường: ${info.prefix}`,
-            `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`,
-            `Ghi chú: ${info.note}`
-        ];
-        lines.forEach((ln, idx) => {
-            ctx.fillStyle = idx === 5 ? "#ffc107" : "#ffffff";
-            y += drawWrappedText(ctx, ln, textX, y, maxTextW, lineH, idx === 2 ? 2 : 1);
+        footerInfoLines.forEach(row => {
+            ctx.fillStyle = row.color;
+            y += drawWrappedText(ctx, row.text, textX, y, maxTextW, lineH, row.max);
         });
 
         const photoObj = applyGpsMeta({
