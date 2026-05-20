@@ -270,9 +270,9 @@ function showUpdateNotification() {
                     <div class="col-12 col-sm-7">
                         <label class="form-label text-info fw-bold small mb-1" for="photo-quality-select"><i class="fa-solid fa-sliders me-1"></i> CHẤT LƯỢNG ẢNH / ẢNH GHÉP / VIDEO:</label>
                         <select id="photo-quality-select" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="applyCameraQualitySetting(true)">
-                            <option value="balanced" selected>Chuẩn hiện trường - rõ nét / dung lượng vừa</option>
+                            <option value="balanced">Chuẩn hiện trường - rõ nét / dung lượng vừa</option>
                             <option value="high">Nét cao - ưu tiên chi tiết</option>
-                            <option value="original">Gốc camera - tối đa theo máy</option>
+                            <option value="original" selected>Gốc camera - tối đa theo máy</option>
                             <option value="saving">Tiết kiệm - nhẹ máy, gửi nhanh</option>
                         </select>
                     </div>
@@ -374,12 +374,12 @@ function showUpdateNotification() {
             <div class="card bg-dark border-secondary p-2 mb-3 shadow-sm">
                 <div class="d-flex gap-2 align-items-center justify-content-between flex-wrap">
                     <label class="btn btn-sm btn-outline-info fw-bold mb-0 cursor-pointer">
-                        <i class="fa-solid fa-image me-1"></i> CHỌN ẢNH ĐỂ XEM
+                        <i class="fa-solid fa-image me-1"></i> CHỌN ẢNH XEM
                         <input type="file" class="d-none" accept="image/*" multiple onchange="handleCameraViewFiles(event)">
                     </label>
-                    <button class="btn btn-sm btn-outline-secondary fw-bold" onclick="clearCameraViewImages()"><i class="fa-solid fa-broom me-1"></i> XÓA ẢNH XEM</button>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" onclick="clearCameraViewImages()"><i class="fa-solid fa-broom me-1"></i> XÓA ẢNH</button>
                     <button id="btn-toggle-qt-camera" class="btn btn-sm btn-outline-warning fw-bold ms-auto" onclick="toggleQtArea('camera')">
-                        <i class="fa-solid fa-eye-slash me-1"></i> ẨN ẢNH QUÁ TRÌNH
+                        <i class="fa-solid fa-eye-slash me-1"></i> ẨN ẢNH Q.Trình
                     </button>
                 </div>
                 <div id="camera-viewer-grid" class="row g-2 mt-2 d-none"></div>
