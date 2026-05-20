@@ -1,7 +1,7 @@
 // 🛠️ MẸO QUẢN LÝ CỦA ANH: Không cần sửa tên Cache cứng.
 // Mỗi lần anh sửa code HTML xong đưa lên Host, anh chỉ cần vào đây gõ thêm hoặc sửa vài chữ 
 // ở dòng bình luận ngày tháng này (Ví dụ đổi ngày: 19/05/2026). File sw.js thay đổi 1 byte là app bắt được.
-// Nhật ký cập nhật: Bản vá lỗi đồng bộ và nút check thủ công - Ngày 19/05/2026 loi xem
+// Nhật ký cập nhật: Bản vá lỗi đồng bộ và nút check thủ công - Ngày 19/05/2026
 
 const CACHE_NAME = 'AirGapCamera-Static-Storage'; 
 
