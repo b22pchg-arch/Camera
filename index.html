@@ -166,10 +166,10 @@
             #imageViewerModal .modal-content { height: 100vh !important; width: 100vw !important; }
         }
 
-        /* --- V61: Modal xem ảnh - tên ảnh dài không đẩy nút quay lại khỏi màn hình --- */
+        /* --- V62: Modal xem ảnh - tên ảnh dài xuống dòng, nút quay lại vẫn cố định --- */
         #imageViewerModal .modal-header {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 8px;
             min-width: 0;
             flex-wrap: nowrap;
@@ -179,18 +179,36 @@
             flex: 1 1 auto;
             min-width: 0;
             max-width: 100%;
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            line-height: 1.25;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            white-space: normal;
+            line-height: 1.28;
+            max-height: 30dvh;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+        #imageViewerModal .image-viewer-title .viewer-title-main {
+            display: block;
+            color: #0dcaf0;
+            font-weight: 700;
+        }
+        #imageViewerModal .image-viewer-title .viewer-title-time {
+            display: block;
+            color: #adb5bd;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 2px;
         }
         #imageViewerModal .modal-header .btn {
             flex: 0 0 auto;
             white-space: nowrap;
+            position: sticky;
+            top: 0;
         }
         @media (max-width: 430px) {
             #imageViewerModal .modal-title,
-            #imageViewerModal .image-viewer-title { font-size: 12px; }
+            #imageViewerModal .image-viewer-title { font-size: 12px; max-height: 26dvh; }
+            #imageViewerModal .image-viewer-title .viewer-title-time { font-size: 10px; }
             #imageViewerModal .modal-header .btn { font-size: 11px; padding: 4px 7px; }
         }
 
@@ -3009,22 +3027,69 @@ function showCameraErrorUI(err) {
         window.visualViewport.addEventListener("resize", resizeImageViewerToViewport);
     }
 
+    function getPhotoCreatedTimeMs(item) {
+        if (!item) return 0;
+        const candidates = [item.timestampMs, item.createdAtMs, item.captureTimeMs, item.timeMs, item.createdAt, item.timestamp, item.dateTime, item.id];
+        for (const v of candidates) {
+            if (v === null || v === undefined || v === '') continue;
+            if (typeof v === 'number' && Number.isFinite(v)) return v;
+            if (typeof v === 'string') {
+                if (/^\d{12,}$/.test(v)) {
+                    const n = Number(v);
+                    if (Number.isFinite(n)) return n;
+                }
+                const t = Date.parse(v);
+                if (Number.isFinite(t)) return t;
+            }
+        }
+        return 0;
+    }
+
+    function sortPhotosByCreatedTime(a, b) {
+        const ta = getPhotoCreatedTimeMs(a);
+        const tb = getPhotoCreatedTimeMs(b);
+        if (ta !== tb) return ta - tb;
+        return String(a?.id || '').localeCompare(String(b?.id || ''));
+    }
+
+    function formatViewerCreatedTime(item) {
+        const t = getPhotoCreatedTimeMs(item);
+        if (!t) return '';
+        const d = new Date(t);
+        const weekday = d.toLocaleDateString('vi-VN', { weekday: 'long' });
+        const date = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        return `${weekday}, ngày ${date} - ${time}`;
+    }
+
+    function setImageViewerTitle(item, fallbackText) {
+        const title = document.querySelector('#imageViewerModal .modal-title');
+        if (!title) return;
+        const viewerTitleText = item ? (item.name || item.type || fallbackText || 'XEM ẢNH') : (fallbackText || 'XEM ẢNH');
+        const timeText = item ? formatViewerCreatedTime(item) : '';
+        title.innerHTML = `<span class="viewer-title-main"><i class="fa-solid fa-image me-2"></i>${escapeHtml(String(viewerTitleText))}</span>${timeText ? `<span class="viewer-title-time"><i class="fa-regular fa-clock me-1"></i>${escapeHtml(timeText)}</span>` : ''}`;
+        title.setAttribute('title', timeText ? `${viewerTitleText}
+${timeText}` : viewerTitleText);
+    }
+
     function getImageViewerItems(source) {
         if (source === 'pending') {
             const r = getPendingReposForDisplay();
-            return [...r.before, ...r.process, ...r.after].sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+            return [...r.before, ...r.process, ...r.after].sort(sortPhotosByCreatedTime);
         }
         if (source === 'gallery') {
             const showQT = document.getElementById("toggle-show-qt")?.checked !== false;
-            return repoStitched.filter(x => showQT || x.type !== "STITCHED_QT").sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+            return repoStitched.filter(x => showQT || x.type !== "STITCHED_QT").sort(sortPhotosByCreatedTime);
         }
-        if (source === 'camera') return window.cameraViewerItems || [];
+        if (source === 'camera') return (window.cameraViewerItems || []).slice().sort(sortPhotosByCreatedTime);
         return [];
     }
 
     function setImageViewerButtonStates() {
         const canNavigate = imageViewerContext.ids && imageViewerContext.ids.length > 1;
         document.querySelectorAll('#imageViewerModal .image-zoom-toolbar button').forEach(btn => btn.disabled = false);
+        const navButtons = document.querySelectorAll('#imageViewerModal .image-zoom-toolbar button[onclick^="showPrevImageViewer"], #imageViewerModal .image-zoom-toolbar button[onclick^="showNextImageViewer"]');
+        navButtons.forEach(btn => btn.disabled = !canNavigate);
         const delBtn = document.getElementById('btn-delete-viewer-image');
         if (delBtn) delBtn.classList.toggle('d-none', !imageViewerContext.ids[imageViewerContext.index]);
     }
@@ -3036,12 +3101,7 @@ function showCameraErrorUI(err) {
         setupImageViewerZoomOnce();
         resetImageViewerZoom();
         img.src = item.dataUrl;
-        const title = document.querySelector('#imageViewerModal .modal-title');
-        if (title) {
-            const viewerTitleText = item.name || item.type || 'XEM ẢNH';
-            title.innerHTML = `<i class="fa-solid fa-image me-2"></i>${viewerTitleText}`;
-            title.setAttribute('title', viewerTitleText);
-        }
+        setImageViewerTitle(item, 'XEM ẢNH');
         setImageViewerButtonStates();
         openModal('imageViewerModal');
     }
@@ -3056,11 +3116,7 @@ function showCameraErrorUI(err) {
             setupImageViewerZoomOnce();
             resetImageViewerZoom();
             img.src = url;
-            const title = document.querySelector('#imageViewerModal .modal-title');
-            if (title) {
-                title.innerHTML = `<i class="fa-solid fa-image me-2"></i>XEM ẢNH`;
-                title.setAttribute('title', 'XEM ẢNH');
-            }
+            setImageViewerTitle(null, 'XEM ẢNH');
             setImageViewerButtonStates();
             openModal('imageViewerModal');
             return;
