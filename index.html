@@ -650,15 +650,70 @@ function showUpdateNotification() {
 
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
                 <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-qrcode me-2"></i>Giải pháp 3: Phát Vòng Lặp QR Động</h6>
-                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp chuyển nhanh ghi chú text hoặc danh mục cấu hình hiện trường khi hai thiết bị cách ly mạng tuyệt đối.</p>
-                <div class="row g-2">
-                    <div class="col-6"><button class="btn btn-sm btn-outline-info w-100 fw-bold py-2" onclick="startAnimatedQREmitter()"><i class="fa-solid fa-play me-1"></i> PHÁT QR ĐỘNG</button></div>
-                    <div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold py-2" onclick="startAnimatedQRReceiver()"><i class="fa-solid fa-expand me-1"></i> QUÉT QR</button></div>
+                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Dùng khi hai thiết bị cách ly mạng: Máy A phát nhiều QR liên tiếp, Máy B quét để gom đủ mảnh và nạp lại dữ liệu.</p>
+
+                <div class="border border-info rounded p-2 mb-2 bg-black bg-opacity-25">
+                    <div class="small text-info fw-bold mb-2"><i class="fa-solid fa-tower-broadcast me-1"></i> MÁY PHÁT QR LIÊN TIẾP</div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6 col-md-3">
+                            <label class="small text-secondary fw-bold" style="font-size:10px;">Thời gian hiện mỗi QR</label>
+                            <select id="animated-qr-delay" class="form-select form-select-sm bg-secondary text-white border-secondary" style="font-size:11px;">
+                                <option value="450">0.45 giây - nhanh</option>
+                                <option value="700" selected>0.7 giây - chuẩn</option>
+                                <option value="1000">1 giây - dễ quét</option>
+                                <option value="1500">1.5 giây - máy yếu</option>
+                                <option value="2500">2.5 giây - rất chậm</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="small text-secondary fw-bold" style="font-size:10px;">Dung lượng mỗi mảnh</label>
+                            <select id="animated-qr-chunk-size" class="form-select form-select-sm bg-secondary text-white border-secondary" style="font-size:11px;">
+                                <option value="520">Nhẹ - dễ quét</option>
+                                <option value="720" selected>Chuẩn</option>
+                                <option value="920">Nhiều dữ liệu/QR</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3"><button id="btn-animated-emit" class="btn btn-sm btn-outline-info w-100 fw-bold py-2" onclick="startAnimatedQREmitter()"><i class="fa-solid fa-play me-1"></i> PHÁT TỪ ĐẦU</button></div>
+                        <div class="col-6 col-md-3"><button class="btn btn-sm btn-outline-danger w-100 fw-bold py-2" onclick="stopAnimatedQREmitter()"><i class="fa-solid fa-stop me-1"></i> DỪNG PHÁT</button></div>
+                    </div>
+                    <div class="input-group input-group-sm mt-2">
+                        <span class="input-group-text bg-secondary text-light border-secondary small fw-bold" style="font-size:11px;">Phát lại mảnh lẻ</span>
+                        <input id="animated-qr-replay-list" class="form-control bg-dark text-info border-secondary text-center" style="font-size:11px;" placeholder="VD: 1, 4, 8-12">
+                        <button class="btn btn-warning text-dark fw-bold" onclick="startAnimatedQrReplay()" style="font-size:11px;"><i class="fa-solid fa-repeat me-1"></i>PHÁT LẠI</button>
+                    </div>
                 </div>
+
                 <div id="animated-qr-panel" class="text-center p-2 mt-3 border border-secondary rounded bg-black d-none">
                     <div id="animated-qr-title" class="small text-warning mb-2 fw-bold">Đang phát dữ liệu mã hóa...</div>
-                    <div id="animated-qr-display" class="bg-white p-2 rounded mx-auto mb-2" style="width:180px; height:180px; display:flex; align-items:center; justify-content:center;"></div>
+                    <div id="animated-qr-display" class="bg-white p-2 rounded mx-auto mb-2" style="width:240px; height:240px; display:flex; align-items:center; justify-content:center;"></div>
+                    <div class="d-flex justify-content-between small text-secondary mb-1" style="font-size:11px;">
+                        <span id="animated-qr-piece-label">Mảnh: 0/0</span>
+                        <span id="animated-qr-percent-label">0%</span>
+                    </div>
                     <progress id="animated-qr-progress" class="w-100" value="0" max="100"></progress>
+                    <div id="animated-qr-total-label" class="small text-info mt-1 fw-bold" style="font-size:11px;">Tổng số mảnh: 0</div>
+                </div>
+
+                <div class="border border-warning rounded p-2 mt-3 bg-black bg-opacity-25">
+                    <div class="small text-warning fw-bold mb-2"><i class="fa-solid fa-camera-retro me-1"></i> MÁY ĐỌC QR NHẬN DỮ LIỆU</div>
+                    <div class="row g-2">
+                        <div class="col-6"><button id="btn-animated-recv" class="btn btn-sm btn-outline-warning w-100 fw-bold py-2" onclick="startAnimatedQRReceiver()"><i class="fa-solid fa-expand me-1"></i> BẬT MÁY ĐỌC QR</button></div>
+                        <div class="col-6"><button class="btn btn-sm btn-outline-danger w-100 fw-bold py-2" onclick="stopAnimatedQRReceiver()"><i class="fa-solid fa-stop me-1"></i> DỪNG ĐỌC</button></div>
+                    </div>
+                    <div id="animated-qr-receiver-panel" class="d-none mt-2">
+                        <div id="animated-qr-reader-video-box" class="mx-auto border border-warning rounded overflow-hidden bg-black position-relative" style="max-width:320px; aspect-ratio:4/3;">
+                            <video id="animated-qr-reader-video" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+                            <div style="position:absolute; inset:18%; border:2px dashed #ffc107; box-shadow:0 0 0 9999px rgba(0,0,0,0.45); pointer-events:none;"></div>
+                        </div>
+                        <div class="row g-2 mt-2 text-center small" style="font-size:11px;">
+                            <div class="col-4"><div class="border border-secondary rounded p-1"><span class="text-secondary d-block">Tổng mảnh</span><b id="animated-rx-total" class="text-info">0</b></div></div>
+                            <div class="col-4"><div class="border border-secondary rounded p-1"><span class="text-secondary d-block">Đã nhận</span><b id="animated-rx-received" class="text-success">0</b></div></div>
+                            <div class="col-4"><div class="border border-secondary rounded p-1"><span class="text-secondary d-block">Chưa nhận</span><b id="animated-rx-missing" class="text-danger">0</b></div></div>
+                        </div>
+                        <progress id="animated-rx-progress" class="w-100 mt-2" value="0" max="100"></progress>
+                        <textarea id="animated-rx-missing-list" class="form-control form-control-sm bg-dark text-warning border-secondary mt-2 text-center" rows="2" readonly style="font-size:11px;" placeholder="Danh sách mảnh còn thiếu sẽ hiện ở đây để nhập sang máy phát..."></textarea>
+                        <button id="btn-animated-import" class="btn btn-sm btn-success w-100 fw-bold py-2 mt-2 d-none" onclick="importAnimatedQrReceivedData()"><i class="fa-solid fa-cloud-arrow-up me-1"></i> ĐÃ ĐỦ MẢNH - NẠP DỮ LIỆU VÀO KHO</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -757,7 +812,7 @@ function showUpdateNotification() {
                 <ul class="text-secondary ps-3 mb-3">
                     <li><b>Xuất / Nhập file offline:</b> dùng để chuyển gói ảnh/dữ liệu giữa các máy qua Quick Share, Bluetooth, Zalo file hoặc USB.</li>
                     <li><b>Kết nối WebRTC P2P:</b> dùng khi hai máy cùng mạng Wi-Fi hoặc một máy phát hotspot. Máy A gửi, Máy B nhận, quét/dán mã liên kết để kết nối.</li>
-                    <li><b>QR động:</b> dùng để truyền nhanh dữ liệu chữ/cấu hình khi không có mạng nội bộ ổn định.</li>
+                    <li><b>QR động:</b> dùng khi hai máy không có mạng nội bộ. Máy phát chia dữ liệu thành nhiều mảnh QR liên tiếp; có thể chọn thời gian hiện mỗi QR, xem tổng số mảnh/tiến độ và nhập các mảnh thiếu để phát lại. Máy nhận hiển thị tổng số mảnh, số đã nhận, số chưa nhận và danh sách mảnh còn thiếu; khi đủ mảnh thì bấm <b>NẠP DỮ LIỆU VÀO KHO</b>. Với kho ảnh lớn, nên ưu tiên Giải pháp 1 hoặc 2 vì QR động sẽ cần rất nhiều mảnh.</li>
                 </ul>
 
                 <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-hard-drive me-1"></i> 11. QUẢN LÝ DUNG LƯỢNG VÀ LƯU Ý KHI DÙNG</p>
@@ -867,6 +922,14 @@ function showUpdateNotification() {
     let p2pConnection = null;
     let p2pDataChannel = null;
     let animatedQrTimer = null;
+    let animatedQrChunks = [];
+    let animatedQrSessionId = null;
+    let animatedQrCurrentIndex = 0;
+    let animatedQrReplayIndexes = null;
+    let animatedQrScanStream = null;
+    let animatedQrScanTimer = null;
+    let animatedQrReceiverState = null;
+    let animatedQrWasCameraOnBeforeScan = true;
     let p2pIncomingBuffer = [];
 
     // --- VANILLA UI FALLBACK ENGINE ---
@@ -2557,21 +2620,261 @@ function cancelImportFile() {
         };
     }
 
-    // --- GIẢI PHÁP 3: PHÁT VÒNG LẶP QR ĐỘNG CHUYỂN METADATA OFFLINE ---
-    function startAnimatedQREmitter() {
-        const panel = document.getElementById("animated-qr-panel"); const display = document.getElementById("animated-qr-display");
-        panel.classList.remove("d-none"); display.innerHTML = "";
-        if (!db) return;
+    // --- GIẢI PHÁP 3: PHÁT VÒNG LẶP QR ĐỘNG CHUYỂN DỮ LIỆU OFFLINE ---
+    function encodeBase64Unicode(str) {
+        const bytes = new TextEncoder().encode(str);
+        let binary = "";
+        const step = 0x8000;
+        for (let i = 0; i < bytes.length; i += step) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
+        }
+        return btoa(binary);
+    }
+
+    function decodeBase64Unicode(b64) {
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new TextDecoder().decode(bytes);
+    }
+
+    function simpleQrHash(str) {
+        let h = 2166136261;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+        }
+        return (h >>> 0).toString(16);
+    }
+
+    function getAnimatedQrDelay() {
+        const el = document.getElementById("animated-qr-delay");
+        return Math.max(300, parseInt(el ? el.value : "700", 10) || 700);
+    }
+
+    function getAnimatedQrChunkSize() {
+        const el = document.getElementById("animated-qr-chunk-size");
+        return Math.max(360, Math.min(1100, parseInt(el ? el.value : "720", 10) || 720));
+    }
+
+    function prepareAnimatedQrChunks(callback) {
+        if (!db) return alert("Kho dữ liệu chưa sẵn sàng, vui lòng mở lại ứng dụng rồi thử lại.");
+        if (!window.QRCode) return alert("Thiếu thư viện tạo QR qrcode.min.js.");
+
         db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
             const allData = e.target.result || [];
-            let simplified = allData.map(x => ({ t: x.type, n: document.getElementById("tab1-prefix").value || "HT", m: x.timestampMs }));
-            let rawString = JSON.stringify(simplified).slice(0, 400);
-            if(!window.QRCode) return; display.innerHTML = "";
-            new QRCode(display, { text: rawString, width: 160, height: 160 });
-            document.getElementById("animated-qr-title").innerText = "Đang phát vòng lặp Metadata...";
+            if (!allData.length) return alert("Kho lưu trữ trống, không có dữ liệu để phát QR.");
+
+            const prefix = (document.getElementById("tab1-prefix")?.value || "HT").trim() || "HT";
+            const packet = {
+                app: "PC_TQ_QR_SYNC",
+                version: 1,
+                prefix,
+                createdAt: new Date().toISOString(),
+                totalItems: allData.length,
+                items: allData
+            };
+            const encoded = encodeBase64Unicode(JSON.stringify(packet));
+            const chunkSize = getAnimatedQrChunkSize();
+            animatedQrChunks = [];
+            for (let i = 0; i < encoded.length; i += chunkSize) animatedQrChunks.push(encoded.slice(i, i + chunkSize));
+            animatedQrSessionId = "QR" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+            animatedQrCurrentIndex = 0;
+            animatedQrReplayIndexes = null;
+
+            document.getElementById("animated-qr-total-label").innerText = `Tổng số mảnh: ${animatedQrChunks.length} | Dữ liệu: ${allData.length} ảnh/bản ghi | Mã phiên: ${animatedQrSessionId}`;
+            if (animatedQrChunks.length > 300) {
+                alert(`⚠️ Dữ liệu hiện có sẽ tạo ${animatedQrChunks.length} mảnh QR. Cách này sẽ rất lâu nếu truyền nhiều ảnh dung lượng lớn. Anh nên dùng Giải pháp 1 hoặc 2 cho kho ảnh lớn, còn QR động phù hợp nhất với gói nhỏ/khẩn cấp.`);
+            }
+            if (typeof callback === "function") callback();
         };
     }
-    function startAnimatedQRReceiver() { alert("Hãy ưu tiên sử dụng Giải pháp 1 và Giải pháp 2 để đạt độ ổn định và dung lượng tối đa."); }
+
+    function renderAnimatedQrPacket(index) {
+        if (!animatedQrChunks.length) return;
+        const total = animatedQrChunks.length;
+        const display = document.getElementById("animated-qr-display");
+        const progress = document.getElementById("animated-qr-progress");
+        const pieceLabel = document.getElementById("animated-qr-piece-label");
+        const percentLabel = document.getElementById("animated-qr-percent-label");
+        const title = document.getElementById("animated-qr-title");
+        const safeIndex = Math.max(0, Math.min(index, total - 1));
+        const packet = {
+            app: "PC_TQ_QR_SYNC_CHUNK",
+            v: 1,
+            sid: animatedQrSessionId,
+            i: safeIndex + 1,
+            total,
+            hash: simpleQrHash(animatedQrChunks.join("")),
+            payload: animatedQrChunks[safeIndex]
+        };
+        display.innerHTML = "";
+        new QRCode(display, { text: JSON.stringify(packet), width: 224, height: 224, correctLevel: QRCode.CorrectLevel.L });
+        const percent = Math.round(((safeIndex + 1) / total) * 100);
+        progress.value = percent;
+        pieceLabel.innerText = `Mảnh: ${safeIndex + 1}/${total}`;
+        percentLabel.innerText = `${percent}%`;
+        title.innerText = animatedQrReplayIndexes ? `Đang phát lại mảnh lẻ (${safeIndex + 1}/${total})` : `Đang phát QR động - mảnh ${safeIndex + 1}/${total}`;
+    }
+
+    function startAnimatedQREmitter() {
+        stopAnimatedQREmitter(false);
+        prepareAnimatedQrChunks(() => {
+            const panel = document.getElementById("animated-qr-panel");
+            panel.classList.remove("d-none");
+            renderAnimatedQrPacket(0);
+            animatedQrTimer = setInterval(() => {
+                animatedQrCurrentIndex = (animatedQrCurrentIndex + 1) % animatedQrChunks.length;
+                renderAnimatedQrPacket(animatedQrCurrentIndex);
+            }, getAnimatedQrDelay());
+            const btn = document.getElementById("btn-animated-emit");
+            if (btn) btn.innerHTML = `<i class="fa-solid fa-rotate fa-spin me-1"></i> ĐANG PHÁT`;
+        });
+    }
+
+    function stopAnimatedQREmitter(clearTitle = true) {
+        if (animatedQrTimer) clearInterval(animatedQrTimer);
+        animatedQrTimer = null;
+        animatedQrReplayIndexes = null;
+        const btn = document.getElementById("btn-animated-emit");
+        if (btn) btn.innerHTML = `<i class="fa-solid fa-play me-1"></i> PHÁT TỪ ĐẦU`;
+        if (clearTitle && document.getElementById("animated-qr-title")) document.getElementById("animated-qr-title").innerText = "Đã dừng phát QR động.";
+    }
+
+    function parseAnimatedQrReplayList(text, total) {
+        const result = new Set();
+        String(text || "").split(/[;,\s]+/).map(x => x.trim()).filter(Boolean).forEach(part => {
+            if (/^\d+-\d+$/.test(part)) {
+                let [a, b] = part.split("-").map(n => parseInt(n, 10));
+                if (a > b) [a, b] = [b, a];
+                for (let i = a; i <= b; i++) if (i >= 1 && i <= total) result.add(i - 1);
+            } else {
+                const n = parseInt(part, 10);
+                if (n >= 1 && n <= total) result.add(n - 1);
+            }
+        });
+        return Array.from(result).sort((a, b) => a - b);
+    }
+
+    function startAnimatedQrReplay() {
+        const runReplay = () => {
+            const input = document.getElementById("animated-qr-replay-list");
+            const indexes = parseAnimatedQrReplayList(input ? input.value : "", animatedQrChunks.length);
+            if (!indexes.length) return alert("Vui lòng nhập số mảnh cần phát lại, ví dụ: 1, 4, 8-12");
+            stopAnimatedQREmitter(false);
+            animatedQrReplayIndexes = indexes;
+            let pos = 0;
+            document.getElementById("animated-qr-panel").classList.remove("d-none");
+            renderAnimatedQrPacket(indexes[pos]);
+            animatedQrTimer = setInterval(() => {
+                pos = (pos + 1) % indexes.length;
+                renderAnimatedQrPacket(indexes[pos]);
+            }, getAnimatedQrDelay());
+        };
+        if (!animatedQrChunks.length) prepareAnimatedQrChunks(runReplay); else runReplay();
+    }
+
+    function resetAnimatedQrReceiverState(packet) {
+        animatedQrReceiverState = {
+            sid: packet.sid,
+            total: packet.total,
+            hash: packet.hash,
+            chunks: new Array(packet.total).fill(null),
+            firstSeen: Date.now(),
+            lastSeen: Date.now()
+        };
+    }
+
+    function handleAnimatedQrScan(rawValue) {
+        let packet;
+        try { packet = JSON.parse(rawValue); } catch(e) { return; }
+        if (!packet || packet.app !== "PC_TQ_QR_SYNC_CHUNK" || !packet.sid || !packet.total || !packet.i || !packet.payload) return;
+        if (!animatedQrReceiverState || animatedQrReceiverState.sid !== packet.sid || animatedQrReceiverState.total !== packet.total) resetAnimatedQrReceiverState(packet);
+        const idx = packet.i - 1;
+        if (idx < 0 || idx >= animatedQrReceiverState.total) return;
+        if (!animatedQrReceiverState.chunks[idx]) animatedQrReceiverState.chunks[idx] = packet.payload;
+        animatedQrReceiverState.lastSeen = Date.now();
+        updateAnimatedQrReceiverProgress();
+    }
+
+    function updateAnimatedQrReceiverProgress() {
+        if (!animatedQrReceiverState) return;
+        const total = animatedQrReceiverState.total || 0;
+        const received = animatedQrReceiverState.chunks.filter(Boolean).length;
+        const missing = [];
+        for (let i = 0; i < total; i++) if (!animatedQrReceiverState.chunks[i]) missing.push(i + 1);
+        const percent = total ? Math.round((received / total) * 100) : 0;
+        document.getElementById("animated-rx-total").innerText = total;
+        document.getElementById("animated-rx-received").innerText = received;
+        document.getElementById("animated-rx-missing").innerText = missing.length;
+        document.getElementById("animated-rx-progress").value = percent;
+        document.getElementById("animated-rx-missing-list").value = missing.length ? missing.join(",") : "ĐÃ NHẬN ĐỦ MẢNH";
+        const importBtn = document.getElementById("btn-animated-import");
+        if (missing.length === 0 && total > 0) importBtn.classList.remove("d-none"); else importBtn.classList.add("d-none");
+    }
+
+    async function startAnimatedQRReceiver() {
+        if (!('BarcodeDetector' in window)) return alert("Trình duyệt này chưa hỗ trợ BarcodeDetector để quét QR trực tiếp. Hãy dùng Chrome/Edge Android mới hoặc Giải pháp 1/2.");
+        const panel = document.getElementById("animated-qr-receiver-panel");
+        const video = document.getElementById("animated-qr-reader-video");
+        panel.classList.remove("d-none");
+        animatedQrWasCameraOnBeforeScan = isCameraOn;
+        try {
+            if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+            animatedQrScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } });
+            video.srcObject = animatedQrScanStream;
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+            document.getElementById("btn-animated-recv").innerHTML = `<i class="fa-solid fa-camera fa-beat me-1"></i> ĐANG ĐỌC QR`;
+            if (animatedQrScanTimer) clearInterval(animatedQrScanTimer);
+            animatedQrScanTimer = setInterval(async () => {
+                try {
+                    if (video.readyState === video.HAVE_CURRENT_DATA || video.readyState === video.HAVE_ENOUGH_DATA) {
+                        const barcodes = await detector.detect(video);
+                        if (barcodes.length > 0) handleAnimatedQrScan(barcodes[0].rawValue);
+                    }
+                } catch(e) {}
+            }, 160);
+        } catch(err) {
+            alert("Không bật được camera đọc QR: " + err.message);
+            panel.classList.add("d-none");
+        }
+    }
+
+    function stopAnimatedQRReceiver() {
+        if (animatedQrScanTimer) clearInterval(animatedQrScanTimer);
+        animatedQrScanTimer = null;
+        if (animatedQrScanStream) animatedQrScanStream.getTracks().forEach(t => t.stop());
+        animatedQrScanStream = null;
+        const video = document.getElementById("animated-qr-reader-video");
+        if (video) video.srcObject = null;
+        const btn = document.getElementById("btn-animated-recv");
+        if (btn) btn.innerHTML = `<i class="fa-solid fa-expand me-1"></i> BẬT MÁY ĐỌC QR`;
+        if (animatedQrWasCameraOnBeforeScan && isCameraOn) setTimeout(initCamera, 250);
+    }
+
+    function importAnimatedQrReceivedData() {
+        if (!animatedQrReceiverState) return alert("Chưa có dữ liệu QR nào được nhận.");
+        const missing = animatedQrReceiverState.chunks.map((x, i) => x ? null : i + 1).filter(Boolean);
+        if (missing.length) return alert("Chưa đủ mảnh. Các mảnh còn thiếu: " + missing.join(","));
+        try {
+            const encoded = animatedQrReceiverState.chunks.join("");
+            if (simpleQrHash(encoded) !== animatedQrReceiverState.hash) return alert("Dữ liệu đã nhận không khớp mã kiểm tra. Hãy quét lại các mảnh thiếu hoặc phát lại toàn bộ phiên.");
+            const decoded = JSON.parse(decodeBase64Unicode(encoded));
+            const items = Array.isArray(decoded.items) ? decoded.items : (Array.isArray(decoded) ? decoded : []);
+            if (!items.length) return alert("Gói QR không có dữ liệu ảnh hợp lệ để nạp.");
+            let tx = db.transaction("photos", "readwrite");
+            let store = tx.objectStore("photos");
+            items.forEach(item => store.put(item));
+            tx.oncomplete = () => {
+                alert(`✅ Đồng bộ QR thành công! Đã nạp ${items.length} bản ghi vào kho ảnh.`);
+                stopAnimatedQRReceiver();
+                loadDataFromDB();
+                setTimeout(calculateStorageQuota, 300);
+            };
+        } catch(err) {
+            alert("Lỗi giải mã/nạp dữ liệu QR: " + err.message);
+        }
+    }
 </script>
 </body>
 </html>
