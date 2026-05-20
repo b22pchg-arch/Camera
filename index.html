@@ -212,6 +212,34 @@
             #imageViewerModal .modal-header .btn { font-size: 11px; padding: 4px 7px; }
         }
 
+
+        /* --- V64: Khung chức năng Chờ Ghép ẩn/hiện ổn định --- */
+        .pending-tools-shell {
+            border: 1px solid #495057;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #111820;
+        }
+        .pending-tools-header {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            background: #0b1117;
+            border-bottom: 1px solid #343a40;
+        }
+        .pending-tools-header > div { min-width: 0; }
+        #pending-tools-state-note { font-size: 10.5px; line-height: 1.25; }
+        .pending-tools-body { padding: 10px; }
+        .pending-tools-shell.pending-collapsed .pending-tools-body { display: none !important; }
+        .pending-tools-shell.pending-collapsed .pending-tools-header { border-bottom: 0; }
+        @media (max-width: 430px) {
+            .pending-tools-body { padding: 8px; }
+            #pending-tools-title { font-size: 11px; }
+            #pending-tools-state-note { display: none; }
+        }
+
         .footer-toggle-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
         @media (max-width: 430px) {
             .camera-capture-overlay { padding: 7px; gap: 5px; }
@@ -2682,7 +2710,7 @@ function showCameraErrorUI(err) {
     function ensurePendingSessionControls() {
         if (document.getElementById('pending-session-box')) return;
         const anchorBtn = document.getElementById('btn-toggle-qt-pending');
-        const card = anchorBtn ? anchorBtn.closest('.card') : document.querySelector('#pending-content .card');
+        const card = document.getElementById('pending-tools-body') || (anchorBtn ? anchorBtn.closest('.card') : document.querySelector('#pending-content .card'));
         if (!card) return;
         const box = document.createElement('div');
         box.id = 'pending-session-box';
@@ -3079,6 +3107,16 @@ function showCameraErrorUI(err) {
         window.visualViewport.addEventListener("resize", resizeImageViewerToViewport);
     }
 
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     function getPhotoCreatedTimeMs(item) {
         if (!item) return 0;
         const candidates = [item.timestampMs, item.createdAtMs, item.captureTimeMs, item.timeMs, item.createdAt, item.timestamp, item.dateTime, item.id];
@@ -3138,14 +3176,26 @@ ${timeText}` : viewerTitleText);
     }
 
 
+    function getAllKnownImageItemsForSource(source) {
+        if (source === 'pending') return [...repoBefore, ...repoProcess, ...repoAfter].filter(Boolean).sort(sortPhotosByCreatedTime);
+        if (source === 'gallery') return repoStitched.filter(Boolean).sort(sortPhotosByCreatedTime);
+        if (source === 'camera') return (window.cameraViewerItems || []).filter(Boolean).sort(sortPhotosByCreatedTime);
+        return [...repoBefore, ...repoProcess, ...repoAfter, ...repoStitched, ...(window.cameraViewerItems || [])].filter(Boolean).sort(sortPhotosByCreatedTime);
+    }
+
     function viewFullImageById(source, id) {
-        const items = getImageViewerItems(source);
-        const idx = items.findIndex(x => String(x.id) === String(id));
+        let items = getImageViewerItems(source);
+        let idx = items.findIndex(x => String(x.id) === String(id));
         if (idx < 0) {
-            alert('Không tìm thấy ảnh trong danh sách hiện tại. Hãy bấm HIỆN TẤT CẢ hoặc tải lại danh sách ảnh.');
+            items = getAllKnownImageItemsForSource(source);
+            idx = items.findIndex(x => String(x.id) === String(id));
+        }
+        if (idx < 0) {
+            console.warn('Không tìm thấy ảnh theo ID:', source, id);
+            alert('Không tìm thấy ảnh trong kho. Anh hãy bấm HIỆN TẤT CẢ hoặc tải lại danh sách ảnh.');
             return;
         }
-        imageViewerContext = { source: source || null, ids: items.map(x => x.id), index: idx };
+        imageViewerContext = { source: source || null, ids: items.map(x => x.id), index: idx, fallbackItems: items };
         openImageViewerByItem(items[idx], source);
     }
 
@@ -4350,6 +4400,39 @@ function cancelImportFile() {
             alert("Lỗi giải mã/nạp dữ liệu QR: " + err.message);
         }
     }
+
+
+    // --- V64: vá phục hồi Chờ Ghép + xem ảnh ổn định sau khi DOM sẵn sàng ---
+    function initPendingToolsAndSessionsSafe() {
+        try {
+            setupPendingToolsShell();
+            ensurePendingSessionControls();
+            updatePendingSessionControls();
+            updatePendingToolsToggleText();
+        } catch (err) { console.warn('Không thể khởi tạo khung Chờ Ghép:', err); }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initPendingToolsAndSessionsSafe, 250);
+        const pendingTab = document.getElementById('pending-tab');
+        if (pendingTab) pendingTab.addEventListener('click', () => setTimeout(initPendingToolsAndSessionsSafe, 120));
+    });
+
+
+
+    // Bọc renderPending để luôn phục hồi khung chức năng và thống kê phiên sau mỗi lần vẽ lại.
+    (function(){
+        const originalRenderPending = window.renderPending;
+        if (typeof originalRenderPending === 'function' && !window.__pendingRenderWrappedV64) {
+            window.renderPending = function(...args) {
+                const result = originalRenderPending.apply(this, args);
+                try { initPendingToolsAndSessionsSafe(); } catch(e) {}
+                return result;
+            };
+            window.__pendingRenderWrappedV64 = true;
+        }
+    })();
+
 </script>
 </body>
 </html>
