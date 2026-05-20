@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V53.2)</title>
     
     <link rel="manifest" href="manifest.json">
@@ -93,7 +93,34 @@
             .footer-toggle-grid { grid-template-columns: 1fr; }
         }
 
-    </style>
+    
+        /* --- V57: khóa khung app theo màn hình mobile, chống trượt ngang/xê dịch ngoài viewport --- */
+        html, body {
+            width: 100%;
+            max-width: 100%;
+            min-height: 100%;
+            margin: 0;
+            overflow-x: hidden;
+            overscroll-behavior-x: none;
+            background: #1a1d20;
+        }
+        body {
+            min-height: 100dvh;
+            touch-action: pan-y;
+            position: relative;
+        }
+        .container-fluid {
+            width: 100%;
+            max-width: 800px !important;
+            overflow-x: clip;
+        }
+        img, video, canvas, svg {
+            max-width: 100%;
+        }
+        @supports (overflow: clip) {
+            html, body { overflow-x: clip; }
+        }
+</style>
     
     <script>
        let newWorker;
@@ -1785,7 +1812,7 @@ function showCameraErrorUI(err) {
         const note = document.getElementById('tab1-note')?.value.trim() || document.getElementById('tab2-note')?.value.trim() || '';
         return {
             type: type || 'ẢNH',
-            dateLine: `${getVietnamWeekday(now)}, ngày ${now.toLocaleDateString('vi-VN')} - ${now.toLocaleTimeString('vi-VN')}`,
+            dateLine: `${getVietnamWeekday(now)}, ngày ${now.toLocaleDateString('vi-VN')} - ${now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`,
             gpsLine: hasValidGpsData(gpsMeta) ? (gpsMeta.gpsText || `${Number(gpsMeta.lat).toFixed(6)}, ${Number(gpsMeta.lng).toFixed(6)}`) : 'Chưa có tọa độ',
             address: address || 'Chưa xác định địa chỉ',
             prefix: prefix || 'Chưa nhập tên/mã hiện trường',
@@ -1839,7 +1866,8 @@ function showCameraErrorUI(err) {
                 <button id="btn-toggle-camera-tools" class="btn btn-sm btn-outline-info fw-bold" type="button" onclick="toggleCameraToolsPanel()"><i class="fa-solid fa-eye me-1"></i>HIỆN/ẨN</button>
             </div>
             <div id="camera-tools-body" class="camera-tools-body show"></div>`;
-        cameraWrapper.insertAdjacentElement('afterend', shell);
+        const previewRow = document.getElementById('preview-before')?.closest('.row');
+        (previewRow || cameraWrapper).insertAdjacentElement('afterend', shell);
         const body = document.getElementById('camera-tools-body');
 
         const allCards = Array.from(capture.children);
