@@ -943,6 +943,8 @@ function showUpdateNotification() {
                 <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-box-open me-1"></i> 6. TAB CHỜ GHÉP - QUẢN LÝ ẢNH NGUỒN</p>
                 <ul class="text-secondary ps-3 mb-3">
                     <li>Tab này chia ảnh thành 3 kho: <b>Trước</b>, <b>Q.Trình</b>, <b>Sau</b>.</li>
+                    <li>Khu vực <b>Quản lý phiên chờ ghép</b> hiển thị số phiên đã kết thúc/chưa kết thúc, cho phép chọn phiên từ danh sách hoặc nhập mã phiên để chỉ xem đúng ảnh của phiên đó.</li>
+                    <li>Khi đang lọc một phiên, bấm <b>CHIA SẺ / TẢI VỀ ẢNH CỦA PHIÊN ĐANG XEM</b> để xuất riêng bộ ảnh của phiên đó.</li>
                     <li>Có thể bấm <b>Tải ảnh</b> ở từng cột để thêm ảnh ngoài vào kho chờ ghép. Ảnh upload sẽ được xử lý theo chất lượng đang chọn ở tab Máy Ảnh.</li>
                     <li>Dùng nút <b>ẩn/hiện khu vực Quá Trình</b> để thu gọn cột Q.Trình. Khi ẩn, hai cột Trước/Sau sẽ rộng hơn để dễ kiểm tra.</li>
                     <li>Có thể chọn từng ảnh rồi dùng các nút ghép thủ công: <b>CHỈ GHÉP T/S</b>, <b>CHỈ GHÉP QT</b>, <b>GHÉP FULL</b>, <b>PHIÊN</b>.</li>
@@ -1037,10 +1039,13 @@ function showUpdateNotification() {
         </div>
         <div class="image-zoom-hint mt-2">Chụm 2 ngón để zoom, kéo 1 ngón khi đã phóng to, chạm đúp nhẹ để phóng to/thu về.</div>
       </div>
-      <div class="modal-footer border-secondary p-2 justify-content-center image-zoom-toolbar">
+      <div class="modal-footer border-secondary p-2 justify-content-center image-zoom-toolbar flex-wrap">
+        <button type="button" class="btn btn-outline-light btn-sm fw-bold" onclick="showPrevImageViewer()"><i class="fa-solid fa-chevron-left me-1"></i>ẢNH TRƯỚC</button>
+        <button type="button" class="btn btn-outline-light btn-sm fw-bold" onclick="showNextImageViewer()">ẢNH SAU<i class="fa-solid fa-chevron-right ms-1"></i></button>
         <button type="button" class="btn btn-outline-info btn-sm fw-bold" onclick="zoomImageViewer(1.25)"><i class="fa-solid fa-plus me-1"></i>PHÓNG</button>
         <button type="button" class="btn btn-outline-info btn-sm fw-bold" onclick="zoomImageViewer(0.8)"><i class="fa-solid fa-minus me-1"></i>THU</button>
         <button type="button" class="btn btn-outline-warning btn-sm fw-bold" onclick="resetImageViewerZoom()"><i class="fa-solid fa-compress me-1"></i>VỪA MÀN HÌNH</button>
+        <button type="button" id="btn-delete-viewer-image" class="btn btn-outline-danger btn-sm fw-bold" onclick="deleteCurrentViewerImage()"><i class="fa-solid fa-trash me-1"></i>XÓA ẢNH</button>
         <button type="button" class="btn btn-secondary btn-sm fw-bold" onclick="closeImageViewer()"><i class="fa-solid fa-xmark me-1"></i>ĐÓNG ẢNH</button>
       </div>
     </div>
@@ -1236,6 +1241,8 @@ function showUpdateNotification() {
         initLocationQrPreference();
         initExtraInsertPreferences();
         reorganizeCameraCaptureLayout();
+        ensurePendingSessionControls();
+        updatePendingSessionControls();
         setInterval(drawCompassCanvas, 200);
         window.addEventListener('orientationchange', () => setTimeout(updateCameraFrameRatio, 400));
         window.addEventListener('resize', updateCameraFrameRatio);
@@ -2434,6 +2441,7 @@ function showCameraErrorUI(err) {
     
     function updateUIState() {
         document.getElementById("pending-count").innerText = repoBefore.length + repoProcess.length + repoAfter.length;
+        if (document.getElementById('pending-session-box')) updatePendingSessionControls();
         document.getElementById("gallery-count").innerText = repoStitched.length;
     }
     function disableStitchButtons() {
@@ -2528,6 +2536,163 @@ function showCameraErrorUI(err) {
             moved: false
         }
     };
+
+    let pendingSessionFilter = null;
+    let imageViewerContext = { source: null, ids: [], index: -1 };
+
+    function getPendingReposForDisplay() {
+        if (!pendingSessionFilter) {
+            return { before: repoBefore, process: repoProcess, after: repoAfter };
+        }
+        const sessions = buildPendingSessions();
+        const session = sessions.find(s => s.no === pendingSessionFilter);
+        if (!session) return { before: [], process: [], after: [] };
+        const ids = new Set(session.items.map(x => x.id));
+        return {
+            before: repoBefore.filter(x => ids.has(x.id)),
+            process: repoProcess.filter(x => ids.has(x.id)),
+            after: repoAfter.filter(x => ids.has(x.id))
+        };
+    }
+
+    function buildPendingSessions() {
+        const all = [...repoBefore, ...repoProcess, ...repoAfter]
+            .filter(Boolean)
+            .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+        const sessions = [];
+        let current = null;
+        const startSession = () => {
+            current = { no: sessions.length + 1, before: [], process: [], after: [], items: [], startMs: null, endMs: null, ended: false };
+            sessions.push(current);
+        };
+        all.forEach(item => {
+            if (!current || item.type === "TRƯỚC") startSession();
+            current.items.push(item);
+            current.startMs = current.startMs == null ? (item.timestampMs || Date.now()) : Math.min(current.startMs, item.timestampMs || Date.now());
+            current.endMs = current.endMs == null ? (item.timestampMs || Date.now()) : Math.max(current.endMs, item.timestampMs || Date.now());
+            if (item.type === "TRƯỚC") current.before.push(item);
+            else if (item.type === "SAU") current.after.push(item);
+            else if (item.type === "QUÁ TRÌNH") current.process.push(item);
+            else current.process.push(item);
+            if (item.type === "SAU") { current.ended = current.before.length > 0 && current.after.length > 0; current = null; }
+        });
+        sessions.forEach(s => { s.ended = s.before.length > 0 && s.after.length > 0; });
+        return sessions;
+    }
+
+    function ensurePendingSessionControls() {
+        if (document.getElementById('pending-session-box')) return;
+        const anchorBtn = document.getElementById('btn-toggle-qt-pending');
+        const card = anchorBtn ? anchorBtn.closest('.card') : document.querySelector('#pending-content .card');
+        if (!card) return;
+        const box = document.createElement('div');
+        box.id = 'pending-session-box';
+        box.className = 'border border-info rounded p-2 mb-2 bg-black bg-opacity-25';
+        box.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div class="small fw-bold text-info"><i class="fa-solid fa-flag-checkered me-1"></i>QUẢN LÝ PHIÊN CHỜ GHÉP</div>
+                <div class="small">
+                    <span class="badge bg-success me-1">Đã kết thúc: <span id="pending-ended-count">0</span></span>
+                    <span class="badge bg-warning text-dark">Chưa kết thúc: <span id="pending-unfinished-count">0</span></span>
+                </div>
+            </div>
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-sm-5">
+                    <label class="small text-secondary fw-bold mb-1" style="font-size:10px;">Chọn phiên đang có</label>
+                    <select id="pending-session-select" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="selectPendingSessionFromDropdown()"></select>
+                </div>
+                <div class="col-6 col-sm-3">
+                    <label class="small text-secondary fw-bold mb-1" style="font-size:10px;">Nhập mã phiên</label>
+                    <input id="pending-session-input" type="number" min="1" class="form-control form-control-sm bg-dark text-info border-secondary text-center" placeholder="VD: 2">
+                </div>
+                <div class="col-6 col-sm-4 d-grid gap-1">
+                    <button class="btn btn-sm btn-outline-info fw-bold" onclick="showPendingSessionByInput()"><i class="fa-solid fa-eye me-1"></i>HIỆN PHIÊN</button>
+                    <button class="btn btn-sm btn-outline-light fw-bold" onclick="showAllPendingSessions()"><i class="fa-solid fa-layer-group me-1"></i>HIỆN TẤT CẢ</button>
+                </div>
+                <div class="col-12">
+                    <button class="btn btn-sm btn-success w-100 fw-bold" onclick="shareCurrentPendingSession()"><i class="fa-solid fa-share-nodes me-1"></i>CHIA SẺ / TẢI VỀ ẢNH CỦA PHIÊN ĐANG XEM</button>
+                </div>
+            </div>
+            <div id="pending-session-caption" class="small text-secondary mt-2 text-center" style="font-size:10.5px;">Đang hiển thị toàn bộ ảnh trong kho chờ ghép.</div>`;
+        card.insertBefore(box, anchorBtn);
+    }
+
+    function updatePendingSessionControls() {
+        ensurePendingSessionControls();
+        const sessions = buildPendingSessions();
+        const ended = sessions.filter(s => s.ended).length;
+        const unfinished = Math.max(0, sessions.length - ended);
+        const endedEl = document.getElementById('pending-ended-count');
+        const unfinishedEl = document.getElementById('pending-unfinished-count');
+        if (endedEl) endedEl.textContent = ended;
+        if (unfinishedEl) unfinishedEl.textContent = unfinished;
+        const select = document.getElementById('pending-session-select');
+        if (select) {
+            const opts = ['<option value="">Tất cả phiên</option>'].concat(sessions.map(s => {
+                const label = `Phiên ${s.no} - ${s.ended ? 'Đã kết thúc' : 'Chưa kết thúc'} - T:${s.before.length} QT:${s.process.length} S:${s.after.length}`;
+                return `<option value="${s.no}" ${pendingSessionFilter === s.no ? 'selected' : ''}>${label}</option>`;
+            }));
+            select.innerHTML = opts.join('');
+        }
+        const cap = document.getElementById('pending-session-caption');
+        if (cap) {
+            if (pendingSessionFilter) {
+                const s = sessions.find(x => x.no === pendingSessionFilter);
+                cap.textContent = s ? `Đang hiển thị Phiên ${s.no}: ${s.ended ? 'đã kết thúc' : 'chưa kết thúc'} | Trước: ${s.before.length}, Quá trình: ${s.process.length}, Sau: ${s.after.length}` : 'Không tìm thấy phiên đã chọn.';
+            } else cap.textContent = 'Đang hiển thị toàn bộ ảnh trong kho chờ ghép.';
+        }
+    }
+
+    function selectPendingSessionFromDropdown() {
+        const v = parseInt(document.getElementById('pending-session-select')?.value || '', 10);
+        pendingSessionFilter = Number.isFinite(v) ? v : null;
+        const input = document.getElementById('pending-session-input');
+        if (input) input.value = pendingSessionFilter || '';
+        renderPending();
+    }
+
+    function showPendingSessionByInput() {
+        const v = parseInt(document.getElementById('pending-session-input')?.value || '', 10);
+        const sessions = buildPendingSessions();
+        if (!Number.isFinite(v) || v < 1 || v > sessions.length) return alert(`Mã phiên không hợp lệ. Hiện có ${sessions.length} phiên.`);
+        pendingSessionFilter = v;
+        renderPending();
+    }
+
+    function showAllPendingSessions() {
+        pendingSessionFilter = null;
+        const input = document.getElementById('pending-session-input');
+        if (input) input.value = '';
+        renderPending();
+    }
+
+    async function shareCurrentPendingSession() {
+        const sessions = buildPendingSessions();
+        if (!sessions.length) return alert('Kho chờ ghép đang trống.');
+        let session = null;
+        if (pendingSessionFilter) session = sessions.find(s => s.no === pendingSessionFilter);
+        if (!session) {
+            const v = parseInt(document.getElementById('pending-session-input')?.value || '', 10);
+            if (Number.isFinite(v)) session = sessions.find(s => s.no === v);
+        }
+        if (!session) return alert('Vui lòng chọn hoặc nhập mã phiên cần chia sẻ/tải về.');
+        const itemsToShare = [...session.before, ...session.process, ...session.after].sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+        if (!itemsToShare.length) return alert('Phiên này chưa có ảnh.');
+        itemsToShare.forEach(item => {
+            if (!item.name || !/\.jpe?g$/i.test(item.name)) item.name = buildStandardPhotoName(item, item.type);
+            saveToDB(item);
+        });
+        if (navigator.share && navigator.canShare) {
+            try {
+                const filesArray = itemsToShare.map(item => dataUrlToFile(item.dataUrl, item.name));
+                if (navigator.canShare({ files: filesArray })) {
+                    await navigator.share({ files: filesArray, title: `Ảnh Phiên ${session.no} - PC Tuyên Quang` });
+                    return;
+                }
+            } catch (err) { if (err.name === 'AbortError') return; }
+        }
+        triggerBatchDownloads(itemsToShare);
+    }
 
     function applyImageViewerTransform() {
         const img = document.getElementById("image-viewer-img");
@@ -2815,12 +2980,52 @@ function showCameraErrorUI(err) {
         window.visualViewport.addEventListener("resize", resizeImageViewerToViewport);
     }
 
-    function viewFullImage(url) {
+    function getImageViewerItems(source) {
+        if (source === 'pending') {
+            const r = getPendingReposForDisplay();
+            return [...r.before, ...r.process, ...r.after].sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+        }
+        if (source === 'gallery') {
+            const showQT = document.getElementById("toggle-show-qt")?.checked !== false;
+            return repoStitched.filter(x => showQT || x.type !== "STITCHED_QT").sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+        }
+        if (source === 'camera') return window.cameraViewerItems || [];
+        return [];
+    }
+
+    function setImageViewerButtonStates() {
+        const canNavigate = imageViewerContext.ids && imageViewerContext.ids.length > 1;
+        document.querySelectorAll('#imageViewerModal .image-zoom-toolbar button').forEach(btn => btn.disabled = false);
+        const delBtn = document.getElementById('btn-delete-viewer-image');
+        if (delBtn) delBtn.classList.toggle('d-none', !imageViewerContext.ids[imageViewerContext.index]);
+    }
+
+    function openImageViewerByItem(item, source) {
+        if (!item || !item.dataUrl) return;
+        const img = document.getElementById("image-viewer-img");
+        if (!img) return viewFullImage(item.dataUrl);
+        setupImageViewerZoomOnce();
+        resetImageViewerZoom();
+        img.src = item.dataUrl;
+        const title = document.querySelector('#imageViewerModal .modal-title');
+        if (title) title.innerHTML = `<i class="fa-solid fa-image me-2"></i>${item.name || item.type || 'XEM ẢNH'}`;
+        setImageViewerButtonStates();
+        openModal('imageViewerModal');
+    }
+
+    function viewFullImage(url, source, id) {
         const img = document.getElementById("image-viewer-img");
         if (img) {
+            const items = getImageViewerItems(source);
+            const idx = id ? items.findIndex(x => x.id === id) : -1;
+            imageViewerContext = { source: source || null, ids: items.map(x => x.id), index: idx >= 0 ? idx : -1 };
+            if (idx >= 0) return openImageViewerByItem(items[idx], source);
             setupImageViewerZoomOnce();
             resetImageViewerZoom();
             img.src = url;
+            const title = document.querySelector('#imageViewerModal .modal-title');
+            if (title) title.innerHTML = `<i class="fa-solid fa-image me-2"></i>XEM ẢNH`;
+            setImageViewerButtonStates();
             openModal('imageViewerModal');
             return;
         }
@@ -2828,21 +3033,61 @@ function showCameraErrorUI(err) {
         if (w) w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`);
     }
 
+    function showImageViewerAt(offset) {
+        const ctx = imageViewerContext;
+        if (!ctx.source || !ctx.ids.length) return;
+        const items = getImageViewerItems(ctx.source);
+        if (!items.length) return closeImageViewer();
+        let currentId = ctx.ids[ctx.index];
+        let currentIndex = items.findIndex(x => x.id === currentId);
+        if (currentIndex < 0) currentIndex = Math.min(Math.max(ctx.index, 0), items.length - 1);
+        let nextIndex = (currentIndex + offset + items.length) % items.length;
+        imageViewerContext = { source: ctx.source, ids: items.map(x => x.id), index: nextIndex };
+        openImageViewerByItem(items[nextIndex], ctx.source);
+    }
+
+    function showPrevImageViewer() { showImageViewerAt(-1); }
+    function showNextImageViewer() { showImageViewerAt(1); }
+
+    function deleteCurrentViewerImage() {
+        const ctx = imageViewerContext;
+        const id = ctx.ids && ctx.ids[ctx.index];
+        if (!id) return alert('Ảnh này chỉ đang xem tạm, không có trong kho để xóa.');
+        if (!confirm('Xóa ảnh đang xem khỏi kho?')) return;
+        deleteFromDB(id);
+        repoBefore = repoBefore.filter(x => x.id !== id);
+        repoProcess = repoProcess.filter(x => x.id !== id);
+        repoAfter = repoAfter.filter(x => x.id !== id);
+        repoStitched = repoStitched.filter(x => x.id !== id);
+        if (Array.isArray(window.cameraViewerItems)) window.cameraViewerItems = window.cameraViewerItems.filter(x => x.id !== id);
+        updateUIState();
+        renderPending();
+        renderGallery();
+        const items = getImageViewerItems(ctx.source);
+        if (!items.length) return closeImageViewer();
+        const nextIndex = Math.min(ctx.index, items.length - 1);
+        imageViewerContext = { source: ctx.source, ids: items.map(x => x.id), index: nextIndex };
+        openImageViewerByItem(items[nextIndex], ctx.source);
+    }
+
     function closeImageViewer() {
         const img = document.getElementById("image-viewer-img");
         resetImageViewerZoom();
         if (img) img.src = "";
+        imageViewerContext = { source: null, ids: [], index: -1 };
         closeModal('imageViewerModal');
     }
 
     function renderPending() {
+        updatePendingSessionControls();
+        const displayRepos = getPendingReposForDisplay();
         const GAP_MS = 15 * 60 * 1000;
         const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => {
             if (repo.length === 0) return '<div class="small text-muted p-2 text-center">Trống</div>';
             let listHtml = '';
             repo.forEach((item, index) => {
                 const tStr = new Date(item.timestampMs).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' });
-                listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}')">${mapButtonHtml(item, 'top-map')}<div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
+                listHtml += `<div class="photo-card mb-2" id="card_${item.id}"><input type="${inputType}" name="${inputName}" value="${item.id}" class="form-check-input photo-${inputType === 'radio' ? 'radio' : 'checkbox'}"><img src="${item.dataUrl}" onclick="viewFullImage('${item.dataUrl}', 'pending', '${item.id}')">${mapButtonHtml(item, 'top-map')}<div class="p-1 px-2 small text-secondary fw-bold" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> ${tStr}</div></div>`;
                 
                 if (index < repo.length - 1) {
                     const nextItem = repo[index+1]; let isNewSession = (item.timestampMs - nextItem.timestampMs) > GAP_MS;
@@ -2860,9 +3105,9 @@ function showCameraErrorUI(err) {
             });
             return listHtml;
         };
-        document.getElementById("list-before").innerHTML = renderListWithSeparators(repoBefore, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
-        document.getElementById("list-process").innerHTML = renderListWithSeparators(repoProcess, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
-        document.getElementById("list-after").innerHTML = renderListWithSeparators(repoAfter, 'radioAfter', 'radio', 'success', 'SAU');
+        document.getElementById("list-before").innerHTML = renderListWithSeparators(displayRepos.before, 'radioBefore', 'radio', 'primary', 'TRƯỚC');
+        document.getElementById("list-process").innerHTML = renderListWithSeparators(displayRepos.process, 'checkQT', 'checkbox', 'warning', 'QUÁ TRÌNH');
+        document.getElementById("list-after").innerHTML = renderListWithSeparators(displayRepos.after, 'radioAfter', 'radio', 'success', 'SAU');
     }
     
     function renderGallery() {
@@ -2893,7 +3138,7 @@ function showCameraErrorUI(err) {
                         <div class="col-12 col-md-6" id="card_${session.id}">
                             <div class="photo-card stitched shadow-sm position-relative border border-primary">
                                 <input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${session.id}" onchange="calculateSelection()">
-                                <img src="${session.dataUrl}" onclick="viewFullImage('${session.dataUrl}')">${mapButtonHtml(session, 'top-map')}
+                                <img src="${session.dataUrl}" onclick="viewFullImage('${session.dataUrl}', 'gallery', '${session.id}')">${mapButtonHtml(session, 'top-map')}
                                 <div class="p-2 bg-dark">
                                     <div class="small fw-bold text-primary text-break">${session.name}</div>
                                     <div class="text-secondary" style="font-size:10px;"><i class="fa-solid fa-images me-1"></i> Ảnh Chốt Phiên (Trước/Sau)</div>
@@ -2907,7 +3152,7 @@ function showCameraErrorUI(err) {
                         <div class="photo-card stitched shadow-sm position-relative border border-warning">
                             <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span>
                             <input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()">
-                            <img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')">${mapButtonHtml(q, 'top-map')}
+                            <img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}', 'gallery', '${q.id}')">${mapButtonHtml(q, 'top-map')}
                             <div class="p-2 bg-dark">
                                     <div class="small fw-bold text-warning text-break">${q.name}</div>
                                     <div class="text-secondary" style="font-size:10px;"><i class="fa-regular fa-clock me-1"></i> Thống kê tiến độ</div>
@@ -2925,7 +3170,7 @@ function showCameraErrorUI(err) {
                 orphanQts.sort((a, b) => (a.qtTimeMs || a.timestampMs) - (b.qtTimeMs || b.timestampMs));
                 html += `<div class="card bg-dark border-warning mb-4 p-2 shadow-sm w-100"><div class="card-header bg-black bg-opacity-50 text-warning border-0 p-2 rounded-top"><span class="fw-bold small text-uppercase"><i class="fa-solid fa-triangle-exclamation me-2"></i>Ảnh Quá Trình Chưa Ghép Cặp Phiên</span></div><div class="card-body p-2 bg-black bg-opacity-25 rounded-bottom"><div class="row g-3">`;
                 orphanQts.forEach(q => {
-                    html += `<div class="col-12 col-sm-6" id="card_${q.id}"><div class="photo-card stitched shadow-sm position-relative border border-warning"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span><input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()"><img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}')">${mapButtonHtml(q, 'top-map')}<div class="p-2 bg-dark"><div class="small fw-bold text-warning text-break">${q.name}</div><div class="text-secondary" style="font-size:11px;">${q.timestampStr}</div></div></div></div>`;
+                    html += `<div class="col-12 col-sm-6" id="card_${q.id}"><div class="photo-card stitched shadow-sm position-relative border border-warning"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="z-index:2; font-size:9px;">QUÁ TRÌNH</span><input type="checkbox" class="form-check-input photo-checkbox gallery-item-check" data-id="${q.id}" onchange="calculateSelection()"><img src="${q.dataUrl}" onclick="viewFullImage('${q.dataUrl}', 'gallery', '${q.id}')">${mapButtonHtml(q, 'top-map')}<div class="p-2 bg-dark"><div class="small fw-bold text-warning text-break">${q.name}</div><div class="text-secondary" style="font-size:11px;">${q.timestampStr}</div></div></div></div>`;
                 });
                 html += `</div></div></div>`;
             }
