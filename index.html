@@ -84,8 +84,8 @@
         .camera-tools-shell { border: 1px solid #495057; border-radius: 12px; overflow: hidden; background: #111820; }
         .camera-tools-header { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:8px 10px; background:#0b1117; border-bottom:1px solid #343a40; }
         .camera-tools-body { padding: 10px; }
-         .ios-image-modal-img { max-width: 100%; max-height: 74vh; object-fit: contain; background: #000; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; transform-origin: center center; transition: transform 0.04s linear; will-change: transform; cursor: grab; }
-        .image-zoom-stage { width: 100%; height: 74vh; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; background: #000; border-radius: 8px; }
+         .ios-image-modal-img { max-width: 100%; max-height: 74vh; object-fit: contain; background: #000; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; transform-origin: center center; transition: none !important; will-change: transform; cursor: grab; pointer-events: none; }
+        .image-zoom-stage { width: 100%; height: 74vh; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; -ms-touch-action: none; overscroll-behavior: contain; background: #000; border-radius: 8px; -webkit-user-select: none; user-select: none; }
         .image-zoom-toolbar { gap: 6px; flex-wrap: wrap; }
         .image-zoom-hint { font-size: 10.5px; line-height: 1.25; color: #adb5bd; }
         @media (max-width: 430px) { .image-zoom-stage { height: 76vh; } .ios-image-modal-img { max-height: 76vh; } }
@@ -959,7 +959,7 @@ function showUpdateNotification() {
         <div id="image-zoom-stage" class="image-zoom-stage">
           <img id="image-viewer-img" src="" class="ios-image-modal-img" alt="Ảnh xem lớn">
         </div>
-        <div class="image-zoom-hint mt-2">Chụm 2 ngón để zoom, kéo ảnh khi đã phóng to, chạm đúp để phóng to/thu về.</div>
+        <div class="image-zoom-hint mt-2">Chụm 2 ngón để zoom, kéo 1 ngón khi đã phóng to, chạm đúp nhẹ để phóng to/thu về.</div>
       </div>
       <div class="modal-footer border-secondary p-2 justify-content-center image-zoom-toolbar">
         <button type="button" class="btn btn-outline-info btn-sm fw-bold" onclick="zoomImageViewer(1.25)"><i class="fa-solid fa-plus me-1"></i>PHÓNG</button>
@@ -2431,153 +2431,302 @@ function showCameraErrorUI(err) {
         } else { triggerBatchDownloads(itemsToShare); }
     }
     function triggerBatchDownloads(items) { items.forEach((item, index) => { setTimeout(() => { const a = document.createElement('a'); a.href = item.dataUrl; a.download = item.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }, index * 300); }); }
-    let imageViewerZoomState = { scale: 1, x: 0, y: 0, pointers: new Map(), lastDistance: 0, lastCenter: null, lastTap: 0, dragStart: null };
+    let imageViewerZoomState = {
+        scale: 1,
+        x: 0,
+        y: 0,
+        raf: 0,
+        pointers: new Map(),
+        lastTapTime: 0,
+        touch: {
+            active: false,
+            mode: "none",
+            startX: 0,
+            startY: 0,
+            startTime: 0,
+            startImgX: 0,
+            startImgY: 0,
+            startScale: 1,
+            startDist: 0,
+            startCenter: null,
+            moved: false
+        }
+    };
+
     function applyImageViewerTransform() {
         const img = document.getElementById("image-viewer-img");
         if (!img) return;
         const st = imageViewerZoomState;
-        img.style.transform = `translate(${st.x}px, ${st.y}px) scale(${st.scale})`;
+        if (st.raf) cancelAnimationFrame(st.raf);
+        st.raf = requestAnimationFrame(() => {
+            img.style.transform = `translate3d(${st.x}px, ${st.y}px, 0) scale(${st.scale})`;
+        });
     }
+
     function resetImageViewerZoom() {
         imageViewerZoomState.scale = 1;
         imageViewerZoomState.x = 0;
         imageViewerZoomState.y = 0;
-        imageViewerZoomState.lastDistance = 0;
-        imageViewerZoomState.lastCenter = null;
-        imageViewerZoomState.dragStart = null;
+        imageViewerZoomState.pointers.clear();
+        imageViewerZoomState.touch = {
+            active: false,
+            mode: "none",
+            startX: 0,
+            startY: 0,
+            startTime: 0,
+            startImgX: 0,
+            startImgY: 0,
+            startScale: 1,
+            startDist: 0,
+            startCenter: null,
+            moved: false
+        };
         applyImageViewerTransform();
     }
-    function zoomImageViewer(factor, cx, cy) {
-        setupImageViewerZoomOnce();
+
+    function clampImageScale(v) {
+        return Math.max(1, Math.min(8, Number(v) || 1));
+    }
+
+    function getZoomStagePoint(clientX, clientY) {
+        const stage = document.getElementById("image-zoom-stage");
+        const r = stage.getBoundingClientRect();
+        return { x: clientX - r.left - r.width / 2, y: clientY - r.top - r.height / 2 };
+    }
+
+    function clampImagePan() {
+        const stage = document.getElementById("image-zoom-stage");
+        const img = document.getElementById("image-viewer-img");
         const st = imageViewerZoomState;
-        const oldScale = st.scale || 1;
-        const nextScale = Math.max(1, Math.min(8, oldScale * factor));
-        if (window.__imageViewerZoomAt) {
-            window.__imageViewerZoomAt(nextScale, (cx !== undefined && cy !== undefined) ? {x: cx, y: cy} : {x: 0, y: 0});
+        if (!stage || !img || st.scale <= 1.001) {
+            if (st.scale <= 1.001) { st.x = 0; st.y = 0; }
             return;
         }
-        if (nextScale <= 1.001) { resetImageViewerZoom(); return; }
+        const sr = stage.getBoundingClientRect();
+        const ir = img.getBoundingClientRect();
+        const baseW = ir.width / st.scale;
+        const baseH = ir.height / st.scale;
+        const maxX = Math.max(0, (baseW * st.scale - sr.width) / 2 + 36);
+        const maxY = Math.max(0, (baseH * st.scale - sr.height) / 2 + 36);
+        st.x = Math.max(-maxX, Math.min(maxX, st.x));
+        st.y = Math.max(-maxY, Math.min(maxY, st.y));
+    }
+
+    function setImageViewerScale(nextScale, point) {
+        const st = imageViewerZoomState;
+        const oldScale = st.scale || 1;
+        nextScale = clampImageScale(nextScale);
+        if (nextScale <= 1.001) {
+            st.scale = 1; st.x = 0; st.y = 0;
+            applyImageViewerTransform();
+            return;
+        }
+        if (point && oldScale > 0) {
+            st.x = point.x - (point.x - st.x) * (nextScale / oldScale);
+            st.y = point.y - (point.y - st.y) * (nextScale / oldScale);
+        }
         st.scale = nextScale;
+        clampImagePan();
         applyImageViewerTransform();
     }
+
+    function zoomImageViewer(factor, cx, cy) {
+        setupImageViewerZoomOnce();
+        const stage = document.getElementById("image-zoom-stage");
+        const r = stage ? stage.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+        const p = (typeof cx === "number" && typeof cy === "number")
+            ? getZoomStagePoint(cx, cy)
+            : { x: 0, y: 0 };
+        setImageViewerScale((imageViewerZoomState.scale || 1) * factor, p);
+    }
+
     function setupImageViewerZoomOnce() {
         const stage = document.getElementById("image-zoom-stage");
         const img = document.getElementById("image-viewer-img");
-        if (!stage || !img || stage.dataset.zoomReady === "1") return;
-        stage.dataset.zoomReady = "1";
+        if (!stage || !img || stage.dataset.zoomReady === "2") return;
+        stage.dataset.zoomReady = "2";
+        img.setAttribute("draggable", "false");
 
-        const clampScale = (v) => Math.max(1, Math.min(8, v));
-        const stagePoint = (clientX, clientY) => {
-            const r = stage.getBoundingClientRect();
-            return { x: clientX - r.left - r.width / 2, y: clientY - r.top - r.height / 2 };
-        };
         const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
         const midpoint = (a, b) => ({ clientX: (a.clientX + b.clientX) / 2, clientY: (a.clientY + b.clientY) / 2 });
+        const movement = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
 
-        function zoomAt(nextScale, point) {
-            const st = imageViewerZoomState;
-            const oldScale = st.scale || 1;
-            nextScale = clampScale(nextScale);
-            if (nextScale <= 1.001) { resetImageViewerZoom(); return; }
-            if (point && oldScale > 0) {
-                st.x = point.x - (point.x - st.x) * (nextScale / oldScale);
-                st.y = point.y - (point.y - st.y) * (nextScale / oldScale);
-            }
-            st.scale = nextScale;
-            applyImageViewerTransform();
-        }
-        window.__imageViewerZoomAt = zoomAt;
-
-        // Chuột / bút / Android Chrome / iOS mới: Pointer Events
-        stage.addEventListener("pointerdown", (e) => {
-            e.preventDefault();
-            try { stage.setPointerCapture(e.pointerId); } catch (_) {}
-            imageViewerZoomState.pointers.set(e.pointerId, e);
-            const now = Date.now();
-            if (now - imageViewerZoomState.lastTap < 300 && imageViewerZoomState.pointers.size === 1) {
-                const p = stagePoint(e.clientX, e.clientY);
-                if (imageViewerZoomState.scale > 1.01) resetImageViewerZoom();
-                else zoomAt(2.4, p);
-            }
-            imageViewerZoomState.lastTap = now;
-            if (imageViewerZoomState.pointers.size === 1) {
-                imageViewerZoomState.dragStart = { clientX: e.clientX, clientY: e.clientY, x: imageViewerZoomState.x, y: imageViewerZoomState.y };
-            } else if (imageViewerZoomState.pointers.size === 2) {
-                const pts = Array.from(imageViewerZoomState.pointers.values());
-                imageViewerZoomState.lastDistance = dist(pts[0], pts[1]);
-            }
-        }, { passive: false });
-
-        stage.addEventListener("pointermove", (e) => {
-            if (!imageViewerZoomState.pointers.has(e.pointerId)) return;
-            e.preventDefault();
-            imageViewerZoomState.pointers.set(e.pointerId, e);
-            const pts = Array.from(imageViewerZoomState.pointers.values());
-            if (pts.length >= 2) {
-                const d = dist(pts[0], pts[1]);
-                if (imageViewerZoomState.lastDistance > 0) {
-                    const c = midpoint(pts[0], pts[1]);
-                    zoomAt(imageViewerZoomState.scale * (d / imageViewerZoomState.lastDistance), stagePoint(c.clientX, c.clientY));
-                }
-                imageViewerZoomState.lastDistance = d;
-            } else if (pts.length === 1 && imageViewerZoomState.scale > 1.01 && imageViewerZoomState.dragStart) {
-                const ds = imageViewerZoomState.dragStart;
-                imageViewerZoomState.x = ds.x + (e.clientX - ds.clientX);
-                imageViewerZoomState.y = ds.y + (e.clientY - ds.clientY);
-                applyImageViewerTransform();
-            }
-        }, { passive: false });
-
-        ["pointerup", "pointercancel", "pointerleave"].forEach(evt => stage.addEventListener(evt, (e) => {
-            imageViewerZoomState.pointers.delete(e.pointerId);
-            imageViewerZoomState.lastDistance = 0;
-            if (imageViewerZoomState.pointers.size === 0) imageViewerZoomState.dragStart = null;
-        }, { passive: false }));
-
-        // iOS Safari cũ trong PWA: Touch Events fallback
-        let touchMode = { lastDist: 0, drag: null };
+        // Touch riêng cho điện thoại: một ngón chỉ kéo, hai ngón chỉ zoom. Không dùng double-tap khi đang kéo.
         stage.addEventListener("touchstart", (e) => {
             e.preventDefault();
+            const st = imageViewerZoomState;
             if (e.touches.length === 1) {
                 const t = e.touches[0];
-                const now = Date.now();
-                if (now - imageViewerZoomState.lastTap < 300) {
-                    const p = stagePoint(t.clientX, t.clientY);
-                    if (imageViewerZoomState.scale > 1.01) resetImageViewerZoom();
-                    else zoomAt(2.4, p);
-                }
-                imageViewerZoomState.lastTap = now;
-                touchMode.drag = { clientX: t.clientX, clientY: t.clientY, x: imageViewerZoomState.x, y: imageViewerZoomState.y };
+                st.touch = {
+                    active: true,
+                    mode: "pan",
+                    startX: t.clientX,
+                    startY: t.clientY,
+                    startTime: Date.now(),
+                    startImgX: st.x,
+                    startImgY: st.y,
+                    startScale: st.scale,
+                    startDist: 0,
+                    startCenter: null,
+                    moved: false
+                };
             } else if (e.touches.length >= 2) {
-                touchMode.lastDist = dist(e.touches[0], e.touches[1]);
-                touchMode.drag = null;
+                const c = midpoint(e.touches[0], e.touches[1]);
+                st.touch = {
+                    active: true,
+                    mode: "pinch",
+                    startX: c.clientX,
+                    startY: c.clientY,
+                    startTime: Date.now(),
+                    startImgX: st.x,
+                    startImgY: st.y,
+                    startScale: st.scale,
+                    startDist: Math.max(1, dist(e.touches[0], e.touches[1])),
+                    startCenter: getZoomStagePoint(c.clientX, c.clientY),
+                    moved: true
+                };
             }
         }, { passive: false });
 
         stage.addEventListener("touchmove", (e) => {
             e.preventDefault();
+            const st = imageViewerZoomState;
+            const g = st.touch;
+            if (!g.active) return;
+
             if (e.touches.length >= 2) {
-                const d = dist(e.touches[0], e.touches[1]);
-                if (touchMode.lastDist > 0) {
-                    const c = midpoint(e.touches[0], e.touches[1]);
-                    zoomAt(imageViewerZoomState.scale * (d / touchMode.lastDist), stagePoint(c.clientX, c.clientY));
-                }
-                touchMode.lastDist = d;
-            } else if (e.touches.length === 1 && imageViewerZoomState.scale > 1.01 && touchMode.drag) {
+                const c = midpoint(e.touches[0], e.touches[1]);
+                const d = Math.max(1, dist(e.touches[0], e.touches[1]));
+                const center = getZoomStagePoint(c.clientX, c.clientY);
+                const nextScale = clampImageScale(g.startScale * (d / g.startDist));
+                st.scale = nextScale;
+                st.x = center.x - (g.startCenter.x - g.startImgX) * (nextScale / g.startScale);
+                st.y = center.y - (g.startCenter.y - g.startImgY) * (nextScale / g.startScale);
+                clampImagePan();
+                applyImageViewerTransform();
+                st.touch.mode = "pinch";
+                st.touch.moved = true;
+                return;
+            }
+
+            if (e.touches.length === 1 && g.mode === "pan") {
                 const t = e.touches[0];
-                imageViewerZoomState.x = touchMode.drag.x + (t.clientX - touchMode.drag.clientX);
-                imageViewerZoomState.y = touchMode.drag.y + (t.clientY - touchMode.drag.clientY);
+                const dx = t.clientX - g.startX;
+                const dy = t.clientY - g.startY;
+                if (movement(g.startX, g.startY, t.clientX, t.clientY) > 6) st.touch.moved = true;
+                if (st.scale > 1.001) {
+                    st.x = g.startImgX + dx;
+                    st.y = g.startImgY + dy;
+                    clampImagePan();
+                    applyImageViewerTransform();
+                }
+            }
+        }, { passive: false });
+
+        stage.addEventListener("touchend", (e) => {
+            e.preventDefault();
+            const st = imageViewerZoomState;
+            const g = st.touch;
+            if (!g.active) return;
+
+            // Chỉ nhận double-tap khi chạm nhẹ, không kéo, không chụm.
+            if (g.mode === "pan" && !g.moved && Date.now() - g.startTime < 260) {
+                const now = Date.now();
+                if (now - st.lastTapTime < 320) {
+                    const p = getZoomStagePoint(g.startX, g.startY);
+                    if (st.scale > 1.001) resetImageViewerZoom();
+                    else setImageViewerScale(2.5, p);
+                    st.lastTapTime = 0;
+                } else {
+                    st.lastTapTime = now;
+                }
+            }
+
+            if (e.touches.length === 0) {
+                st.touch.active = false;
+                st.touch.mode = "none";
+                clampImagePan();
+                applyImageViewerTransform();
+            } else if (e.touches.length === 1) {
+                // Sau khi nhả một ngón khỏi pinch, khởi tạo lại pan tại vị trí hiện tại để không bị giật.
+                const t = e.touches[0];
+                st.touch = {
+                    active: true,
+                    mode: "pan",
+                    startX: t.clientX,
+                    startY: t.clientY,
+                    startTime: Date.now(),
+                    startImgX: st.x,
+                    startImgY: st.y,
+                    startScale: st.scale,
+                    startDist: 0,
+                    startCenter: null,
+                    moved: true
+                };
+            }
+        }, { passive: false });
+
+        stage.addEventListener("touchcancel", (e) => {
+            e.preventDefault();
+            imageViewerZoomState.touch.active = false;
+            imageViewerZoomState.touch.mode = "none";
+        }, { passive: false });
+
+        // Pointer chỉ dùng cho chuột/bút để tránh điện thoại bị xử lý trùng touch + pointer.
+        stage.addEventListener("pointerdown", (e) => {
+            if (e.pointerType === "touch") return;
+            e.preventDefault();
+            try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+            const st = imageViewerZoomState;
+            st.pointers.set(e.pointerId, e);
+            st.touch = {
+                active: true,
+                mode: "pan",
+                startX: e.clientX,
+                startY: e.clientY,
+                startTime: Date.now(),
+                startImgX: st.x,
+                startImgY: st.y,
+                startScale: st.scale,
+                startDist: 0,
+                startCenter: null,
+                moved: false
+            };
+        }, { passive: false });
+
+        stage.addEventListener("pointermove", (e) => {
+            if (e.pointerType === "touch" || !imageViewerZoomState.pointers.has(e.pointerId)) return;
+            e.preventDefault();
+            const st = imageViewerZoomState;
+            const g = st.touch;
+            if (st.scale > 1.001 && g.active) {
+                st.x = g.startImgX + (e.clientX - g.startX);
+                st.y = g.startImgY + (e.clientY - g.startY);
+                clampImagePan();
                 applyImageViewerTransform();
             }
         }, { passive: false });
-        stage.addEventListener("touchend", () => { touchMode.lastDist = 0; touchMode.drag = null; }, { passive: false });
+
+        ["pointerup", "pointercancel", "pointerleave"].forEach(evt => stage.addEventListener(evt, (e) => {
+            if (e.pointerType === "touch") return;
+            imageViewerZoomState.pointers.delete(e.pointerId);
+            imageViewerZoomState.touch.active = false;
+        }, { passive: false }));
+
+        stage.addEventListener("dblclick", (e) => {
+            e.preventDefault();
+            const p = getZoomStagePoint(e.clientX, e.clientY);
+            if (imageViewerZoomState.scale > 1.001) resetImageViewerZoom();
+            else setImageViewerScale(2.5, p);
+        }, { passive: false });
 
         stage.addEventListener("wheel", (e) => {
             e.preventDefault();
-            const p = stagePoint(e.clientX, e.clientY);
-            zoomAt(imageViewerZoomState.scale * (e.deltaY < 0 ? 1.12 : 0.88), p);
+            const p = getZoomStagePoint(e.clientX, e.clientY);
+            setImageViewerScale(imageViewerZoomState.scale * (e.deltaY < 0 ? 1.12 : 0.88), p);
         }, { passive: false });
     }
+
     function viewFullImage(url) {
         const img = document.getElementById("image-viewer-img");
         if (img) {
@@ -2590,13 +2739,14 @@ function showCameraErrorUI(err) {
         const w = window.open();
         if (w) w.document.write(`<body style="margin:0; background:#000; display:flex; align-items:center; justify-content:center;"><img src="${url}" style="max-width:100%; max-height:100%;"></body>`);
     }
+
     function closeImageViewer() {
         const img = document.getElementById("image-viewer-img");
         resetImageViewerZoom();
         if (img) img.src = "";
         closeModal('imageViewerModal');
     }
-    
+
     function renderPending() {
         const GAP_MS = 15 * 60 * 1000;
         const renderListWithSeparators = (repo, inputName, inputType, color, typeStr) => {
