@@ -606,17 +606,49 @@ function showUpdateNotification() {
     </div>
 </div>
 
-            <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
-                <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-network-wired me-2"></i>Giải pháp 2: Kết nối WebRTC P2P (Mã QR cải tiến)</h6>
-                <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Hai máy kết nối chung một mạng Wifi nội bộ (hoặc một máy phát Hotspot). Trao đổi mã liên kết để tạo đường truyền nội bộ bắn ảnh siêu tốc.</p>
+            <div class="card bg-dark border-info p-3 mb-3 shadow-sm">
+                <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-network-wired me-2"></i>Giải pháp 2: Cầu truyền nội bộ kín SCADA (Hotspot + WebRTC)</h6>
+                <p class="text-secondary small mb-2" style="font-size:11px; line-height:1.45;">
+                    Dùng khi khu vực SCADA <b>không internet, không Wi-Fi sẵn có, không nối ra ngoài</b>. Một điện thoại/thiết bị giám sát tạm phát <b>Hotspot nội bộ riêng</b>, máy còn lại kết nối vào Hotspot đó; QR chỉ dùng để bắt tay, dữ liệu ảnh truyền trực tiếp trong mạng kín.
+                </p>
+                <div class="alert alert-warning bg-warning bg-opacity-10 border-warning text-warning small mb-2" style="font-size:11px; line-height:1.4;">
+                    <b>Lưu ý an toàn:</b> không kết nối thiết bị SCADA vào mạng này nếu quy định vận hành không cho phép. Nếu thiết bị không có Wi-Fi/Hotspot/Bluetooth/cáp thì WebRTC không thể truyền được; khi đó dùng Giải pháp 1 hoặc QR động.
+                </div>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-12 col-sm-6">
+                        <label class="small text-info fw-bold mb-1">Chế độ truyền:</label>
+                        <select id="p2p-transfer-mode" class="form-select form-select-sm bg-secondary text-white border-secondary">
+                            <option value="safe">Siêu ổn định - máy yếu / xa nguồn phát</option>
+                            <option value="balanced" selected>Cân bằng - khuyến nghị hiện trường</option>
+                            <option value="fast">Nhanh - máy khỏe / đứng gần nhau</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <label class="small text-info fw-bold mb-1">Mô hình kết nối kín:</label>
+                        <div class="small border border-secondary rounded bg-black bg-opacity-25 p-2 text-secondary" style="font-size:10.5px; line-height:1.35;">
+                            Máy A bật Hotspot riêng → Máy B nối vào Hotspot → A bấm Gửi → B bấm Nhận → quét/dán QR bắt tay.
+                        </div>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2 mb-3">
-                    <button class="btn btn-sm btn-outline-info flex-fill fw-bold py-2" onclick="startP2PHandshake(true)"><i class="fa-solid fa-paper-plane me-1"></i> MÁY A (GỬI)</button>
+                    <button class="btn btn-sm btn-outline-info flex-fill fw-bold py-2" onclick="startP2PHandshake(true)"><i class="fa-solid fa-wifi me-1"></i> MÁY A (PHÁT/GỬI)</button>
                     <button class="btn btn-sm btn-outline-warning flex-fill fw-bold py-2" onclick="startP2PHandshake(false)"><i class="fa-solid fa-inbox me-1"></i> MÁY B (NHẬN)</button>
                 </div>
-                
+
                 <div id="p2p-handshake-panel" class="border border-secondary rounded p-2 bg-black bg-opacity-25 d-none">
                     <div class="small fw-bold text-warning mb-2" id="p2p-status-lbl">Trạng thái: Đang chờ thao tác...</div>
-                    
+
+                    <div id="p2p-transfer-stats" class="d-none mb-2">
+                        <div class="d-flex justify-content-between small text-secondary mb-1" style="font-size:10.5px;">
+                            <span id="p2p-transfer-caption">Tiến độ truyền</span>
+                            <span id="p2p-transfer-percent">0%</span>
+                        </div>
+                        <progress id="p2p-transfer-progress" class="w-100" value="0" max="100"></progress>
+                        <div id="p2p-transfer-detail" class="small text-info text-center mt-1" style="font-size:10.5px;">0 / 0 mảnh</div>
+                    </div>
+
                     <div id="p2p-video-scan-container" class="d-none my-2 border border-info rounded overflow-hidden position-relative mx-auto" style="max-width: 320px; aspect-ratio: 4/3; background: #000;">
                         <video id="p2p-scanner-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
                         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 65%; height: 65%; border: 2px dashed #0dcaf0; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
@@ -625,9 +657,9 @@ function showUpdateNotification() {
                     <div id="p2p-qr-box" class="text-center my-2 p-2 bg-white rounded d-none mx-auto" style="width: 200px; height: 200px;">
                         <div id="p2p-qrcode-canvas" style="display: inline-block;"></div>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label class="small text-info fw-bold mb-1"><i class="fa-solid fa-key me-1"></i> Mã liên kết máy này (Chạm vào ô chữ để copy):</label>
+                        <label class="small text-info fw-bold mb-1"><i class="fa-solid fa-key me-1"></i> Mã liên kết máy này (chạm để copy):</label>
                         <textarea id="p2p-sdp-text" class="form-control form-control-sm bg-dark text-info small mb-1 text-center cursor-pointer fw-bold" style="font-size: 11px;" rows="2" readonly onclick="copyMySDP()" placeholder="Mã bắt tay liên kết..."></textarea>
                         <div id="p2p-copy-status" class="small text-success text-center d-none fw-bold" style="font-size:11px;"><i class="fa-solid fa-circle-check"></i> Đã sao chép mã thành công!</div>
                     </div>
@@ -812,7 +844,9 @@ function showUpdateNotification() {
                 <p class="text-info fw-bold mb-1"><i class="fa-solid fa-file-sharing me-1"></i> 10. TAB ĐỒNG BỘ - CHUYỂN DỮ LIỆU OFFLINE</p>
                 <ul class="text-secondary ps-3 mb-3">
                     <li><b>Xuất / Nhập file offline:</b> dùng để chuyển gói ảnh/dữ liệu giữa các máy qua Quick Share, Bluetooth, Zalo file hoặc USB.</li>
-                    <li><b>Kết nối WebRTC P2P:</b> dùng khi hai máy cùng mạng Wi-Fi hoặc một máy phát hotspot. Máy A gửi, Máy B nhận, quét/dán mã liên kết để kết nối.</li>
+                    <li><b>Cầu truyền nội bộ kín SCADA:</b> dùng khi không có internet và không có Wi‑Fi cơ quan. Một điện thoại/thiết bị giám sát bật <b>Hotspot riêng</b>, máy còn lại kết nối vào Hotspot đó. QR chỉ dùng để trao đổi mã bắt tay; dữ liệu ảnh truyền trực tiếp bằng WebRTC trong mạng nội bộ kín.</li>
+                    <li><b>Chế độ truyền P2P:</b> chọn <b>Siêu ổn định</b> khi máy yếu/đứng xa, <b>Cân bằng</b> cho hiện trường thông thường, <b>Nhanh</b> khi hai máy gần nhau và cấu hình tốt. Hệ thống tự chia dữ liệu thành mảnh nhỏ, theo dõi tiến độ, kiểm soát bộ đệm và yêu cầu phát lại mảnh thiếu.</li>
+                    <li><b>Lưu ý với SCADA cách ly:</b> không kết nối thiết bị SCADA vào Hotspot nếu quy định vận hành không cho phép. Nếu thiết bị không có Wi‑Fi/Hotspot/Bluetooth/cáp, WebRTC không có kênh truyền vật lý để chạy; khi đó dùng Giải pháp 1 hoặc QR động.</li>
                     <li><b>QR động:</b> dùng khi hai máy không có mạng nội bộ. Máy phát chia dữ liệu thành nhiều mảnh QR liên tiếp; có thể chọn thời gian hiện mỗi QR, xem tổng số mảnh/tiến độ và nhập các mảnh thiếu để phát lại. Máy nhận hiển thị tổng số mảnh, số đã nhận, số chưa nhận và danh sách mảnh còn thiếu; khi đủ mảnh thì bấm <b>NẠP DỮ LIỆU VÀO KHO</b>. Với kho ảnh lớn, nên ưu tiên Giải pháp 1 hoặc 2 vì QR động sẽ cần rất nhiều mảnh.</li>
                 </ul>
 
@@ -922,6 +956,9 @@ function showUpdateNotification() {
 
     let p2pConnection = null;
     let p2pDataChannel = null;
+    let p2pSendChunksCache = [];
+    let p2pSendSessionId = null;
+    let p2pReceiveState = null;
     let animatedQrTimer = null;
     let animatedQrChunks = [];
     let animatedQrSessionId = null;
@@ -2444,49 +2481,223 @@ function cancelImportFile() {
 }
 
     // --- GIẢI PHÁP 2: WEBRTC PEER-TO-PEER ĐỒNG BỘ TUẦN TỰ TRÁNH TRÀN BỘ ĐỆM DI ĐỘNG ---
+    function getP2PModeSettings() {
+        const mode = (document.getElementById("p2p-transfer-mode") || {}).value || "balanced";
+        const table = {
+            safe: { chunkSize: 18000, highWater: 90000, delay: 45, label: "Siêu ổn định" },
+            balanced: { chunkSize: 32000, highWater: 180000, delay: 18, label: "Cân bằng" },
+            fast: { chunkSize: 56000, highWater: 360000, delay: 4, label: "Nhanh" }
+        };
+        return table[mode] || table.balanced;
+    }
+
+    function formatP2PBytes(bytes) {
+        if (!bytes && bytes !== 0) return "0 B";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return (bytes / 1024 / 1024).toFixed(2) + " MB";
+    }
+
+    function updateP2PProgress(caption, done, total, detail) {
+        const box = document.getElementById("p2p-transfer-stats");
+        const bar = document.getElementById("p2p-transfer-progress");
+        const pct = document.getElementById("p2p-transfer-percent");
+        const cap = document.getElementById("p2p-transfer-caption");
+        const det = document.getElementById("p2p-transfer-detail");
+        if (!box || !bar) return;
+        const percent = total ? Math.min(100, Math.round(done * 100 / total)) : 0;
+        box.classList.remove("d-none");
+        bar.value = percent;
+        if (pct) pct.innerText = percent + "%";
+        if (cap) cap.innerText = caption || "Tiến độ truyền";
+        if (det) det.innerText = detail || `${done} / ${total} mảnh`;
+    }
+
     function initWebRTCP2P(isInitiator) {
-        p2pConnection = new RTCPeerConnection({ iceServers: [] });
-        if (isInitiator) { p2pDataChannel = p2pConnection.createDataChannel("syncChannel"); setupDataChannelHandlers(p2pDataChannel); } 
-        else { p2pConnection.ondatachannel = (event) => { p2pDataChannel = event.channel; setupDataChannelHandlers(p2pDataChannel); }; }
-        p2pConnection.onicecandidate = (e) => { if (!e.candidate) { displayLocalSDPQR(JSON.stringify(p2pConnection.localDescription)); } };
+        if (p2pConnection) {
+            try { p2pConnection.close(); } catch(e) {}
+        }
+
+        p2pConnection = new RTCPeerConnection({
+            iceServers: [],
+            iceCandidatePoolSize: 0
+        });
+
+        p2pConnection.oniceconnectionstatechange = () => {
+            const statusLbl = document.getElementById("p2p-status-lbl");
+            if (!statusLbl || !p2pConnection) return;
+            const st = p2pConnection.iceConnectionState;
+            if (st === "connected" || st === "completed") {
+                statusLbl.className = "small fw-bold text-success";
+                statusLbl.innerText = "✅ Đã nối được kênh nội bộ kín. Có thể truyền dữ liệu không cần internet.";
+            } else if (st === "failed" || st === "disconnected") {
+                statusLbl.className = "small fw-bold text-danger";
+                statusLbl.innerText = "❌ Kênh nội bộ bị ngắt. Kiểm tra lại Hotspot/Wi‑Fi nội bộ, để hai máy gần nhau rồi bắt tay lại.";
+            } else if (st === "checking") {
+                statusLbl.className = "small fw-bold text-info";
+                statusLbl.innerText = "⏳ Đang dò đường truyền nội bộ giữa hai máy...";
+            }
+        };
+
+        if (isInitiator) {
+            p2pDataChannel = p2pConnection.createDataChannel("syncChannel", { ordered: true });
+            setupDataChannelHandlers(p2pDataChannel);
+        } else {
+            p2pConnection.ondatachannel = (event) => {
+                p2pDataChannel = event.channel;
+                setupDataChannelHandlers(p2pDataChannel);
+            };
+        }
+
+        p2pConnection.onicecandidate = (e) => {
+            if (!e.candidate) {
+                displayLocalSDPQR(JSON.stringify(p2pConnection.localDescription));
+            }
+        };
     }
 
     function setupDataChannelHandlers(channel) {
+        channel.binaryType = "arraybuffer";
+        channel.bufferedAmountLowThreshold = 65536;
+
         channel.onopen = () => {
+            const mode = getP2PModeSettings();
             document.getElementById("p2p-status-lbl").className = "small fw-bold text-success";
-            document.getElementById("p2p-status-lbl").innerText = "Trạng thái: ĐÃ THÔNG LUỒNG KẾT NỐI P2P! Sẵn sàng bắn dữ liệu.";
+            document.getElementById("p2p-status-lbl").innerText = `Trạng thái: ĐÃ THÔNG LUỒNG P2P NỘI BỘ KÍN (${mode.label}). Sẵn sàng bắn dữ liệu.`;
             document.getElementById("btn-p2p-send-data").classList.remove("d-none");
             document.getElementById("p2p-qr-box").classList.add("d-none");
         };
-        
-        // 🛠️ NÂNG CẤP: Lắng nghe và gom mảnh dữ liệu ảnh tuần tự theo mô hình Streaming Pacing
-        channel.onmessage = (event) => {
+
+        channel.onclose = () => {
+            const statusLbl = document.getElementById("p2p-status-lbl");
+            if (statusLbl) {
+                statusLbl.className = "small fw-bold text-warning";
+                statusLbl.innerText = "⚠️ Kênh P2P đã đóng. Nếu chưa truyền xong, hãy bắt tay lại.";
+            }
+        };
+
+        channel.onmessage = async (event) => {
             try {
                 const packet = JSON.parse(event.data);
                 const statusLbl = document.getElementById("p2p-status-lbl");
-                
+
                 if (packet.type === "P2P_START") {
-                    p2pIncomingBuffer = [];
-                    statusLbl.className = "small fw-bold text-info animate-pulse";
-                    statusLbl.innerText = `⏳ Đang nhận luồng ảnh trực tiếp... (Tổng số: ${packet.total} ảnh)`;
-                } 
-                else if (packet.type === "P2P_ITEM") {
-                    p2pIncomingBuffer.push(packet.item);
-                    statusLbl.innerText = `⏳ Đang nạp gói ảnh vào bộ đệm... (${p2pIncomingBuffer.length} ảnh đã nhận)`;
-                } 
-                else if (packet.type === "P2P_END") {
-                    let tx = db.transaction("photos", "readwrite");
-                    let store = tx.objectStore("photos");
-                    p2pIncomingBuffer.forEach(item => store.put(item));
-                    tx.oncomplete = () => {
-                        statusLbl.className = "small fw-bold text-success";
-                        statusLbl.innerText = `✅ Đồng bộ thành công! Đã nạp ${p2pIncomingBuffer.length} bản ghi vào thiết bị.`;
-                        alert(`Máy B nhận thành công toàn bộ ${p2pIncomingBuffer.length} ảnh trực tiếp từ Máy A!`);
-                        loadDataFromDB(); setTimeout(calculateStorageQuota, 300); p2pIncomingBuffer = [];
+                    p2pReceiveState = {
+                        sessionId: packet.sessionId,
+                        totalChunks: packet.totalChunks,
+                        totalRecords: packet.totalRecords,
+                        totalBytes: packet.totalBytes,
+                        chunks: new Array(packet.totalChunks),
+                        received: new Set()
                     };
+                    if (statusLbl) {
+                        statusLbl.className = "small fw-bold text-info";
+                        statusLbl.innerText = `⏳ Đang nhận gói SCADA kín: ${packet.totalRecords} bản ghi, ${formatP2PBytes(packet.totalBytes)}.`;
+                    }
+                    updateP2PProgress("Máy B đang nhận dữ liệu", 0, packet.totalChunks, `0 / ${packet.totalChunks} mảnh`);
+                    try { channel.send(JSON.stringify({ type: "P2P_READY", sessionId: packet.sessionId })); } catch(e) {}
+                    return;
                 }
-            } catch(e) { console.error("Lỗi luồng nhận P2P:", e); }
+
+                if (packet.type === "P2P_CHUNK") {
+                    if (!p2pReceiveState || p2pReceiveState.sessionId !== packet.sessionId) return;
+                    if (!p2pReceiveState.received.has(packet.index)) {
+                        p2pReceiveState.chunks[packet.index] = packet.data;
+                        p2pReceiveState.received.add(packet.index);
+                    }
+                    const got = p2pReceiveState.received.size;
+                    const total = p2pReceiveState.totalChunks;
+                    updateP2PProgress("Máy B đang nhận dữ liệu", got, total, `${got} / ${total} mảnh | còn thiếu ${Math.max(total - got, 0)}`);
+                    if (statusLbl) statusLbl.innerText = `⏳ Đang nhận mảnh dữ liệu... ${got}/${total}`;
+                    return;
+                }
+
+                if (packet.type === "P2P_END") {
+                    if (!p2pReceiveState || p2pReceiveState.sessionId !== packet.sessionId) return;
+                    const missing = [];
+                    for (let i = 0; i < p2pReceiveState.totalChunks; i++) {
+                        if (!p2pReceiveState.received.has(i)) missing.push(i);
+                    }
+                    if (missing.length > 0) {
+                        if (statusLbl) {
+                            statusLbl.className = "small fw-bold text-warning";
+                            statusLbl.innerText = `⚠️ Còn thiếu ${missing.length} mảnh. Đang yêu cầu máy A phát lại tự động...`;
+                        }
+                        updateP2PProgress("Máy B còn thiếu mảnh", p2pReceiveState.received.size, p2pReceiveState.totalChunks, `Thiếu: ${missing.slice(0, 20).map(x => x + 1).join(", ")}${missing.length > 20 ? "..." : ""}`);
+                        try { channel.send(JSON.stringify({ type: "P2P_RESEND_REQUEST", sessionId: packet.sessionId, missing })); } catch(e) {}
+                    } else {
+                        await finalizeP2PReceive();
+                    }
+                    return;
+                }
+
+                if (packet.type === "P2P_RESEND_REQUEST") {
+                    if (!p2pSendChunksCache.length || packet.sessionId !== p2pSendSessionId) return;
+                    if (statusLbl) {
+                        statusLbl.className = "small fw-bold text-warning";
+                        statusLbl.innerText = `🔁 Máy B yêu cầu phát lại ${packet.missing.length} mảnh. Đang gửi bổ sung...`;
+                    }
+                    await resendP2PChunks(packet.missing || []);
+                    return;
+                }
+
+                if (packet.type === "P2P_COMPLETE") {
+                    if (statusLbl) {
+                        statusLbl.className = "small fw-bold text-success";
+                        statusLbl.innerText = `✅ Máy B xác nhận đã nhận đủ và nạp ${packet.totalRecords || 0} bản ghi.`;
+                    }
+                    const btn = document.getElementById("btn-p2p-send-data");
+                    if (btn) {
+                        btn.removeAttribute("disabled");
+                        btn.className = "btn btn-sm btn-outline-success w-100 fw-bold py-3 mt-2";
+                        btn.innerHTML = `<i class="fa-solid fa-check-double me-1"></i> MÁY B ĐÃ NHẬN ĐỦ`;
+                    }
+                    return;
+                }
+
+                // Tương thích ngược với gói P2P_ITEM cũ nếu máy đối diện chưa cập nhật.
+                if (packet.type === "P2P_START_OLD" || packet.type === "P2P_ITEM" || packet.type === "P2P_END_OLD") {
+                    if (packet.type === "P2P_ITEM") p2pIncomingBuffer.push(packet.item);
+                }
+            } catch(e) {
+                console.error("Lỗi luồng nhận P2P:", e);
+            }
         };
+    }
+
+    async function finalizeP2PReceive() {
+        const statusLbl = document.getElementById("p2p-status-lbl");
+        try {
+            if (!p2pReceiveState) return;
+            if (statusLbl) {
+                statusLbl.className = "small fw-bold text-info";
+                statusLbl.innerText = "⏳ Đã nhận đủ mảnh. Đang ghép và nạp dữ liệu vào kho ảnh...";
+            }
+            const raw = p2pReceiveState.chunks.join("");
+            const allData = JSON.parse(raw);
+            let tx = db.transaction("photos", "readwrite");
+            let store = tx.objectStore("photos");
+            allData.forEach(item => store.put(item));
+            tx.oncomplete = () => {
+                const total = allData.length;
+                if (statusLbl) {
+                    statusLbl.className = "small fw-bold text-success";
+                    statusLbl.innerText = `✅ Đồng bộ thành công! Đã nạp ${total} bản ghi vào thiết bị.`;
+                }
+                updateP2PProgress("Máy B đã nhận đủ dữ liệu", p2pReceiveState.totalChunks, p2pReceiveState.totalChunks, `Đã nạp ${total} bản ghi vào kho`);
+                try { p2pDataChannel.send(JSON.stringify({ type: "P2P_COMPLETE", sessionId: p2pReceiveState.sessionId, totalRecords: total })); } catch(e) {}
+                alert(`Máy B nhận thành công toàn bộ ${total} ảnh/bản ghi trực tiếp từ Máy A!`);
+                loadDataFromDB();
+                setTimeout(calculateStorageQuota, 300);
+                p2pReceiveState = null;
+            };
+        } catch(err) {
+            if (statusLbl) {
+                statusLbl.className = "small fw-bold text-danger";
+                statusLbl.innerText = "❌ Lỗi ghép dữ liệu nhận được: " + err.message;
+            }
+            alert("Lỗi khi ghép/nạp dữ liệu P2P: " + err.message);
+        }
     }
 
     function startP2PHandshake(isInitiator) {
@@ -2495,12 +2706,20 @@ function cancelImportFile() {
         document.getElementById("p2p-sdp-text").value = "";
         document.getElementById("p2p-remote-sdp-text").value = "";
         document.getElementById("btn-p2p-send-data").classList.add("d-none");
-        
+        const stats = document.getElementById("p2p-transfer-stats");
+        if (stats) stats.classList.add("d-none");
+        p2pSendChunksCache = [];
+        p2pSendSessionId = null;
+        p2pReceiveState = null;
+
         if (isInitiator) {
-            document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy A): Đang sinh khóa Offer...";
-            initWebRTCP2P(true); p2pConnection.createOffer().then(offer => p2pConnection.setLocalDescription(offer));
+            document.getElementById("p2p-status-lbl").className = "small fw-bold text-info";
+            document.getElementById("p2p-status-lbl").innerText = "Máy A: bật Hotspot nội bộ trước, chờ Máy B kết nối xong rồi quét/dán mã Offer này.";
+            initWebRTCP2P(true);
+            p2pConnection.createOffer().then(offer => p2pConnection.setLocalDescription(offer));
         } else {
-            document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy B): Hãy dán mã hoặc quét mã Offer từ Máy A...";
+            document.getElementById("p2p-status-lbl").className = "small fw-bold text-warning";
+            document.getElementById("p2p-status-lbl").innerText = "Máy B: hãy kết nối Wi‑Fi vào Hotspot của Máy A, sau đó dán hoặc quét mã Offer từ Máy A.";
             initWebRTCP2P(false);
         }
     }
@@ -2512,7 +2731,6 @@ function cancelImportFile() {
         if (window.QRCode) { new QRCode(canvasContainer, { text: sdpText, width: 184, height: 184, correctLevel: QRCode.CorrectLevel.L }); }
     }
 
-    // 🛠️ NÂNG CẤP: Chức năng chạm tay vào ô là Copy luôn mã liên kết nội bộ công nghiệp
     function copyMySDP() {
         const textarea = document.getElementById("p2p-sdp-text"); if (!textarea.value) return;
         textarea.select();
@@ -2526,7 +2744,6 @@ function cancelImportFile() {
         });
     }
 
-    // 🛠️ NÂNG CẤP: Cho phép dán văn bản để chủ động nhấn nút "Kết nối bằng mã dán"
     function connectP2PManual() {
         const remoteStr = document.getElementById("p2p-remote-sdp-text").value.trim();
         if (!remoteStr) return alert("Vui lòng dán chuỗi mã bắt tay nhận được từ máy đối diện vào ô nhập trước!");
@@ -2546,7 +2763,7 @@ function cancelImportFile() {
         }
 
         const detector = new BarcodeDetector({ formats: ['qr_code'] });
-        document.getElementById("p2p-status-lbl").className = "small fw-bold text-info animate-pulse";
+        document.getElementById("p2p-status-lbl").className = "small fw-bold text-info";
         document.getElementById("p2p-status-lbl").innerText = "Trạng thái: 📷 ĐANG QUÉT MÃ QR CỦA MÁY ĐỐI DIỆN...";
 
         let timer = setInterval(async () => {
@@ -2568,55 +2785,113 @@ function cancelImportFile() {
             let sdpObj = JSON.parse(scannedSdp);
             p2pConnection.setRemoteDescription(new RTCSessionDescription(sdpObj)).then(() => {
                 if (sdpObj.type === "offer") {
-                    document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy B): Đang tính toán chuỗi phản hồi (Answer)...";
+                    document.getElementById("p2p-status-lbl").innerText = "Máy B: Đã nhận Offer. Đang sinh Answer để đưa lại cho Máy A...";
                     p2pConnection.createAnswer().then(answer => p2pConnection.setLocalDescription(answer));
                 } else if (sdpObj.type === "answer") {
-                    document.getElementById("p2p-status-lbl").innerText = "Trạng thái (Máy A): Cấu hình khớp! Kênh truyền đang thông mạch...";
+                    document.getElementById("p2p-status-lbl").innerText = "Máy A: Đã nhận Answer. Đang mở kênh truyền nội bộ...";
                 }
             });
         } catch(err) { alert("Mã bắt tay không đúng cấu trúc: " + err.message); }
     }
 
-    // 🛠️ NÂNG CẤP: Thuật toán bắn ảnh tuần tự phân đoạn (Streaming Pacing) chống sập luồng truyền dữ liệu di động
-    function sendDataOverP2P() {
+    function waitP2PBufferLow(channel, highWater) {
+        if (!channel || channel.bufferedAmount < highWater) return Promise.resolve();
+        return new Promise(resolve => {
+            const done = () => {
+                channel.removeEventListener("bufferedamountlow", done);
+                resolve();
+            };
+            channel.addEventListener("bufferedamountlow", done, { once: true });
+            setTimeout(done, 250);
+        });
+    }
+
+    function sleepP2P(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function resendP2PChunks(missing) {
+        if (!p2pDataChannel || p2pDataChannel.readyState !== "open") return;
+        const mode = getP2PModeSettings();
+        for (let i = 0; i < missing.length; i++) {
+            const index = missing[i];
+            if (p2pSendChunksCache[index] === undefined) continue;
+            await waitP2PBufferLow(p2pDataChannel, mode.highWater);
+            p2pDataChannel.send(JSON.stringify({
+                type: "P2P_CHUNK",
+                sessionId: p2pSendSessionId,
+                index,
+                data: p2pSendChunksCache[index]
+            }));
+            updateP2PProgress("Máy A đang phát lại mảnh thiếu", i + 1, missing.length, `Phát lại ${i + 1}/${missing.length} mảnh`);
+            if (mode.delay) await sleepP2P(mode.delay);
+        }
+        p2pDataChannel.send(JSON.stringify({ type: "P2P_END", sessionId: p2pSendSessionId }));
+    }
+
+    async function sendDataOverP2P() {
         if (!p2pDataChannel || p2pDataChannel.readyState !== "open") return alert("Kênh truyền trực tiếp chưa thông suốt!");
-        const btn = document.getElementById("btn-p2p-send-data"); btn.setAttribute("disabled", "true");
-        
-        db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = (e) => {
+        const btn = document.getElementById("btn-p2p-send-data");
+        const statusLbl = document.getElementById("p2p-status-lbl");
+        const mode = getP2PModeSettings();
+        btn.setAttribute("disabled", "true");
+
+        db.transaction("photos", "readonly").objectStore("photos").getAll().onsuccess = async (e) => {
             const allData = e.target.result || [];
             if (allData.length === 0) { btn.removeAttribute("disabled"); return alert("Kho lưu trữ trống, không có ảnh hiện trường để gửi!"); }
-            
+
             try {
-                // Đẩy gói tín hiệu mở màn báo tổng số lượng ảnh sắp truyền
-                p2pDataChannel.send(JSON.stringify({ type: "P2P_START", total: allData.length }));
-                
-                let currentIndex = 0;
-                function streamNextItem() {
-                    if (currentIndex < allData.length) {
-                        btn.innerText = `⏳ ĐANG TRUYỀN TẢI... (${currentIndex + 1}/${allData.length} ẢNH)`;
-                        
-                        p2pDataChannel.send(JSON.stringify({
-                            type: "P2P_ITEM",
-                            item: allData[currentIndex],
-                            index: currentIndex
-                        }));
-                        
-                        currentIndex++;
-                        setTimeout(streamNextItem, 100); // Khoảng giãn cách 100ms an toàn tuyệt đối cho phần cứng di động
-                    } else {
-                        // Đẩy gói tín hiệu kết thúc luồng truyền để ép máy B lưu kho IndexedDB
-                        p2pDataChannel.send(JSON.stringify({ type: "P2P_END" }));
-                        btn.removeAttribute("disabled");
-                        btn.className = "btn btn-sm btn-outline-success w-100 fw-bold py-3 mt-2";
-                        btn.innerHTML = `<i class="fa-solid fa-check-double me-1"></i> ĐÃ GỬI XONG ${allData.length} ẢNH`;
-                        alert(`Đã truyền tải thành công toàn bộ ${allData.length} ảnh hiện trường sang Máy B an toàn!`);
-                    }
+                const payload = JSON.stringify(allData);
+                p2pSendSessionId = "P2P_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+                p2pSendChunksCache = [];
+                for (let i = 0; i < payload.length; i += mode.chunkSize) {
+                    p2pSendChunksCache.push(payload.slice(i, i + mode.chunkSize));
                 }
-                streamNextItem();
-                
+
+                p2pDataChannel.send(JSON.stringify({
+                    type: "P2P_START",
+                    sessionId: p2pSendSessionId,
+                    totalRecords: allData.length,
+                    totalBytes: payload.length,
+                    totalChunks: p2pSendChunksCache.length,
+                    chunkSize: mode.chunkSize,
+                    mode: mode.label
+                }));
+
+                if (statusLbl) {
+                    statusLbl.className = "small fw-bold text-info";
+                    statusLbl.innerText = `⏳ Đang truyền ${allData.length} bản ghi qua mạng nội bộ kín (${mode.label})...`;
+                }
+
+                for (let i = 0; i < p2pSendChunksCache.length; i++) {
+                    await waitP2PBufferLow(p2pDataChannel, mode.highWater);
+                    p2pDataChannel.send(JSON.stringify({
+                        type: "P2P_CHUNK",
+                        sessionId: p2pSendSessionId,
+                        index: i,
+                        data: p2pSendChunksCache[i]
+                    }));
+                    btn.innerText = `⏳ ĐANG TRUYỀN... (${i + 1}/${p2pSendChunksCache.length} MẢNH)`;
+                    updateP2PProgress("Máy A đang gửi dữ liệu", i + 1, p2pSendChunksCache.length, `${i + 1} / ${p2pSendChunksCache.length} mảnh | ${formatP2PBytes(payload.length)}`);
+                    if (mode.delay) await sleepP2P(mode.delay);
+                }
+
+                await waitP2PBufferLow(p2pDataChannel, mode.highWater);
+                p2pDataChannel.send(JSON.stringify({ type: "P2P_END", sessionId: p2pSendSessionId }));
+                btn.removeAttribute("disabled");
+                btn.className = "btn btn-sm btn-outline-success w-100 fw-bold py-3 mt-2";
+                btn.innerHTML = `<i class="fa-solid fa-check-double me-1"></i> ĐÃ PHÁT XONG - CHỜ MÁY B XÁC NHẬN`;
+                if (statusLbl) {
+                    statusLbl.className = "small fw-bold text-success";
+                    statusLbl.innerText = `✅ Máy A đã phát xong ${p2pSendChunksCache.length} mảnh. Nếu Máy B thiếu mảnh, hệ thống sẽ tự phát lại.`;
+                }
             } catch(err) {
                 btn.removeAttribute("disabled"); btn.innerText = "BẮN TOÀN BỘ ẢNH SANG MÁY B";
-                alert("Lỗi luồng truyền: " + err.message + "\nHãy thử lại hoặc chọn Giải pháp 1 (Xuất file JSON).");
+                if (statusLbl) {
+                    statusLbl.className = "small fw-bold text-danger";
+                    statusLbl.innerText = "❌ Lỗi luồng truyền: " + err.message;
+                }
+                alert("Lỗi luồng truyền: " + err.message + "\nHãy thử chế độ Siêu ổn định hoặc chọn Giải pháp 1 (Xuất file JSON).");
             }
         };
     }
