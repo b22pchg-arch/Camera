@@ -171,7 +171,7 @@ function showUpdateNotification() {
 }
     </script>
     <script src="qrcode.min.js"></script>
-	<script src="html5-qrcode.min.js"></script>
+	<script src="jsQR.min.js"></script>
 </head>
 <body>
 
@@ -698,7 +698,7 @@ function showUpdateNotification() {
                 <div class="border border-warning rounded p-2 mt-3 bg-black bg-opacity-25">
                     <div class="small text-warning fw-bold mb-2"><i class="fa-solid fa-camera-retro me-1"></i> MÁY ĐỌC QR NHẬN DỮ LIỆU</div>
                     <div class="row g-2">
-                        <div class="col-6"><button id="btn-animated-recv" class="btn btn-sm btn-outline-warning w-100 fw-bold py-2" onclick="startAnimatedQRReceiver()"><i class="fa-solid fa-expand me-1"></i> BẬT MÁY ĐỌC QR</button></div>
+                        <div class="col-6"><button id="btn-animated-recv" class="btn btn-sm btn-outline-warning w-100 fw-bold py-2" onclick="startAnimatedQRReceiver()"><i class="fa-solid fa-expand me-1"></i> BẬT ĐỌC QR</button></div>
                         <div class="col-6"><button class="btn btn-sm btn-outline-danger w-100 fw-bold py-2" onclick="stopAnimatedQRReceiver()"><i class="fa-solid fa-stop me-1"></i> DỪNG ĐỌC</button></div>
                     </div>
                     <div id="animated-qr-receiver-panel" class="d-none mt-2">
