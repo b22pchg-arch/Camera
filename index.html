@@ -18,8 +18,20 @@
     
     <style>
         body { background-color: #1a1d20; color: #e9ecef; font-family: system-ui, -apple-system, sans-serif; }
-        .nav-tabs .nav-link { color: #adb5bd; border: none; font-weight: bold; font-size: 13px; padding: 10px 5px; }
+        .nav-tabs .nav-item { min-width: 0; }
+        .nav-tabs .nav-link { color: #adb5bd; border: none; font-weight: bold; font-size: 13px; padding: 10px 5px; white-space: nowrap; line-height: 1.12; overflow: hidden; text-overflow: clip; }
         .nav-tabs .nav-link.active { background-color: #212529; color: #0dcaf0; border-bottom: 3px solid #0dcaf0; }
+        .nav-tabs .nav-link i { font-size: 15px; line-height: 1; }
+        @media (max-width: 430px) {
+            .nav-tabs .nav-link { font-size: 11px; padding: 8px 2px; letter-spacing: -0.2px; }
+            .nav-tabs .nav-link i { font-size: 14px; margin-bottom: 2px !important; }
+            #help-tab { font-size: 10.5px; letter-spacing: -0.35px; }
+        }
+        @media (max-width: 360px) {
+            .nav-tabs .nav-link { font-size: 10px; padding-left: 1px; padding-right: 1px; }
+            .nav-tabs .nav-link i { font-size: 13px; }
+            #help-tab { font-size: 9.8px; }
+        }
         
         #camera-wrapper { background: #000; border-radius: 12px; overflow: hidden; max-width: 640px; margin: 0 auto; border: 1px solid #495057; }
         #camera-container { position: relative; aspect-ratio: 16/9; width: 100%; background: #000; }
@@ -196,8 +208,8 @@ function showUpdateNotification() {
             </button>
         </li>
         <li class="nav-item flex-fill text-center" role="presentation">
-            <button class="nav-link w-100" id="help-tab" data-bs-toggle="tab" data-bs-target="#help-content" type="button" role="tab">
-                <i class="fa-solid fa-circle-info mb-1 d-block"></i> HDSD
+            <button class="nav-link w-100" id="help-tab" data-bs-toggle="tab" data-bs-target="#help-content" type="button" role="tab" title="Hướng dẫn sử dụng">
+                <i class="fa-solid fa-circle-info mb-1 d-block"></i><span class="tab-text-nowrap">HDSD</span>
             </button>
         </li>
     </ul>
