@@ -84,11 +84,87 @@
         .camera-tools-shell { border: 1px solid #495057; border-radius: 12px; overflow: hidden; background: #111820; }
         .camera-tools-header { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:8px 10px; background:#0b1117; border-bottom:1px solid #343a40; }
         .camera-tools-body { padding: 10px; }
-         .ios-image-modal-img { max-width: 100%; max-height: 74vh; object-fit: contain; background: #000; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; transform-origin: center center; transition: none !important; will-change: transform; cursor: grab; pointer-events: none; }
-        .image-zoom-stage { width: 100%; height: 74vh; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; -ms-touch-action: none; overscroll-behavior: contain; background: #000; border-radius: 8px; -webkit-user-select: none; user-select: none; }
+        /* --- V57: modal xem ảnh full màn hình thật sự cho mobile, tablet và điện thoại gập --- */
+        #imageViewerModal {
+            padding: 0 !important;
+            overflow: hidden !important;
+            background: #000 !important;
+            overscroll-behavior: none;
+        }
+        #imageViewerModal .modal-dialog {
+            width: 100dvw !important;
+            max-width: none !important;
+            height: 100dvh !important;
+            max-height: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            transform: none !important;
+        }
+        #imageViewerModal .modal-content {
+            width: 100dvw !important;
+            height: 100dvh !important;
+            max-height: none !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            display: flex;
+            flex-direction: column;
+            padding-left: env(safe-area-inset-left, 0px);
+            padding-right: env(safe-area-inset-right, 0px);
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            background: #000 !important;
+        }
+        #imageViewerModal .modal-header,
+        #imageViewerModal .modal-footer {
+            flex: 0 0 auto;
+            background: rgba(0,0,0,0.96);
+        }
+        #imageViewerModal .modal-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 6px !important;
+        }
+        .ios-image-modal-img {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            background: #000;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-user-drag: none;
+            transform-origin: center center;
+            transition: none !important;
+            will-change: transform;
+            cursor: grab;
+            pointer-events: none;
+        }
+        .image-zoom-stage {
+            width: 100%;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+            -ms-touch-action: none;
+            overscroll-behavior: contain;
+            background: #000;
+            border-radius: 0;
+            -webkit-user-select: none;
+            user-select: none;
+        }
         .image-zoom-toolbar { gap: 6px; flex-wrap: wrap; }
-        .image-zoom-hint { font-size: 10.5px; line-height: 1.25; color: #adb5bd; }
-        @media (max-width: 430px) { .image-zoom-stage { height: 76vh; } .ios-image-modal-img { max-height: 76vh; } }
+        .image-zoom-hint { flex: 0 0 auto; font-size: 10.5px; line-height: 1.25; color: #adb5bd; }
+        @supports not (height: 100dvh) {
+            #imageViewerModal .modal-dialog,
+            #imageViewerModal .modal-content { height: 100vh !important; width: 100vw !important; }
+        }
         .footer-toggle-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
         @media (max-width: 430px) {
             .camera-capture-overlay { padding: 7px; gap: 5px; }
@@ -949,7 +1025,7 @@ function showUpdateNotification() {
 
 
 <div class="modal fade" id="imageViewerModal" style="display:none;" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+  <div class="modal-dialog image-viewer-dialog">
     <div class="modal-content bg-black text-light border-secondary">
       <div class="modal-header border-secondary p-2">
         <h6 class="modal-title text-info"><i class="fa-solid fa-image me-2"></i>XEM ẢNH</h6>
@@ -2725,6 +2801,18 @@ function showCameraErrorUI(err) {
             const p = getZoomStagePoint(e.clientX, e.clientY);
             setImageViewerScale(imageViewerZoomState.scale * (e.deltaY < 0 ? 1.12 : 0.88), p);
         }, { passive: false });
+    }
+
+
+    function resizeImageViewerToViewport() {
+        const modal = document.getElementById("imageViewerModal");
+        if (!modal || !modal.classList.contains("show")) return;
+        clampImagePan();
+        applyImageViewerTransform();
+    }
+    window.addEventListener("resize", resizeImageViewerToViewport);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", resizeImageViewerToViewport);
     }
 
     function viewFullImage(url) {
