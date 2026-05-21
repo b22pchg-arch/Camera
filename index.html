@@ -2005,13 +2005,77 @@ function showCameraErrorUI(err) {
         lines.forEach((ln, idx) => ctx.fillText(ln, x, y + idx * lineHeight, maxWidth));
         return lines.length * lineHeight;
     }
+    function getTypeAccentColor(type) {
+        const label = String(type || '').toUpperCase();
+        if (label.includes('QUÁ TRÌNH')) return '#ffc107';
+        if (label.includes('TRƯỚC')) return '#5aa0ff';
+        if (label.includes('SAU')) return '#20c997';
+        return '#0dcaf0';
+    }
+    function drawFooterHeaderBlock(ctx, info, x, y, maxWidth, scale) {
+        const accent = getTypeAccentColor(info.type);
+        const typeFont = Math.max(22, 30 * scale);
+        const timeFont = Math.max(17, 22 * scale);
+        const dateFont = Math.max(16, 20 * scale);
+        const weekdayFont = Math.max(15, 18 * scale);
+        const clusterGap = Math.max(10, 14 * scale);
+        const rightPad = Math.max(12, 18 * scale);
+        const typeLineH = Math.ceil(typeFont * 1.05);
+        const timeLineH = Math.ceil(timeFont * 1.12);
+        const dateLineH = Math.ceil(dateFont * 1.08);
+        const weekdayLineH = Math.ceil(weekdayFont * 1.12);
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+
+        ctx.font = `bold ${typeFont}px Arial`;
+        const typeW = Math.min(maxWidth, ctx.measureText(info.type).width);
+        ctx.font = `bold ${timeFont}px Arial`;
+        const timeW = Math.min(maxWidth, ctx.measureText(info.timeOnly).width);
+        const leftClusterW = Math.min(maxWidth * 0.44, Math.max(typeW, timeW) + rightPad);
+        const sepX = x + leftClusterW;
+        const rightX = sepX + clusterGap;
+        const rightW = Math.max(120 * scale, maxWidth - leftClusterW - clusterGap);
+
+        ctx.fillStyle = accent;
+        ctx.font = `bold ${typeFont}px Arial`;
+        ctx.fillText(info.type, x, y, leftClusterW - rightPad);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${timeFont}px Arial`;
+        ctx.fillText(info.timeOnly, x, y + typeLineH + Math.max(2, 2 * scale), leftClusterW - rightPad);
+
+        const topPad = Math.max(2, 2 * scale);
+        const lineTop = y + topPad;
+        const lineBottom = y + Math.max(typeLineH + Math.max(2, 2 * scale) + timeLineH, dateLineH + Math.max(2, 2 * scale) + weekdayLineH) - topPad;
+        ctx.strokeStyle = '#ffc107';
+        ctx.lineWidth = Math.max(3, 4 * scale);
+        ctx.beginPath();
+        ctx.moveTo(sepX, lineTop);
+        ctx.lineTo(sepX, lineBottom);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${dateFont}px Arial`;
+        ctx.fillText(`Ngày ${info.dateOnly}`, rightX, y + Math.max(2, 1 * scale), rightW);
+        ctx.font = `bold ${weekdayFont}px Arial`;
+        ctx.fillText(info.weekdayOnly, rightX, y + Math.max(2, 1 * scale) + dateLineH + Math.max(2, 2 * scale), rightW);
+
+        return Math.max(typeLineH + Math.max(2, 2 * scale) + timeLineH, dateLineH + Math.max(2, 2 * scale) + weekdayLineH);
+    }
     function getCaptureContext(type, now, gpsMeta, address) {
         const prefix = document.getElementById('tab1-prefix')?.value.trim() || document.getElementById('tab2-prefix')?.value.trim() || '';
         const team = document.getElementById('tab1-team')?.value.trim() || document.getElementById('tab2-team')?.value.trim() || '';
         const note = document.getElementById('tab1-note')?.value.trim() || document.getElementById('tab2-note')?.value.trim() || '';
+        const weekdayOnly = getVietnamWeekday(now);
+        const dateOnly = now.toLocaleDateString('vi-VN');
+        const timeOnly = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
         return {
             type: type || 'ẢNH',
-            dateLine: `${getVietnamWeekday(now)}, ngày ${now.toLocaleDateString('vi-VN')} - ${now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`,
+            dateLine: `${weekdayOnly}, ngày ${dateOnly} - ${timeOnly}`,
+            timeOnly,
+            dateOnly,
+            weekdayOnly,
             gpsLine: hasValidGpsData(gpsMeta) ? (gpsMeta.gpsText || `${Number(gpsMeta.lat).toFixed(6)}, ${Number(gpsMeta.lng).toFixed(6)}`) : 'Chưa có tọa độ',
             address: address || 'Chưa xác định địa chỉ',
             prefix: prefix || 'Chưa nhập tên/mã hiện trường',
@@ -2027,7 +2091,6 @@ function showCameraErrorUI(err) {
         const W = old.width, base = Math.max(1, W/1600), pad = Math.round(20*base), lineH = Math.round(28*base);
         const info = getCaptureContext(type, now, gpsMeta, address); if (noteOverride) info.note = noteOverride;
         const infoLines = [
-            { text: `Thời gian: ${info.dateLine}`, max: 2, color: '#fff' },
             { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: '#fff' },
             { text: `Địa chỉ: ${info.address}`, max: 3, color: '#fff' },
             { text: `Hiện trường: ${info.prefix}`, max: 2, color: '#fff' },
@@ -2037,15 +2100,18 @@ function showCameraErrorUI(err) {
         const measureCtx = document.createElement('canvas').getContext('2d');
         measureCtx.font = `bold ${Math.round(22*base)}px Arial`;
         const textW = W - pad * 2;
+        const headerScale = Math.max(0.9, base * 1.55);
+        const headerH = drawFooterHeaderBlock(measureCtx, info, pad, pad, textW, headerScale);
         const textBlockH = infoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, textW, lineH, row.max), 0);
-        const stripH = Math.max(Math.round(230*base), pad + Math.round(38*base) + textBlockH + pad);
+        const stripH = Math.max(Math.round(230*base), pad + headerH + Math.round(16*base) + textBlockH + pad);
         canvas.width = W; canvas.height = old.height + stripH;
         const ctx = canvas.getContext('2d'); ctx.drawImage(old, 0, 0);
         const y0 = old.height; ctx.fillStyle = '#080808'; ctx.fillRect(0, y0, W, stripH); ctx.strokeStyle = '#0dcaf0'; ctx.lineWidth = Math.max(2, Math.round(3*base)); ctx.strokeRect(0, y0, W, stripH);
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-        ctx.fillStyle = '#0dcaf0'; ctx.font = `bold ${Math.round(28*base)}px Arial`; ctx.fillText(`${info.type}`, pad, y0 + pad, W-pad*2);
+        let y = y0 + pad;
+        y += drawFooterHeaderBlock(ctx, info, pad, y, textW, headerScale);
+        y += Math.round(16*base);
         ctx.font = `bold ${Math.round(22*base)}px Arial`;
-        let y = y0 + pad + Math.round(38*base);
         infoLines.forEach(row => {
             ctx.fillStyle = row.color;
             y += drawWrappedText(ctx, row.text, pad, y, textW, lineH, row.max);
@@ -2133,7 +2199,6 @@ function showCameraErrorUI(err) {
         const textX = pad;
         const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 2);
         const footerInfoLines = [
-            { text: `Thời gian: ${info.dateLine}`, max: 2, color: "#ffffff" },
             { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: "#ffffff" },
             { text: `Địa chỉ: ${info.address}`, max: 3, color: "#ffffff" },
             { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 2, color: "#ffffff" },
@@ -2142,11 +2207,11 @@ function showCameraErrorUI(err) {
         ];
         const measureCtx = document.createElement('canvas').getContext('2d');
         measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        const headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale);
         const textBlockH = footerInfoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max), 0);
-        const titleH = lineH * 1.25;
         const footerH = Math.ceil(Math.max(
             (enabledExtras.length ? imgBoxSize + 48 * scale : 0),
-            18 * scale + titleH + textBlockH + 22 * scale
+            18 * scale + headerH + 12 * scale + textBlockH + 22 * scale
         ));
 
         canvas.width = out.width;
@@ -2208,10 +2273,8 @@ function showCameraErrorUI(err) {
         let y = fY + 18 * scale;
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
-        ctx.fillStyle = type === "TRƯỚC" ? "#5aa0ff" : (type === "QUÁ TRÌNH" ? "#ffc107" : "#20c997");
-        ctx.font = `bold ${Math.max(22, 30 * scale)}px Arial`;
-        ctx.fillText(`${info.type}`, textX, y, maxTextW);
-        y += lineH * 1.25;
+        y += drawFooterHeaderBlock(ctx, info, textX, y, maxTextW, scale);
+        y += 12 * scale;
         ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
         footerInfoLines.forEach(row => {
             ctx.fillStyle = row.color;
