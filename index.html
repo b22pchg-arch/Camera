@@ -2088,10 +2088,12 @@ function showCameraErrorUI(err) {
         const clusterTextW = Math.max(120 * scale, maxWidth - (clusterX - x));
 
         ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'right';
         ctx.font = `bold ${dateFont}px Arial`;
-        ctx.fillText(`Ngày ${info.dateOnly}`, detailX, y + Math.max(2, 1 * scale), detailW);
+        ctx.fillText(`Ngày ${info.dateOnly}`, sepX - clusterGap, y + Math.max(2, 1 * scale), detailW);
         ctx.font = `bold ${weekdayFont}px Arial`;
-        ctx.fillText(info.weekdayOnly, detailX, y + Math.max(2, 1 * scale) + dateLineH + Math.max(2, 2 * scale), detailW);
+        ctx.fillText(info.weekdayOnly, sepX - clusterGap, y + Math.max(2, 1 * scale) + dateLineH + Math.max(2, 2 * scale), detailW);
+        ctx.textAlign = 'left';
 
         ctx.strokeStyle = '#ffc107';
         ctx.lineWidth = Math.max(3, 4 * scale);
@@ -2164,7 +2166,7 @@ function showCameraErrorUI(err) {
         ctx.font = `bold ${Math.round(22*base)}px Arial`;
         infoLines.forEach(row => {
             ctx.fillStyle = row.color;
-            y += drawWrappedTextBlock(ctx, row.text, pad, y, textW, lineH, row.max, mirror ? 'right' : 'left');
+            y += drawWrappedTextBlock(ctx, row.text, pad, y, textW, lineH, row.max, 'left');
         });
     }
     function reorganizeCameraCaptureLayout() {
@@ -2242,6 +2244,7 @@ function showCameraErrorUI(err) {
         const out = getCaptureOutputDimensions(video.videoWidth, video.videoHeight);
         const scale = Math.max(0.75, out.width / 1000);
         const enabledExtras = ['selfie','map','compass'].filter(key => getExtraInsertPref(key));
+        const orderedExtras = shouldMirrorFooterLayout(type) ? ['compass','map','selfie'].filter(key => enabledExtras.includes(key)) : enabledExtras;
         const imgBoxSize = enabledExtras.length ? Math.min(240 * scale, out.width * 0.16) : 0;
         const pad = 20 * scale;
         const lineH = Math.max(25 * scale, 22);
@@ -2311,12 +2314,12 @@ function showCameraErrorUI(err) {
             });
         };
 
-        let extraX = mirrorLayout ? pad : (canvas.width - pad - (enabledExtras.length * imgBoxSize + Math.max(0, enabledExtras.length - 1) * pad));
+        let extraX = mirrorLayout ? pad : (canvas.width - pad - (orderedExtras.length * imgBoxSize + Math.max(0, orderedExtras.length - 1) * pad));
         const drawTasks = [];
-        enabledExtras.forEach(key => {
-            if (key === 'selfie') drawTasks.push(drawExtraSync(globalExtras.selfie, null, "NGƯỜI CHỤP", extraX));
-            if (key === 'map') drawTasks.push(drawExtraSync(globalExtras.map, 'canvas-map', "BẢN ĐỒ", extraX));
+        orderedExtras.forEach(key => {
             if (key === 'compass') drawTasks.push(drawExtraSync(globalExtras.compass, 'canvas-compass', "LA BÀN", extraX));
+            if (key === 'map') drawTasks.push(drawExtraSync(globalExtras.map, 'canvas-map', "BẢN ĐỒ", extraX));
+            if (key === 'selfie') drawTasks.push(drawExtraSync(globalExtras.selfie, null, "NGƯỜI CHỤP", extraX));
             extraX += imgBoxSize + pad;
         });
         await Promise.all(drawTasks);
@@ -2329,7 +2332,7 @@ function showCameraErrorUI(err) {
         ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
         footerInfoLines.forEach(row => {
             ctx.fillStyle = row.color;
-            y += drawWrappedTextBlock(ctx, row.text, textX, y, maxTextW, lineH, row.max, mirrorLayout ? 'right' : 'left');
+            y += drawWrappedTextBlock(ctx, row.text, textX, y, maxTextW, lineH, row.max, 'left');
         });
 
         const photoObj = applyGpsMeta({
