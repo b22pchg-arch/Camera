@@ -4433,6 +4433,293 @@ function cancelImportFile() {
         }
     })();
 
+
+
+/* --- V65: LƯU CẤU HÌNH OFFLINE - KHÔNG LƯU ẢNH, CHỈ LƯU THIẾT LẬP NGƯỜI DÙNG --- */
+(function(){
+    const OFFLINE_CFG_KEY = 'pctq_gsht_offline_config_v65';
+    const OFFLINE_CFG_AUTO_KEY = 'pctq_gsht_offline_config_auto_v65';
+    const OFFLINE_CFG_FIELDS = [
+        { id:'tab1-team', type:'value' }, { id:'tab2-team', type:'value' },
+        { id:'tab1-prefix', type:'value' }, { id:'tab2-prefix', type:'value' },
+        { id:'tab1-note', type:'value' }, { id:'tab2-note', type:'value' },
+        { id:'photo-quality-select', type:'value' },
+        { id:'qt-stitch-mode', type:'value' }, { id:'qt-stitch-mode-tab2', type:'value' },
+        { id:'toggle-location-qr', type:'checked' },
+        { id:'toggle-show-qt', type:'checked' },
+        { id:'toggle-subtitle', type:'checked' },
+        { id:'max-record-time', type:'value' },
+        { id:'p2p-transfer-mode', type:'value' },
+        { id:'animated-qr-delay', type:'value' },
+        { id:'animated-qr-chunk-size', type:'value' },
+        { id:'animated-qr-replay-list', type:'value' },
+        { id:'toggle-extra-selfie', type:'checked' },
+        { id:'toggle-extra-map', type:'checked' },
+        { id:'toggle-extra-compass', type:'checked' }
+    ];
+    let offlineCfgApplyLock = false;
+    let offlineCfgSaveTimer = null;
+
+    function qs(id) { return document.getElementById(id); }
+    function safeNowText(ts) {
+        if (!ts) return 'Chưa có cấu hình đã lưu';
+        try {
+            return new Date(ts).toLocaleString('vi-VN', { hour12:false });
+        } catch(e) { return String(ts); }
+    }
+    function offlineConfigAutoEnabled() {
+        try { return localStorage.getItem(OFFLINE_CFG_AUTO_KEY) !== '0'; } catch(e) { return true; }
+    }
+    function setOfflineConfigStatus(msg, type='info') {
+        const el = qs('offline-config-status');
+        if (!el) return;
+        const color = type === 'danger' ? 'text-danger' : (type === 'success' ? 'text-success' : (type === 'warning' ? 'text-warning' : 'text-info'));
+        el.className = `small ${color} fw-bold mt-2`;
+        el.textContent = msg;
+    }
+    function collectOfflineConfig() {
+        const fields = {};
+        OFFLINE_CFG_FIELDS.forEach(f => {
+            const el = qs(f.id);
+            if (!el) return;
+            fields[f.id] = f.type === 'checked' ? !!el.checked : (el.value ?? '');
+        });
+        const layout = {};
+        try { layout.cameraToolsHidden = qs('camera-tools-body')?.classList.contains('d-none') ? '1' : (localStorage.getItem('cameraToolsHidden') || '0'); } catch(e) {}
+        try { layout.pendingToolsCollapsed = qs('pending-tools-shell')?.classList.contains('pending-collapsed') ? '1' : (localStorage.getItem('pendingToolsCollapsed') || '0'); } catch(e) {}
+        try { layout.showLocationQrOnStitched = qs('toggle-location-qr') ? (qs('toggle-location-qr').checked ? '1' : '0') : (localStorage.getItem('showLocationQrOnStitched') || '1'); } catch(e) {}
+        ['selfie','map','compass'].forEach(key => {
+            try {
+                const el = qs('toggle-extra-' + key);
+                layout['insertExtra_' + key] = el ? (el.checked ? '1' : '0') : (localStorage.getItem('insertExtra_' + key) || '1');
+            } catch(e) {}
+        });
+        try { layout.isQtCameraVisible = (typeof isQtCameraVisible !== 'undefined' && isQtCameraVisible) ? '1' : '0'; } catch(e) {}
+        try { layout.isQtPendingVisible = (typeof isQtPendingVisible !== 'undefined' && isQtPendingVisible) ? '1' : '0'; } catch(e) {}
+        try { layout.currentFacingMode = (typeof currentFacingMode !== 'undefined') ? currentFacingMode : 'environment'; } catch(e) {}
+        return {
+            app: 'GS_HIEN_TRUONG_PC_TUYEN_QUANG',
+            schema: 65,
+            savedAt: new Date().toISOString(),
+            fields,
+            layout
+        };
+    }
+    function saveOfflineConfig(silent=false) {
+        if (offlineCfgApplyLock) return;
+        try {
+            const cfg = collectOfflineConfig();
+            localStorage.setItem(OFFLINE_CFG_KEY, JSON.stringify(cfg));
+            updateOfflineConfigPanel();
+            if (!silent) setOfflineConfigStatus('✅ Đã lưu cấu hình offline vào máy này.', 'success');
+        } catch(err) {
+            setOfflineConfigStatus('❌ Không lưu được cấu hình: ' + (err && err.message ? err.message : err), 'danger');
+        }
+    }
+    function scheduleOfflineConfigSave() {
+        if (!offlineConfigAutoEnabled() || offlineCfgApplyLock) return;
+        clearTimeout(offlineCfgSaveTimer);
+        offlineCfgSaveTimer = setTimeout(() => saveOfflineConfig(true), 500);
+    }
+    function readOfflineConfig() {
+        try {
+            const raw = localStorage.getItem(OFFLINE_CFG_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch(e) { return null; }
+    }
+    function setFieldValue(id, value) {
+        const el = qs(id);
+        if (!el) return;
+        const field = OFFLINE_CFG_FIELDS.find(f => f.id === id);
+        if (!field) return;
+        if (field.type === 'checked') el.checked = !!value;
+        else el.value = value == null ? '' : String(value);
+    }
+    function applyOfflineConfig(cfg, options={}) {
+        if (!cfg || !cfg.fields) {
+            if (!options.silent) setOfflineConfigStatus('⚠️ Chưa có cấu hình offline để khôi phục.', 'warning');
+            return;
+        }
+        offlineCfgApplyLock = true;
+        try {
+            Object.entries(cfg.fields || {}).forEach(([id, value]) => setFieldValue(id, value));
+
+            // Đồng bộ các ô nhập song song giữa tab Máy Ảnh và Chờ Ghép
+            const pairMap = [['tab1-team','tab2-team'], ['tab1-prefix','tab2-prefix'], ['tab1-note','tab2-note'], ['qt-stitch-mode','qt-stitch-mode-tab2']];
+            pairMap.forEach(([a,b]) => {
+                const ea = qs(a), eb = qs(b);
+                if (ea && eb) {
+                    if ((cfg.fields[a] ?? '') !== '') eb.value = ea.value;
+                    else if ((cfg.fields[b] ?? '') !== '') ea.value = eb.value;
+                }
+            });
+
+            const layout = cfg.layout || {};
+            try { if (layout.showLocationQrOnStitched != null) localStorage.setItem('showLocationQrOnStitched', layout.showLocationQrOnStitched); } catch(e) {}
+            ['selfie','map','compass'].forEach(key => {
+                try {
+                    if (layout['insertExtra_' + key] != null) localStorage.setItem('insertExtra_' + key, layout['insertExtra_' + key]);
+                    if (typeof setExtraInsertPref === 'function') setExtraInsertPref(key, localStorage.getItem('insertExtra_' + key) !== '0');
+                } catch(e) {}
+            });
+            try { if (layout.cameraToolsHidden != null) localStorage.setItem('cameraToolsHidden', layout.cameraToolsHidden); } catch(e) {}
+            try { if (layout.pendingToolsCollapsed != null) localStorage.setItem('pendingToolsCollapsed', layout.pendingToolsCollapsed); } catch(e) {}
+            try { if (layout.currentFacingMode) currentFacingMode = layout.currentFacingMode; } catch(e) {}
+
+            // Gọi lại các hàm áp dụng giao diện/tùy chọn nếu có
+            try { if (typeof applyCameraQualitySetting === 'function') applyCameraQualitySetting(false); } catch(e) {}
+            try { if (typeof initLocationQrPreference === 'function') initLocationQrPreference(); } catch(e) {}
+            try { if (typeof initExtraInsertPreferences === 'function') initExtraInsertPreferences(); } catch(e) {}
+            try { if (typeof renderGallery === 'function' && qs('gallery-content')?.classList.contains('active')) renderGallery(); } catch(e) {}
+
+            // Áp trạng thái ẩn/hiện khung công cụ sau khi các shell đã được tạo
+            setTimeout(() => {
+                try {
+                    const body = qs('camera-tools-body');
+                    if (body && layout.cameraToolsHidden != null) body.classList.toggle('d-none', layout.cameraToolsHidden === '1');
+                } catch(e) {}
+                try {
+                    const shell = qs('pending-tools-shell');
+                    if (shell && layout.pendingToolsCollapsed != null) {
+                        shell.classList.toggle('pending-collapsed', layout.pendingToolsCollapsed === '1');
+                        if (typeof updatePendingToolsToggleText === 'function') updatePendingToolsToggleText();
+                    }
+                } catch(e) {}
+                try {
+                    if (layout.isQtCameraVisible != null && typeof isQtCameraVisible !== 'undefined') {
+                        const desired = layout.isQtCameraVisible === '1';
+                        if (isQtCameraVisible !== desired && typeof toggleQtArea === 'function') toggleQtArea('camera');
+                    }
+                    if (layout.isQtPendingVisible != null && typeof isQtPendingVisible !== 'undefined') {
+                        const desired = layout.isQtPendingVisible === '1';
+                        if (isQtPendingVisible !== desired && typeof toggleQtArea === 'function') toggleQtArea('pending');
+                    }
+                } catch(e) {}
+            }, 150);
+
+            updateOfflineConfigPanel();
+            if (!options.silent) setOfflineConfigStatus('✅ Đã khôi phục cấu hình offline.', 'success');
+        } catch(err) {
+            if (!options.silent) setOfflineConfigStatus('❌ Lỗi khôi phục cấu hình: ' + (err && err.message ? err.message : err), 'danger');
+        } finally {
+            setTimeout(() => { offlineCfgApplyLock = false; }, 300);
+        }
+    }
+    function updateOfflineConfigPanel() {
+        const cfg = readOfflineConfig();
+        const auto = qs('offline-config-auto');
+        if (auto) auto.checked = offlineConfigAutoEnabled();
+        const last = qs('offline-config-last-save');
+        if (last) last.textContent = cfg ? safeNowText(cfg.savedAt) : 'Chưa có';
+        const count = qs('offline-config-field-count');
+        if (count) count.textContent = cfg && cfg.fields ? Object.keys(cfg.fields).length : '0';
+    }
+    function installOfflineConfigPanel() {
+        if (qs('offline-config-panel')) return;
+        const sync = qs('sync-content');
+        if (!sync) return;
+        const panel = document.createElement('div');
+        panel.id = 'offline-config-panel';
+        panel.className = 'card bg-dark border-success p-3 mb-3 shadow-sm';
+        panel.innerHTML = `
+            <h6 class="text-success fw-bold mb-2 text-uppercase" style="font-size:13px;"><i class="fa-solid fa-floppy-disk me-2"></i>Lưu cấu hình offline người dùng</h6>
+            <p class="text-secondary small mb-2" style="font-size:11px; line-height:1.45;">Tự nhớ các thiết lập hay dùng trên chính thiết bị này: tổ đội, mã hiện trường, ghi chú, chất lượng ảnh/video, chế độ ghép, QR vị trí, chèn selfie/bản đồ/la bàn, chế độ đồng bộ và trạng thái ẩn/hiện giao diện. Không lưu ảnh hiện trường trong mục này.</p>
+            <div class="form-check form-switch border border-secondary rounded p-2 mb-2 bg-black bg-opacity-25 d-flex justify-content-between align-items-center">
+                <label class="form-check-label small text-info fw-bold ms-1" for="offline-config-auto"><i class="fa-solid fa-rotate me-1"></i>TỰ ĐỘNG LƯU KHI THAY ĐỔI CẤU HÌNH</label>
+                <input class="form-check-input me-1" type="checkbox" id="offline-config-auto" checked onchange="setOfflineConfigAutoSave(this.checked)">
+            </div>
+            <div class="row g-2">
+                <div class="col-6 col-md-3"><button class="btn btn-sm btn-success w-100 fw-bold" onclick="saveOfflineConfigNow()"><i class="fa-solid fa-floppy-disk me-1"></i>LƯU NGAY</button></div>
+                <div class="col-6 col-md-3"><button class="btn btn-sm btn-outline-success w-100 fw-bold" onclick="restoreOfflineConfigNow()"><i class="fa-solid fa-rotate-left me-1"></i>KHÔI PHỤC</button></div>
+                <div class="col-6 col-md-3"><button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="exportOfflineConfigFile()"><i class="fa-solid fa-file-export me-1"></i>XUẤT CẤU HÌNH</button></div>
+                <div class="col-6 col-md-3">
+                    <label class="btn btn-sm btn-outline-warning w-100 fw-bold mb-0 cursor-pointer"><i class="fa-solid fa-file-import me-1"></i>NHẬP CẤU HÌNH<input type="file" class="d-none" accept=".json,application/json" onchange="importOfflineConfigFile(event)"></label>
+                </div>
+                <div class="col-12"><button class="btn btn-sm btn-outline-danger w-100 fw-bold" onclick="clearOfflineConfigSaved()"><i class="fa-solid fa-trash me-1"></i>XÓA CẤU HÌNH ĐÃ LƯU TRÊN MÁY NÀY</button></div>
+            </div>
+            <div class="small text-secondary mt-2" style="font-size:11px; line-height:1.35;">Lần lưu gần nhất: <b id="offline-config-last-save" class="text-info">Chưa có</b> · Số mục đã lưu: <b id="offline-config-field-count" class="text-info">0</b></div>
+            <div id="offline-config-status" class="small text-info fw-bold mt-2">Sẵn sàng lưu cấu hình offline.</div>`;
+        const firstCard = sync.querySelector('.card');
+        if (firstCard) firstCard.insertAdjacentElement('afterend', panel); else sync.prepend(panel);
+        updateOfflineConfigPanel();
+    }
+    function bindOfflineConfigWatchers() {
+        OFFLINE_CFG_FIELDS.forEach(f => {
+            const el = qs(f.id);
+            if (!el || el.dataset.offlineCfgBound === '1') return;
+            el.dataset.offlineCfgBound = '1';
+            const ev = f.type === 'checked' ? 'change' : (el.tagName === 'SELECT' ? 'change' : 'input');
+            el.addEventListener(ev, scheduleOfflineConfigSave);
+            el.addEventListener('change', scheduleOfflineConfigSave);
+        });
+        // Theo dõi thêm click các nút ẩn/hiện vì chúng chỉ đổi biến/class
+        ['btn-toggle-qt-camera','btn-toggle-qt-pending','btn-toggle-camera-tools','pending-tools-toggle'].forEach(id => {
+            const el = qs(id);
+            if (el && el.dataset.offlineCfgBound !== '1') {
+                el.dataset.offlineCfgBound = '1';
+                el.addEventListener('click', () => setTimeout(scheduleOfflineConfigSave, 200));
+            }
+        });
+    }
+    function bootOfflineConfig() {
+        installOfflineConfigPanel();
+        bindOfflineConfigWatchers();
+        const cfg = readOfflineConfig();
+        if (cfg) applyOfflineConfig(cfg, { silent:true });
+        updateOfflineConfigPanel();
+        setTimeout(bindOfflineConfigWatchers, 1000);
+    }
+
+    window.saveOfflineConfigNow = () => saveOfflineConfig(false);
+    window.restoreOfflineConfigNow = () => applyOfflineConfig(readOfflineConfig(), { silent:false });
+    window.setOfflineConfigAutoSave = function(enabled) {
+        try { localStorage.setItem(OFFLINE_CFG_AUTO_KEY, enabled ? '1' : '0'); } catch(e) {}
+        updateOfflineConfigPanel();
+        setOfflineConfigStatus(enabled ? '✅ Đã bật tự động lưu cấu hình.' : '⏸ Đã tắt tự động lưu cấu hình.', enabled ? 'success' : 'warning');
+        if (enabled) saveOfflineConfig(true);
+    };
+    window.exportOfflineConfigFile = function() {
+        try {
+            const cfg = collectOfflineConfig();
+            const blob = new Blob([JSON.stringify(cfg, null, 2)], { type:'application/json' });
+            const a = document.createElement('a');
+            const ts = new Date().toISOString().slice(0,19).replace(/[-:T]/g,'');
+            a.href = URL.createObjectURL(blob);
+            a.download = `Cau_hinh_GS_Hien_Truong_${ts}.json`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+            setOfflineConfigStatus('✅ Đã xuất file cấu hình offline.', 'success');
+        } catch(err) { setOfflineConfigStatus('❌ Không xuất được cấu hình: ' + err.message, 'danger'); }
+    };
+    window.importOfflineConfigFile = function(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const cfg = JSON.parse(e.target.result);
+                if (!cfg || !cfg.fields) throw new Error('File không đúng định dạng cấu hình.');
+                localStorage.setItem(OFFLINE_CFG_KEY, JSON.stringify(cfg));
+                applyOfflineConfig(cfg, { silent:false });
+                setOfflineConfigStatus('✅ Đã nhập và áp dụng cấu hình offline.', 'success');
+            } catch(err) { setOfflineConfigStatus('❌ Lỗi nhập cấu hình: ' + err.message, 'danger'); }
+            event.target.value = '';
+        };
+        reader.onerror = () => { setOfflineConfigStatus('❌ Không đọc được file cấu hình.', 'danger'); event.target.value = ''; };
+        reader.readAsText(file, 'utf-8');
+    };
+    window.clearOfflineConfigSaved = function() {
+        if (!confirm('Xóa cấu hình offline đã lưu trên máy này? Ảnh trong kho KHÔNG bị xóa.')) return;
+        try {
+            localStorage.removeItem(OFFLINE_CFG_KEY);
+            updateOfflineConfigPanel();
+            setOfflineConfigStatus('✅ Đã xóa cấu hình offline đã lưu. Kho ảnh không bị ảnh hưởng.', 'success');
+        } catch(err) { setOfflineConfigStatus('❌ Không xóa được cấu hình: ' + err.message, 'danger'); }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => setTimeout(bootOfflineConfig, 700));
+    window.addEventListener('beforeunload', () => { if (offlineConfigAutoEnabled()) { try { saveOfflineConfig(true); } catch(e) {} } });
+})();
 </script>
 </body>
 </html>
