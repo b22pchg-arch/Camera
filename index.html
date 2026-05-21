@@ -2005,6 +2005,18 @@ function showCameraErrorUI(err) {
         lines.forEach((ln, idx) => ctx.fillText(ln, x, y + idx * lineHeight, maxWidth));
         return lines.length * lineHeight;
     }
+    function drawWrappedTextBlock(ctx, text, x, y, maxWidth, lineHeight, maxLines, align = 'left') {
+        const lines = getWrappedTextLines(ctx, text, maxWidth, maxLines);
+        const oldAlign = ctx.textAlign;
+        const oldBase = ctx.textBaseline;
+        ctx.textBaseline = 'top';
+        ctx.textAlign = align === 'right' ? 'right' : 'left';
+        const drawX = align === 'right' ? (x + maxWidth) : x;
+        lines.forEach((ln, idx) => ctx.fillText(ln, drawX, y + idx * lineHeight, maxWidth));
+        ctx.textAlign = oldAlign;
+        ctx.textBaseline = oldBase;
+        return lines.length * lineHeight;
+    }
     function getTypeAccentColor(type) {
         const label = String(type || '').toUpperCase();
         if (label.includes('QUÁ TRÌNH')) return '#ffc107';
@@ -2012,7 +2024,11 @@ function showCameraErrorUI(err) {
         if (label.includes('SAU')) return '#20c997';
         return '#0dcaf0';
     }
-    function drawFooterHeaderBlock(ctx, info, x, y, maxWidth, scale) {
+    function shouldMirrorFooterLayout(type) {
+        const label = String(type || '').trim().toUpperCase();
+        return label === 'SAU' || label === 'ẢNH SAU';
+    }
+    function drawFooterHeaderBlock(ctx, info, x, y, maxWidth, scale, mirror = false) {
         const accent = getTypeAccentColor(info.type);
         const typeFont = Math.max(22, 30 * scale);
         const timeFont = Math.max(17, 22 * scale);
@@ -2032,22 +2048,51 @@ function showCameraErrorUI(err) {
         const typeW = Math.min(maxWidth, ctx.measureText(info.type).width);
         ctx.font = `bold ${timeFont}px Arial`;
         const timeW = Math.min(maxWidth, ctx.measureText(info.timeOnly).width);
-        const leftClusterW = Math.min(maxWidth * 0.44, Math.max(typeW, timeW) + rightPad);
-        const sepX = x + leftClusterW;
-        const rightX = sepX + clusterGap;
-        const rightW = Math.max(120 * scale, maxWidth - leftClusterW - clusterGap);
+        const clusterW = Math.min(maxWidth * 0.44, Math.max(typeW, timeW) + rightPad);
+        const detailW = Math.max(120 * scale, maxWidth - clusterW - clusterGap);
+        const topPad = Math.max(2, 2 * scale);
+        const blockH = Math.max(typeLineH + Math.max(2, 2 * scale) + timeLineH, dateLineH + Math.max(2, 2 * scale) + weekdayLineH);
+        const lineTop = y + topPad;
+        const lineBottom = y + blockH - topPad;
 
-        ctx.fillStyle = accent;
-        ctx.font = `bold ${typeFont}px Arial`;
-        ctx.fillText(info.type, x, y, leftClusterW - rightPad);
+        if (!mirror) {
+            const sepX = x + clusterW;
+            const rightX = sepX + clusterGap;
+
+            ctx.fillStyle = accent;
+            ctx.font = `bold ${typeFont}px Arial`;
+            ctx.fillText(info.type, x, y, clusterW - rightPad);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${timeFont}px Arial`;
+            ctx.fillText(info.timeOnly, x, y + typeLineH + Math.max(2, 2 * scale), clusterW - rightPad);
+
+            ctx.strokeStyle = '#ffc107';
+            ctx.lineWidth = Math.max(3, 4 * scale);
+            ctx.beginPath();
+            ctx.moveTo(sepX, lineTop);
+            ctx.lineTo(sepX, lineBottom);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${dateFont}px Arial`;
+            ctx.fillText(`Ngày ${info.dateOnly}`, rightX, y + Math.max(2, 1 * scale), detailW);
+            ctx.font = `bold ${weekdayFont}px Arial`;
+            ctx.fillText(info.weekdayOnly, rightX, y + Math.max(2, 1 * scale) + dateLineH + Math.max(2, 2 * scale), detailW);
+            return blockH;
+        }
+
+        const detailX = x;
+        const sepX = x + detailW + clusterGap;
+        const clusterX = sepX + Math.max(4, 6 * scale);
+        const clusterTextW = Math.max(120 * scale, maxWidth - (clusterX - x));
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${timeFont}px Arial`;
-        ctx.fillText(info.timeOnly, x, y + typeLineH + Math.max(2, 2 * scale), leftClusterW - rightPad);
+        ctx.font = `bold ${dateFont}px Arial`;
+        ctx.fillText(`Ngày ${info.dateOnly}`, detailX, y + Math.max(2, 1 * scale), detailW);
+        ctx.font = `bold ${weekdayFont}px Arial`;
+        ctx.fillText(info.weekdayOnly, detailX, y + Math.max(2, 1 * scale) + dateLineH + Math.max(2, 2 * scale), detailW);
 
-        const topPad = Math.max(2, 2 * scale);
-        const lineTop = y + topPad;
-        const lineBottom = y + Math.max(typeLineH + Math.max(2, 2 * scale) + timeLineH, dateLineH + Math.max(2, 2 * scale) + weekdayLineH) - topPad;
         ctx.strokeStyle = '#ffc107';
         ctx.lineWidth = Math.max(3, 4 * scale);
         ctx.beginPath();
@@ -2055,13 +2100,17 @@ function showCameraErrorUI(err) {
         ctx.lineTo(sepX, lineBottom);
         ctx.stroke();
 
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${dateFont}px Arial`;
-        ctx.fillText(`Ngày ${info.dateOnly}`, rightX, y + Math.max(2, 1 * scale), rightW);
-        ctx.font = `bold ${weekdayFont}px Arial`;
-        ctx.fillText(info.weekdayOnly, rightX, y + Math.max(2, 1 * scale) + dateLineH + Math.max(2, 2 * scale), rightW);
+        ctx.fillStyle = accent;
+        ctx.font = `bold ${typeFont}px Arial`;
+        ctx.textAlign = 'right';
+        ctx.fillText(info.type, clusterX + clusterTextW, y, clusterTextW - rightPad);
 
-        return Math.max(typeLineH + Math.max(2, 2 * scale) + timeLineH, dateLineH + Math.max(2, 2 * scale) + weekdayLineH);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${timeFont}px Arial`;
+        ctx.fillText(info.timeOnly, clusterX + clusterTextW, y + typeLineH + Math.max(2, 2 * scale), clusterTextW - rightPad);
+        ctx.textAlign = 'left';
+
+        return blockH;
     }
     function getCaptureContext(type, now, gpsMeta, address) {
         const prefix = document.getElementById('tab1-prefix')?.value.trim() || document.getElementById('tab2-prefix')?.value.trim() || '';
@@ -2097,11 +2146,12 @@ function showCameraErrorUI(err) {
             { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 2, color: '#fff' },
             { text: `Ghi chú: ${info.note}`, max: 3, color: '#ffc107' }
         ];
+        const mirror = shouldMirrorFooterLayout(type);
         const measureCtx = document.createElement('canvas').getContext('2d');
         measureCtx.font = `bold ${Math.round(22*base)}px Arial`;
         const textW = W - pad * 2;
         const headerScale = Math.max(0.9, base * 1.55);
-        const headerH = drawFooterHeaderBlock(measureCtx, info, pad, pad, textW, headerScale);
+        const headerH = drawFooterHeaderBlock(measureCtx, info, pad, pad, textW, headerScale, mirror);
         const textBlockH = infoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, textW, lineH, row.max), 0);
         const stripH = Math.max(Math.round(230*base), pad + headerH + Math.round(16*base) + textBlockH + pad);
         canvas.width = W; canvas.height = old.height + stripH;
@@ -2109,12 +2159,12 @@ function showCameraErrorUI(err) {
         const y0 = old.height; ctx.fillStyle = '#080808'; ctx.fillRect(0, y0, W, stripH); ctx.strokeStyle = '#0dcaf0'; ctx.lineWidth = Math.max(2, Math.round(3*base)); ctx.strokeRect(0, y0, W, stripH);
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
         let y = y0 + pad;
-        y += drawFooterHeaderBlock(ctx, info, pad, y, textW, headerScale);
+        y += drawFooterHeaderBlock(ctx, info, pad, y, textW, headerScale, mirror);
         y += Math.round(16*base);
         ctx.font = `bold ${Math.round(22*base)}px Arial`;
         infoLines.forEach(row => {
             ctx.fillStyle = row.color;
-            y += drawWrappedText(ctx, row.text, pad, y, textW, lineH, row.max);
+            y += drawWrappedTextBlock(ctx, row.text, pad, y, textW, lineH, row.max, mirror ? 'right' : 'left');
         });
     }
     function reorganizeCameraCaptureLayout() {
@@ -2195,9 +2245,10 @@ function showCameraErrorUI(err) {
         const imgBoxSize = enabledExtras.length ? Math.min(240 * scale, out.width * 0.16) : 0;
         const pad = 20 * scale;
         const lineH = Math.max(25 * scale, 22);
-        const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + (enabledExtras.length - 1) * pad + pad) : 0;
-        const textX = pad;
-        const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 2);
+        const mirrorLayout = shouldMirrorFooterLayout(type);
+        const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + (Math.max(0, enabledExtras.length - 1) * pad)) : 0;
+        const textX = mirrorLayout ? (pad + extrasTotalW + (enabledExtras.length ? pad : 0)) : pad;
+        const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 3);
         const footerInfoLines = [
             { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: "#ffffff" },
             { text: `Địa chỉ: ${info.address}`, max: 3, color: "#ffffff" },
@@ -2207,7 +2258,7 @@ function showCameraErrorUI(err) {
         ];
         const measureCtx = document.createElement('canvas').getContext('2d');
         measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
-        const headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale);
+        const headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale, mirrorLayout);
         const textBlockH = footerInfoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max), 0);
         const footerH = Math.ceil(Math.max(
             (enabledExtras.length ? imgBoxSize + 48 * scale : 0),
@@ -2260,7 +2311,7 @@ function showCameraErrorUI(err) {
             });
         };
 
-        let extraX = canvas.width - pad - (enabledExtras.length * imgBoxSize + Math.max(0, enabledExtras.length - 1) * pad);
+        let extraX = mirrorLayout ? pad : (canvas.width - pad - (enabledExtras.length * imgBoxSize + Math.max(0, enabledExtras.length - 1) * pad));
         const drawTasks = [];
         enabledExtras.forEach(key => {
             if (key === 'selfie') drawTasks.push(drawExtraSync(globalExtras.selfie, null, "NGƯỜI CHỤP", extraX));
@@ -2273,12 +2324,12 @@ function showCameraErrorUI(err) {
         let y = fY + 18 * scale;
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
-        y += drawFooterHeaderBlock(ctx, info, textX, y, maxTextW, scale);
+        y += drawFooterHeaderBlock(ctx, info, textX, y, maxTextW, scale, mirrorLayout);
         y += 12 * scale;
         ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
         footerInfoLines.forEach(row => {
             ctx.fillStyle = row.color;
-            y += drawWrappedText(ctx, row.text, textX, y, maxTextW, lineH, row.max);
+            y += drawWrappedTextBlock(ctx, row.text, textX, y, maxTextW, lineH, row.max, mirrorLayout ? 'right' : 'left');
         });
 
         const photoObj = applyGpsMeta({
