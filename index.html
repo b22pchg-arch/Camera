@@ -1061,9 +1061,25 @@ function showUpdateNotification() {
                     <li><b>Chế độ truyền P2P:</b> chọn <b>Siêu ổn định</b> khi máy yếu/đứng xa, <b>Cân bằng</b> cho hiện trường thông thường, <b>Nhanh</b> khi hai máy gần nhau và cấu hình tốt. Hệ thống tự chia dữ liệu thành mảnh nhỏ, theo dõi tiến độ, kiểm soát bộ đệm và yêu cầu phát lại mảnh thiếu.</li>
                     <li><b>Lưu ý với SCADA cách ly:</b> không kết nối thiết bị SCADA vào Hotspot nếu quy định vận hành không cho phép. Nếu thiết bị không có Wi‑Fi/Hotspot/Bluetooth/cáp, WebRTC không có kênh truyền vật lý để chạy; khi đó dùng Giải pháp 1 hoặc QR động.</li>
                     <li><b>QR động:</b> dùng khi hai máy không có mạng nội bộ. Máy phát chia dữ liệu thành nhiều mảnh QR liên tiếp; có thể chọn thời gian hiện mỗi QR, xem tổng số mảnh/tiến độ và nhập các mảnh thiếu để phát lại. Máy nhận hiển thị tổng số mảnh, số đã nhận, số chưa nhận và danh sách mảnh còn thiếu; khi đủ mảnh thì bấm <b>NẠP DỮ LIỆU VÀO KHO</b>. Với kho ảnh lớn, nên ưu tiên Giải pháp 1 hoặc 2 vì QR động sẽ cần rất nhiều mảnh.</li>
+                    <li><b>Lưu cấu hình offline:</b> nằm trong tab <b>Đồng Bộ</b>, dùng để ghi nhớ các thiết lập thường dùng của người dùng trên chính thiết bị đang mở app. Tính năng này chỉ lưu cấu hình, không lưu ảnh hiện trường.</li>
                 </ul>
 
-                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-hard-drive me-1"></i> 11. QUẢN LÝ DUNG LƯỢNG VÀ LƯU Ý KHI DÙNG</p>
+                <p class="text-success fw-bold mb-1"><i class="fa-solid fa-floppy-disk me-1"></i> 11. LƯU CẤU HÌNH OFFLINE VÀ CẬP NHẬT PHIÊN BẢN</p>
+                <ul class="text-secondary ps-3 mb-3">
+                    <li><b>Mục đích:</b> giúp app tự nhớ các lựa chọn quen dùng sau khi tắt/mở lại, mất mạng hoặc cập nhật mã nguồn mới. Người dùng không phải nhập lại tổ đội, mã hiện trường, chất lượng ảnh, chế độ ghép và chế độ truyền dữ liệu sau mỗi lần mở app.</li>
+                    <li><b>Các thông tin được lưu:</b> tổ đội/đơn vị/người thực hiện, tên hoặc mã hiện trường, ghi chú, chất lượng ảnh/ảnh ghép/video, chế độ ghép ảnh Quá Trình, bật/tắt QR vị trí, bật/tắt chèn selfie/bản đồ/la bàn, thời gian quay video, chế độ truyền WebRTC, thời gian hiện QR động và dung lượng mỗi mảnh QR.</li>
+                    <li><b>Không lưu ảnh:</b> cấu hình offline không chứa ảnh chụp, ảnh ghép, âm thanh hoặc video. Kho ảnh vẫn được quản lý riêng trong bộ nhớ trình duyệt.</li>
+                    <li><b>Tự động lưu:</b> khi bật công tắc <b>TỰ ĐỘNG LƯU KHI THAY ĐỔI CẤU HÌNH</b>, app sẽ tự ghi lại cấu hình sau khi người dùng thay đổi các ô nhập, danh sách chọn hoặc công tắc. Nếu muốn kiểm soát thủ công, có thể tắt công tắc này và bấm <b>LƯU NGAY</b> khi cần.</li>
+                    <li><b>Khôi phục cấu hình:</b> bấm <b>KHÔI PHỤC</b> để nạp lại cấu hình đã lưu trên máy. Khi mở app, hệ thống cũng cố gắng tự áp lại cấu hình đã lưu nếu vẫn còn trong trình duyệt.</li>
+                    <li><b>Xuất cấu hình:</b> bấm <b>XUẤT CẤU HÌNH</b> để tải về một file JSON dự phòng. Nên xuất file này trước khi cập nhật lớn, đổi điện thoại, đổi đường dẫn triển khai hoặc xóa dữ liệu trình duyệt.</li>
+                    <li><b>Nhập cấu hình:</b> bấm <b>NHẬP CẤU HÌNH</b> và chọn file JSON đã xuất trước đó. App sẽ đọc file, áp lại các trường cấu hình phù hợp và bỏ qua những trường không còn tồn tại trong phiên bản mới.</li>
+                    <li><b>Khi cập nhật bản mới:</b> nếu app vẫn chạy cùng domain/link gốc, cùng giao thức <b>https</b> và người dùng không xóa dữ liệu trang web, cấu hình cũ thường sẽ được nhận lại tự động vì được lưu trong <b>localStorage</b> của trình duyệt.</li>
+                    <li><b>Khi cấu hình có thể mất:</b> đổi domain/link, đổi trình duyệt, mở chế độ ẩn danh, gỡ PWA rồi cài lại, xóa dữ liệu trang web, hoặc iOS/Safari tự dọn dữ liệu web sau thời gian dài không dùng. Trong các trường hợp này, hãy dùng file <b>Xuất cấu hình</b> để nhập lại.</li>
+                    <li><b>Xóa cấu hình:</b> nút <b>XÓA CẤU HÌNH</b> chỉ xóa thiết lập đã lưu trên máy hiện tại, không xóa ảnh trong các kho <b>Chờ Ghép</b> hoặc <b>Đã Ghép</b>.</li>
+                    <li><b>Khuyến nghị triển khai:</b> khi phát hành phiên bản mới, cố gắng giữ nguyên đường dẫn truy cập app và không đổi khóa lưu cấu hình. Nếu thêm tùy chọn mới, chỉ thêm trường mới để các cấu hình cũ vẫn tương thích.</li>
+                </ul>
+
+                <p class="text-warning fw-bold mb-1"><i class="fa-solid fa-hard-drive me-1"></i> 12. QUẢN LÝ DUNG LƯỢNG VÀ LƯU Ý KHI DÙNG</p>
                 <ul class="text-secondary ps-3 mb-0">
                     <li>Khi bộ nhớ báo trên <span class="text-danger fw-bold">80%</span>, nên vào tab <b>Đã Ghép</b>, tải ảnh về máy rồi xóa khỏi app.</li>
                     <li>Chọn chất lượng <b>Gốc camera</b> cho ảnh rất nét nhưng tốn bộ nhớ hơn; khi cần gửi nhanh qua mạng yếu nên chọn <b>Chuẩn hiện trường</b> hoặc <b>Tiết kiệm</b>.</li>
