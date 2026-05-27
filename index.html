@@ -6648,7 +6648,7 @@ window.addEventListener('load', () => {
 <script>
 // --- GSHT V78: Whisper iframe runner - cô lập Emscripten Module khỏi trang chính ---
 (function(){
-  const RUNNER_VERSION = 'iframe-runner-v78-20260527';
+  const RUNNER_VERSION = 'iframe-runner-v79-force-all-buttons-20260527';
   let runnerFrame = null;
   let runnerReadyPromise = null;
   let runnerSeq = 1;
@@ -6765,6 +6765,271 @@ window.addEventListener('load', () => {
   window.prepareWhisperOfflineWorker = prepareWhisperIframeRuntime;
   window.prepareWhisperMainThreadRuntime = prepareWhisperIframeRuntime;
   window.gshtTranscribeWithWhisperMainThread = transcribeWithWhisperIframe;
+})();
+</script>
+
+
+
+<script>
+// --- GSHT V79: Ép toàn bộ nút Whisper đi qua iframe runner, không dùng nhánh main-thread cũ ---
+(function(){
+  'use strict';
+  const RUNNER_FORCE_VERSION = 'iframe-runner-v79-force-all-buttons-20260527';
+
+  function uiStatus(msg, kind){
+    try { setOfflineSttStatus(msg, kind || 'info'); } catch(e) { console.log('[GSHT STT]', msg); }
+  }
+  function uiPartial(msg){
+    try { setOfflineSttPartial(msg || ''); } catch(e) {}
+  }
+  function transcriptEl(){ return document.getElementById('standalone-stt-result'); }
+  function setTranscript(text){ const el = transcriptEl(); if (el) el.value = text || ''; }
+  function appendTranscript(text){
+    const el = transcriptEl();
+    const s = String(text || '').trim();
+    if (!s) return;
+    if (typeof appendStandaloneTranscript === 'function') { try { appendStandaloneTranscript(s); return; } catch(e) {} }
+    if (el) el.value = (el.value ? el.value.trim() + '\n' : '') + s;
+  }
+  function getPref(){
+    if (typeof getOfflineSttPreference === 'function') return getOfflineSttPreference();
+    return {
+      modelPath: document.getElementById('offline-stt-model-path')?.value || document.getElementById('offline-stt-whisper-model-path')?.value || 'stt/whisper/ggml-tiny-q5_1.bin',
+      modelKey: document.getElementById('offline-stt-model-key')?.value || 'whisper-tiny-q5_1'
+    };
+  }
+  function getRunnerBase(){
+    const workerInput = document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js';
+    let p = String(workerInput || '').replace(/\\/g, '/');
+    if (p.includes('/')) p = p.slice(0, p.lastIndexOf('/') + 1);
+    else p = 'stt/whisper/';
+    return p;
+  }
+
+  let forceFrame = null;
+  let forceReadyPromise = null;
+  let forceSeq = 1;
+  let forceModelKey = '';
+  let forceModelReady = false;
+  const forcePending = new Map();
+
+  function ensureForceRunner(){
+    if (forceReadyPromise) return forceReadyPromise;
+    forceReadyPromise = new Promise((resolve, reject) => {
+      const iframe = document.createElement('iframe');
+      iframe.id = 'gsht-whisper-force-runner';
+      iframe.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:2px;height:2px;opacity:0;pointer-events:none;border:0;';
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.src = getRunnerBase() + 'gsht-whisper-runner.html?v=' + encodeURIComponent(RUNNER_FORCE_VERSION);
+      const timer = setTimeout(() => reject(new Error('Whisper iframe runner không phản hồi. Kiểm tra stt/whisper/gsht-whisper-runner.html đã upload chưa.')), 30000);
+      function onMsg(ev){
+        const d = ev.data || {};
+        if (d.source !== 'gsht-whisper-runner') return;
+        if (d.type === 'loaded' || d.type === 'runtime-ready') {
+          clearTimeout(timer);
+          window.removeEventListener('message', onMsg);
+          forceFrame = iframe;
+          uiPartial('Whisper iframe runner đã tải: ' + (d.version || ''));
+          resolve(iframe);
+        }
+      }
+      window.addEventListener('message', onMsg);
+      document.body.appendChild(iframe);
+    });
+    return forceReadyPromise;
+  }
+  function forceRequest(command, payload, transfer){
+    return ensureForceRunner().then(frame => new Promise((resolve, reject) => {
+      const requestId = 'force_' + (forceSeq++);
+      const timer = setTimeout(() => {
+        forcePending.delete(requestId);
+        reject(new Error('Whisper iframe runner timeout: ' + command));
+      }, command === 'transcribe' ? 240000 : 120000);
+      forcePending.set(requestId, { resolve, reject, timer, command });
+      frame.contentWindow.postMessage(Object.assign({ target:'gsht-whisper-runner', command, requestId }, payload || {}), '*', transfer || []);
+    }));
+  }
+  window.addEventListener('message', function(ev){
+    const d = ev.data || {};
+    if (d.source !== 'gsht-whisper-runner') return;
+    if (d.type === 'log') { try { console.log('[GSHT Whisper iframe]', d.message || ''); } catch(e) {} return; }
+    if (d.type === 'progress' || d.type === 'status') { uiPartial(d.message || ''); return; }
+    if (d.type === 'abort') { uiStatus('❌ Whisper iframe abort: ' + (d.message || ''), 'danger'); return; }
+    if (!d.requestId || !forcePending.has(d.requestId)) return;
+    const item = forcePending.get(d.requestId);
+    if (d.type === 'ready' || d.type === 'result' || d.type === 'pong') {
+      clearTimeout(item.timer);
+      forcePending.delete(d.requestId);
+      item.resolve(d);
+    } else if (d.type === 'error') {
+      clearTimeout(item.timer);
+      forcePending.delete(d.requestId);
+      item.reject(new Error(d.message || 'Whisper iframe runner lỗi'));
+    }
+  });
+
+  async function resolveWhisperModelBufferForce(){
+    const pref = getPref();
+    if (typeof gshtResolveWhisperModelBuffer === 'function') {
+      const model = await gshtResolveWhisperModelBuffer(pref);
+      const buf = model.buffer instanceof ArrayBuffer ? model.buffer.slice(0) : model.buffer;
+      const key = pref.modelPath || pref.modelKey || model.key || 'whisper-model';
+      return { key, buffer: buf };
+    }
+    const path = pref.modelPath || 'stt/whisper/ggml-tiny-q5_1.bin';
+    const res = await fetch(path, { cache:'no-store' });
+    if (!res.ok) throw new Error('Không tải được model Whisper: ' + path);
+    return { key: path, buffer: await res.arrayBuffer() };
+  }
+  async function prepareForceWhisper(){
+    uiStatus('⏳ Đang nạp Whisper bằng iframe runner V79...', 'warning');
+    await ensureForceRunner();
+    const model = await resolveWhisperModelBufferForce();
+    if (forceModelReady && forceModelKey === model.key) {
+      uiStatus('✅ Whisper iframe runner đã sẵn sàng.', 'success');
+      return;
+    }
+    const buf = model.buffer.slice(0);
+    await forceRequest('init', { modelKey: model.key, modelBuffer: buf }, [buf]);
+    forceModelReady = true;
+    forceModelKey = model.key;
+    uiStatus('✅ Whisper iframe runner đã nạp model.', 'success');
+  }
+  function monoFromAudioBuffer(audioBuffer){
+    const channels = audioBuffer.numberOfChannels || 1;
+    const len = audioBuffer.length || 0;
+    const out = new Float32Array(len);
+    for (let c = 0; c < channels; c++) {
+      const ch = audioBuffer.getChannelData(c);
+      for (let i = 0; i < len; i++) out[i] += ch[i] / channels;
+    }
+    return { audio: out, sampleRate: audioBuffer.sampleRate || 44100 };
+  }
+  async function decodeAudioFileForWhisper(file, maxSeconds){
+    const arrayBuffer = await file.arrayBuffer();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('Trình duyệt không hỗ trợ AudioContext.');
+    const ctx = new AC();
+    let audioBuffer;
+    try { audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0)); }
+    finally { try { await ctx.close(); } catch(e) {} }
+    const mono = monoFromAudioBuffer(audioBuffer);
+    const max = Math.floor((maxSeconds || 10) * mono.sampleRate);
+    if (mono.audio.length > max) mono.audio = mono.audio.slice(0, max);
+    return mono;
+  }
+  async function transcribeForce(audio, sampleRate, label){
+    await prepareForceWhisper();
+    const src = audio instanceof Float32Array ? audio : new Float32Array(audio || []);
+    const buf = src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength);
+    uiStatus('⏳ Whisper iframe V79 đang xử lý ' + (src.length / (sampleRate || 16000)).toFixed(1) + ' giây...', 'warning');
+    const res = await forceRequest('transcribe', { audioBuffer: buf, sampleRate: sampleRate || 16000, language:'vi', label:label || 'audio' }, [buf]);
+    const text = String(res.text || '').trim();
+    if (text) appendTranscript(text);
+    uiStatus('✅ Whisper iframe V79 xử lý xong.', 'success');
+    uiPartial(text || 'Whisper xử lý xong nhưng chưa nhận được văn bản rõ ràng.');
+    return text;
+  }
+
+  async function handleFile(ev){
+    const input = ev && ev.target;
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    try {
+      const el = transcriptEl();
+      if (el) el.value = '⏳ Đang test file bằng Whisper iframe V79: ' + file.name;
+      uiStatus('⏳ Đang decode file âm thanh giống demo...', 'warning');
+      const decoded = await decodeAudioFileForWhisper(file, 10);
+      const text = await transcribeForce(decoded.audio, decoded.sampleRate, 'file-test-' + file.name);
+      if (el) el.value = text || 'Whisper xử lý xong nhưng không có văn bản rõ ràng.';
+    } catch(err) {
+      const msg = err && err.message ? err.message : String(err || 'Lỗi không xác định');
+      uiStatus('❌ Test file Whisper iframe V79 lỗi: ' + msg, 'danger');
+      setTranscript('❌ Test file Whisper iframe V79 lỗi: ' + msg);
+    } finally {
+      if (input) input.value = '';
+    }
+  }
+
+  let micRunning = false;
+  let micCtx = null;
+  let micStream = null;
+  let micSource = null;
+  let micProcessor = null;
+  let micBuffer = [];
+  let micSamples = 0;
+  let micProcessing = false;
+
+  async function startMic(){
+    await prepareForceWhisper();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('Trình duyệt không hỗ trợ AudioContext.');
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true }, video:false });
+    micCtx = new AC();
+    micSource = micCtx.createMediaStreamSource(micStream);
+    micProcessor = micCtx.createScriptProcessor(4096, 1, 1);
+    micBuffer = [];
+    micSamples = 0;
+    micProcessing = false;
+    micRunning = true;
+    const segmentSeconds = 5;
+    const targetSamples = Math.floor(micCtx.sampleRate * segmentSeconds);
+    micProcessor.onaudioprocess = async function(e){
+      if (!micRunning || micProcessing) return;
+      const data = e.inputBuffer.getChannelData(0);
+      micBuffer.push(new Float32Array(data));
+      micSamples += data.length;
+      uiPartial('Đang gom âm thanh Whisper iframe V79: ' + (micSamples / micCtx.sampleRate).toFixed(1) + '/' + segmentSeconds + ' giây');
+      if (micSamples >= targetSamples) {
+        micProcessing = true;
+        const merged = new Float32Array(micSamples);
+        let off = 0;
+        for (const part of micBuffer) { merged.set(part, off); off += part.length; }
+        micBuffer = [];
+        micSamples = 0;
+        try { await transcribeForce(merged.slice(0, targetSamples), micCtx.sampleRate, 'micro-5s'); }
+        catch(err) { uiStatus('❌ Whisper iframe V79 mic lỗi: ' + (err && err.message ? err.message : err), 'danger'); }
+        finally { micProcessing = false; }
+      }
+    };
+    micSource.connect(micProcessor);
+    micProcessor.connect(micCtx.destination);
+    uiStatus('🎙️ Whisper iframe V79 đang nhận diện. Mỗi đoạn 5 giây xử lý một lần.', 'success');
+  }
+  async function stopMic(){
+    micRunning = false;
+    try { if (micProcessor) micProcessor.disconnect(); } catch(e) {}
+    try { if (micSource) micSource.disconnect(); } catch(e) {}
+    try { if (micStream) micStream.getTracks().forEach(t => t.stop()); } catch(e) {}
+    try { if (micCtx) await micCtx.close(); } catch(e) {}
+    micCtx = micStream = micSource = micProcessor = null;
+    micBuffer = [];
+    micSamples = 0;
+    micProcessing = false;
+    uiStatus('Đã dừng Whisper iframe V79.', 'secondary');
+  }
+
+  // Ghi đè các hàm mà nút HTML gọi trực tiếp.
+  window.handleStandaloneWhisperAudioFile = handleFile;
+  window.gshtTranscribeWithWhisperMainThread = transcribeForce;
+  window.prepareWhisperMainThreadRuntime = prepareForceWhisper;
+  window.prepareWhisperOfflineWorker = prepareForceWhisper;
+  window.startWhisperMicTranscribe = startMic;
+  window.stopWhisperMicTranscribe = stopMic;
+
+  const oldToggle = window.toggleStandaloneTranscribe;
+  window.toggleStandaloneTranscribe = async function(){
+    const engine = (document.getElementById('offline-stt-engine')?.value || '').toLowerCase();
+    if (engine === 'whisper') {
+      if (micRunning) { await stopMic(); return; }
+      try { await startMic(); } catch(err) { uiStatus('❌ Không khởi động được Whisper iframe V79: ' + (err && err.message ? err.message : err), 'danger'); }
+      return;
+    }
+    if (typeof oldToggle === 'function') return oldToggle.apply(this, arguments);
+    uiStatus('Chưa có hàm toggleStandaloneTranscribe cho engine này.', 'danger');
+  };
+
+  try { console.log('[GSHT] Whisper V79 forced iframe overrides loaded'); } catch(e) {}
 })();
 </script>
 
