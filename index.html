@@ -404,98 +404,173 @@
     
     <script>
        let newWorker;
+let isPwaUpdateReloading = false;
 
-// 1. Đăng ký Service Worker tĩnh, ưu tiên Offline hoàn toàn
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js') // Giữ nguyên đường dẫn tĩnh, không đổi tham số
-            .then(reg => {
-                console.log('✅ Hệ thống PWA sẵn sàng.');
+function bindServiceWorkerEvents(reg) {
+    if (!reg || reg.__gshtUpdateBound) return;
+    reg.__gshtUpdateBound = true;
 
-                // Lắng nghe xem có bản cập nhật nào đang chờ kích hoạt hay không
-                if (reg.waiting) {
-                    newWorker = reg.waiting;
-                    showUpdateNotification();
-                }
+    if (reg.waiting && navigator.serviceWorker.controller) {
+        newWorker = reg.waiting;
+        if (typeof showUpdateNotification === 'function') showUpdateNotification();
+    }
 
-                reg.addEventListener('updatefound', () => {
-                    const installingWorker = reg.installing;
-                    installingWorker.addEventListener('statechange', () => {
-                        if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            newWorker = installingWorker;
-                            showUpdateNotification();
-                        }
-                    });
-                });
-            });
-
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (refreshing) return;
-            refreshing = true;
-            window.location.reload(); // Tự động làm mới màn hình khi nhận được mã nguồn mới
+    reg.addEventListener('updatefound', () => {
+        const installingWorker = reg.installing;
+        if (!installingWorker) return;
+        installingWorker.addEventListener('statechange', () => {
+            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                newWorker = installingWorker;
+                if (typeof showUpdateNotification === 'function') showUpdateNotification();
+            }
         });
     });
 }
 
-// 2. 🚀 HÀM CHỦ ĐỘNG ÉP TRÌNH DUYỆT LÊN MẠNG SĂN FILE MỚI KHI ẤN NÚT
-function checkUpdateManually() {
-    if (!navigator.onLine) return alert("❌ Thiết bị đang ngoại tuyến! Vui lòng kết nối Wifi hoặc 4G để kiểm tra cập nhật.");
-    
-    const btn = document.getElementById("btn-manual-update");
-    const icon = document.getElementById("update-icon");
-    
-    btn.setAttribute("disabled", "true");
-    icon.classList.add("fa-spin");
-    btn.innerText = "⏳ ĐANG KẾT NỐI MÁY CHỦ KIỂM TRA...";
+async function ensureServiceWorkerRegistration() {
+    if (!('serviceWorker' in navigator)) return null;
+    let reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) {
+        reg = await navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });
+    }
+    bindServiceWorkerEvents(reg);
+    return reg;
+}
 
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then(reg => {
-            if (reg) {
-                // Lệnh tối cao ép trình duyệt bỏ qua bộ nhớ đệm, lên thẳng Server tải file sw.js về so sánh byte
-                reg.update().then(() => {
-                    setTimeout(() => {
-                        btn.removeAttribute("disabled");
-                        icon.classList.remove("fa-spin");
-                        btn.innerHTML = `<i class="fa-solid fa-rotate me-1" id="update-icon"></i> KIỂM TRA BẢN CẬP NHẬT MỚI`;
-                        
-                        // Nếu sau khi ép check mạng mà không có Service Worker nào rơi vào trạng thái cài đặt/chờ
-                        if (!reg.waiting && !reg.installing) {
-                            alert("✅ Ứng dụng hiện tại đã là phiên bản mới nhất trên máy chủ!");
-                        }
-                    }, 2000);
-                }).catch(err => {
-                    btn.removeAttribute("disabled");
-                    icon.classList.remove("fa-spin");
-                    btn.innerHTML = `<i class="fa-solid fa-rotate me-1" id="update-icon"></i> KIỂM TRA BẢN CẬP NHẬT MỚI`;
-                    alert("❌ Lỗi kết nối máy chủ: " + err.message);
-                });
-            }
+// 1. Đăng ký Service Worker tĩnh, ưu tiên Offline hoàn toàn nhưng vẫn cho kiểm tra cập nhật chủ động
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+        try {
+            const reg = await ensureServiceWorkerRegistration();
+            console.log('✅ Hệ thống PWA sẵn sàng.', reg);
+        } catch (err) {
+            console.warn('⚠️ Không đăng ký được Service Worker:', err);
+        }
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (isPwaUpdateReloading) return;
+            isPwaUpdateReloading = true;
+            window.location.reload();
         });
+    });
+}
+
+function setManualUpdateButtonBusy(isBusy, text) {
+    const btn = document.getElementById('btn-manual-update');
+    const icon = document.getElementById('update-icon');
+    if (!btn) return;
+    if (isBusy) {
+        btn.setAttribute('disabled', 'true');
+        btn.innerHTML = text || '<i class="fa-solid fa-rotate fa-spin me-1" id="update-icon"></i> ĐANG KIỂM TRA CẬP NHẬT...';
+        const newIcon = document.getElementById('update-icon');
+        if (newIcon) newIcon.classList.add('fa-spin');
+    } else {
+        btn.removeAttribute('disabled');
+        btn.innerHTML = '<i class="fa-solid fa-rotate me-1" id="update-icon"></i> KIỂM TRA BẢN CẬP NHẬT MỚI';
+        if (icon) icon.classList.remove('fa-spin');
+    }
+}
+
+async function fetchNoStore(url) {
+    return fetch(url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now(), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+    });
+}
+
+function waitForServiceWorkerInstall(reg, timeoutMs = 5000) {
+    return new Promise(resolve => {
+        let done = false;
+        const finish = value => {
+            if (done) return;
+            done = true;
+            resolve(value);
+        };
+        const timer = setTimeout(() => finish(null), timeoutMs);
+        const handleWorker = worker => {
+            if (!worker) return;
+            worker.addEventListener('statechange', () => {
+                if (worker.state === 'installed') {
+                    clearTimeout(timer);
+                    finish(worker);
+                }
+            });
+        };
+        if (reg.installing) handleWorker(reg.installing);
+        reg.addEventListener('updatefound', () => handleWorker(reg.installing), { once: true });
+    });
+}
+
+// 2. 🚀 HÀM CHỦ ĐỘNG ÉP TRÌNH DUYỆT LÊN MẠNG SĂN FILE MỚI KHI ẤN NÚT
+async function checkUpdateManually() {
+    if (!navigator.onLine) {
+        return alert('❌ Thiết bị đang ngoại tuyến! Vui lòng kết nối Wifi hoặc 4G để kiểm tra cập nhật.');
+    }
+    if (!('serviceWorker' in navigator)) {
+        return alert('❌ Trình duyệt này không hỗ trợ Service Worker nên không thể kiểm tra cập nhật PWA.');
+    }
+
+    setManualUpdateButtonBusy(true, '<i class="fa-solid fa-rotate fa-spin me-1" id="update-icon"></i> ĐANG KIỂM TRA SERVER...');
+
+    try {
+        const reg = await ensureServiceWorkerRegistration();
+        if (!reg) throw new Error('Không lấy được đăng ký Service Worker.');
+
+        // Tải cưỡng bức các file cốt lõi để phá cache HTTP/CDN. Nếu index.html đổi mà sw.js chưa đổi,
+        // bước reload sau vẫn giúp app lấy HTML mới nhờ chiến lược network-first trong sw.js.
+        await Promise.allSettled([
+            fetchNoStore('./sw.js'),
+            fetchNoStore('./index.html'),
+            fetchNoStore('./manifest.json')
+        ]);
+
+        const installPromise = waitForServiceWorkerInstall(reg, 5500);
+        await reg.update();
+        const installedWorker = await installPromise;
+
+        if (reg.waiting || installedWorker) {
+            newWorker = reg.waiting || installedWorker;
+            showUpdateNotification();
+            setManualUpdateButtonBusy(false);
+            return;
+        }
+
+        setManualUpdateButtonBusy(false);
+        const reload = confirm(`✅ Đã kiểm tra cập nhật. Nếu anh vừa thay đổi file HTML nhưng chưa đổi sw.js, hãy nạp lại giao diện để lấy bản mới nhất.
+
+Bấm OK để nạp lại ứng dụng ngay.`);
+        if (reload) window.location.reload();
+    } catch (err) {
+        console.error(err);
+        setManualUpdateButtonBusy(false);
+        alert('❌ Lỗi kiểm tra cập nhật: ' + (err?.message || err));
     }
 }
 
 function showUpdateNotification() {
-    // Hiện banner màu vàng báo có tính năng mới (giữ nguyên cấu trúc giao diện cũ)
     const oldBanner = document.getElementById('pwa-update-banner');
     if (oldBanner) oldBanner.remove();
     
     const updateBanner = document.createElement('div');
     updateBanner.id = 'pwa-update-banner';
     updateBanner.style.cssText = `
-        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-        background-color: #ffc107; color: #111; padding: 12px 20px;
-        border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
+        background-color: #ffc107; color: #111; padding: 12px 14px;
+        border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.55);
         z-index: 99999; display: flex; align-items: center; justify-content: space-between;
-        gap: 15px; width: 90%; max-width: 450px; border: 2px solid #fff;
+        gap: 10px; width: 94%; max-width: 480px; border: 2px solid #fff; font-family: system-ui, sans-serif;
     `;
     updateBanner.innerHTML = `
-        <div style="font-size: 13px; font-weight: bold;"><i class="fa-solid fa-bell-exclamation fa-bounce me-2"></i> PHÁT HIỆN BẢN CẬP NHẬT MỚI THÀNH CÔNG!</div>
-        <button id="pwa-update-btn" style="background-color: #dc3545; color: white; border: none; padding: 6px 12px; font-weight: bold; border-radius: 4px; font-size: 11px;">NÂNG CẤP NGAY</button>
+        <div style="font-size: 12px; font-weight: bold; line-height:1.35;"><i class="fa-solid fa-bell-exclamation fa-bounce me-2"></i> PHÁT HIỆN BẢN CẬP NHẬT MỚI. BẤM NÂNG CẤP ĐỂ KÍCH HOẠT.</div>
+        <button id="pwa-update-btn" style="background-color: #dc3545; color: white; border: none; padding: 7px 10px; font-weight: bold; border-radius: 6px; font-size: 11px; white-space:nowrap;">NÂNG CẤP</button>
     `;
     document.body.appendChild(updateBanner);
     document.getElementById('pwa-update-btn').addEventListener('click', () => {
-        if (newWorker) newWorker.postMessage({ action: 'skipWaiting' });
+        if (newWorker) {
+            newWorker.postMessage({ action: 'skipWaiting' });
+        } else {
+            window.location.reload();
+        }
     });
 }
     </script>
@@ -796,7 +871,7 @@ function showUpdateNotification() {
                                 <div class="row g-2 align-items-end">
                                     <div class="col-12 col-sm-7">
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-url">Đường dẫn ngoài đã lưu</label>
-                                        <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="https://drive.google.com/file/d/1Z56f2oywTBACLkxvNv3kmwLaoepn9u2z/view?usp=drive_link" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
+                                        <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="https://drive.google.com/drive/folders/15-vcmtKgLUZzdhUh0TSnU8Z7xaO5QpBM?usp=sharing" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
                                     </div>
                                     <div class="col-12 col-sm-5">
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-key">Tên lưu nội bộ</label>
@@ -3974,6 +4049,7 @@ ${timeText}` : viewerTitleText);
     const OFFLINE_STT_FOLDER_URL_KEY = 'gsht_offline_stt_external_folder_url_v1';
     const OFFLINE_STT_DRIVE_API_KEY = 'gsht_offline_stt_drive_api_key_v1';
     let offlineSttFolderFiles = [];
+    let offlineSttModelBlobUrls = {};
     const DEFAULT_VOSK_VN_MODEL_ZIP_URL = 'https://alphacephei.com/vosk/models/vosk-model-small-vn-0.4.zip';
 
     // --- V69: chuyển ZIP model Vosk chính thức thành model.tar.gz ngay trong PWA ---
@@ -4331,12 +4407,15 @@ ${timeText}` : viewerTitleText);
         });
     }
     async function resolveOfflineSttModelPath(pref) {
-        const rawPath = String(pref.modelPath || '').trim();
+        const rawPath = String(pref?.modelPath || '').trim();
         if (!rawPath.startsWith(OFFLINE_STT_IDB_PREFIX)) return rawPath;
         const key = normalizeOfflineSttModelKey(rawPath.slice(OFFLINE_STT_IDB_PREFIX.length));
         const record = await getOfflineSttModelRecord(key);
-        if (!record || !record.blob) throw new Error('Chưa có model đã lưu với tên: ' + key);
-        const blobUrl = URL.createObjectURL(record.blob);
+        if (!record || !record.blob) throw new Error('Chưa có model đã lưu với tên: ' + key + '. Hãy bấm CHỌN FILE hoặc TẢI MODEL trước.');
+        if (offlineSttModelBlobUrls[key]) return offlineSttModelBlobUrls[key];
+        const blob = record.blob instanceof Blob ? record.blob : new Blob([record.blob], { type: record.type || 'application/octet-stream' });
+        const blobUrl = URL.createObjectURL(blob);
+        offlineSttModelBlobUrls[key] = blobUrl;
         return blobUrl;
     }
     async function downloadAndStoreOfflineSttModel() {
@@ -4374,7 +4453,11 @@ ${timeText}` : viewerTitleText);
                 blob = await res.blob();
                 setOfflineSttModelProgress(100, true);
             }
-            await putOfflineSttModelRecord({ key, blob, sourceUrl:url, size:blob.size, type:blob.type || 'application/octet-stream', savedAt:Date.now() });
+            if (/\.zip(\?|$)/i.test(url) || /application\/zip/i.test(blob.type || '')) {
+                setOfflineSttModelStoreStatus('⏳ Đang chuyển ZIP Vosk sang model.tar.gz trước khi lưu...', 'warning');
+                blob = await convertVoskZipBlobToTarGzBlob(blob, p => setOfflineSttModelProgress(p, true));
+            }
+            await putOfflineSttModelRecord({ key, blob, engine: (document.getElementById('offline-stt-engine')?.value || 'vosk'), sourceUrl:url, fileName:url.split('/').pop() || key, size:blob.size, type:blob.type || 'application/octet-stream', savedAt:Date.now() });
             const modelInput = document.getElementById('offline-stt-model-path');
             if (modelInput) modelInput.value = OFFLINE_STT_IDB_PREFIX + key;
             saveOfflineSttPreference();
@@ -4387,20 +4470,27 @@ ${timeText}` : viewerTitleText);
         }
     }
     async function importOfflineSttModelFile(event) {
-        const file = event?.target?.files?.[0];
+        let file = event?.target?.files?.[0];
         if (!file) return;
         const key = getOfflineSttModelKey();
-        const lower = file.name.toLowerCase();
-        if (lower.endsWith('.zip') && !confirm('File này là .zip. Vosk Browser thường cần model .tar.gz; Whisper dùng .bin.\n\nVẫn lưu file ZIP này?')) { event.target.value = ''; return; }
+        const originalName = file.name || key;
+        const lower = originalName.toLowerCase();
         try {
+            setOfflineSttModelProgress(10, true);
+            if (lower.endsWith('.zip')) {
+                file = await maybeConvertVoskZipFileForStorage(file);
+            }
+            const inferredEngine = lower.endsWith('.bin') || /ggml|whisper/i.test(originalName) ? 'whisper' : 'vosk';
+            const engineInput = document.getElementById('offline-stt-engine');
+            if (engineInput) engineInput.value = inferredEngine;
             setOfflineSttModelProgress(35, true);
-            setOfflineSttModelStoreStatus('⏳ Đang lưu file model vào kho nội bộ...', 'warning');
-            await putOfflineSttModelRecord({ key, blob:file, sourceUrl:'local-file:' + file.name, size:file.size, type:file.type || 'application/octet-stream', savedAt:Date.now() });
+            setOfflineSttModelStoreStatus('⏳ Đang lưu file model vào kho nội bộ IndexedDB...', 'warning');
+            await putOfflineSttModelRecord({ key, blob:file, engine: inferredEngine, sourceUrl:'local-file:' + originalName, fileName: originalName, storedFileName: file.name || originalName, size:file.size, type:file.type || 'application/octet-stream', savedAt:Date.now() });
             const modelInput = document.getElementById('offline-stt-model-path');
             if (modelInput) modelInput.value = OFFLINE_STT_IDB_PREFIX + key;
             saveOfflineSttPreference();
             setOfflineSttModelProgress(100, true);
-            setOfflineSttModelStoreStatus(`✅ Đã lưu file "${file.name}" thành "${key}" (${(file.size/1024/1024).toFixed(1)} MB).`, 'success');
+            setOfflineSttModelStoreStatus(`✅ Đã lưu file "${originalName}" thành "${key}" (${(file.size/1024/1024).toFixed(1)} MB). Có thể bấm DÙNG ĐÃ LƯU hoặc KIỂM TRA.`, 'success');
         } catch(err) {
             setOfflineSttModelProgress(0, false);
             setOfflineSttModelStoreStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
@@ -4412,13 +4502,22 @@ ${timeText}` : viewerTitleText);
         const key = getOfflineSttModelKey();
         try {
             const record = await getOfflineSttModelRecord(key);
-            if (!record) return alert('Chưa có model đã lưu với tên: ' + key);
+            if (!record || !record.blob) return alert(`Chưa có model đã lưu với tên: ${key}
+
+Hãy bấm CHỌN FILE hoặc TẢI MODEL trước.`);
             const modelInput = document.getElementById('offline-stt-model-path');
             if (modelInput) modelInput.value = OFFLINE_STT_IDB_PREFIX + key;
+            const engineInput = document.getElementById('offline-stt-engine');
+            if (engineInput && record.engine) engineInput.value = record.engine;
+            offlineSttRuntime = null;
+            if (offlineSttWorker) { try { offlineSttWorker.terminate(); } catch(e) {} offlineSttWorker = null; }
             saveOfflineSttPreference();
-            setOfflineSttModelStoreStatus(`✅ Đang dùng model đã lưu "${key}" (${((record.size || record.blob?.size || 0)/1024/1024).toFixed(1)} MB).`, 'success');
+            setOfflineSttModelStoreStatus(`✅ Đã chọn model đã lưu "${key}" (${((record.size || record.blob?.size || 0)/1024/1024).toFixed(1)} MB). Đang kiểm tra khả năng nạp...`, 'success');
+            await checkOfflineSttEngine();
         } catch(err) {
             setOfflineSttModelStoreStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
+            alert(`Không dùng được model đã lưu:
+${err && err.message ? err.message : err}`);
         }
     }
     async function deleteStoredOfflineSttModel() {
@@ -4495,15 +4594,39 @@ ${timeText}` : viewerTitleText);
         const el = document.getElementById('offline-stt-partial');
         if (el) el.textContent = text || '...';
     }
+    function loadScriptOnce(src) {
+        return new Promise((resolve, reject) => {
+            const existing = document.querySelector(`script[data-dynamic-src="${src}"]`) || document.querySelector(`script[src="${src}"]`);
+            if (existing) return resolve(true);
+            const s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.dataset.dynamicSrc = src;
+            s.onload = () => resolve(true);
+            s.onerror = () => reject(new Error('Không tải được ' + src));
+            document.head.appendChild(s);
+        });
+    }
     async function loadVoskBrowserApi() {
         if (window.Vosk && typeof window.Vosk.createModel === 'function') return window.Vosk;
         if (typeof window.createModel === 'function') return { createModel: window.createModel };
-        try {
-            const mod = await import('./vosk.js');
-            if (mod && typeof mod.createModel === 'function') return { createModel: mod.createModel };
-            if (mod && mod.default && typeof mod.default.createModel === 'function') return mod.default;
-        } catch(e) {}
-        throw new Error('Chưa có thư viện Vosk local. Hãy đặt vosk.js/vosk.wasm hoặc bản vosk-browser trong thư mục PWA.');
+        const moduleCandidates = ['./stt/vosk/vosk.js', './vosk.js'];
+        for (const path of moduleCandidates) {
+            try {
+                const mod = await import(path);
+                if (mod && typeof mod.createModel === 'function') return { createModel: mod.createModel };
+                if (mod && mod.default && typeof mod.default.createModel === 'function') return mod.default;
+            } catch(e) {}
+        }
+        const scriptCandidates = ['stt/vosk/vosk.js', 'vosk.js'];
+        for (const path of scriptCandidates) {
+            try {
+                await loadScriptOnce(path);
+                if (window.Vosk && typeof window.Vosk.createModel === 'function') return window.Vosk;
+                if (typeof window.createModel === 'function') return { createModel: window.createModel };
+            } catch(e) {}
+        }
+        throw new Error('Chưa có thư viện Vosk local. Hãy đặt stt/vosk/vosk.js hoặc vosk.js cùng PWA, sau đó mở lại app/cập nhật cache.');
     }
     async function prepareVoskOfflineRecognizer(sampleRate = 16000) {
         const pref = getOfflineSttPreference();
@@ -4511,7 +4634,12 @@ ${timeText}` : viewerTitleText);
         setOfflineSttStatus('⏳ Đang nạp Vosk model tiếng Việt offline...', 'warning');
         const VoskApi = await loadVoskBrowserApi();
         const resolvedModelPath = await resolveOfflineSttModelPath(pref);
-        const model = await VoskApi.createModel(resolvedModelPath);
+        let model;
+        try {
+            model = await VoskApi.createModel(resolvedModelPath);
+        } catch(e) {
+            throw new Error('Vosk không nạp được model từ ' + pref.modelPath + '. Nếu anh vừa chọn file .tar.gz, hãy chắc chắn file đó là model.tar.gz đúng cấu trúc Vosk và đã có stt/vosk/vosk.js. Chi tiết: ' + (e && e.message ? e.message : e));
+        }
         offlineSttRuntime = { kind:'vosk', model, modelPath: pref.modelPath, resolvedModelPath };
         setOfflineSttStatus('✅ Vosk đã sẵn sàng offline.', 'success');
         return offlineSttRuntime;
