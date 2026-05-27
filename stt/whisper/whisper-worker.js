@@ -15,7 +15,7 @@
  *   transcribeFile { sampleRate, audio: Float32Array }
  */
 
-let Module = null;
+var Module = null;
 let runtimeReadyPromise = null;
 let whisperInstance = null;
 let modelLoaded = false;
@@ -99,7 +99,7 @@ async function ensureRuntime() {
 
   runtimeReadyPromise = new Promise((resolve, reject) => {
     try {
-      const runtimeJs = 'libmain.js';
+      const runtimeJs = self.__gshtRuntimeJs || 'libmain.js';
       Module = {
         noInitialRun: true,
         print: (text) => post('log', { message: String(text || '') }),
@@ -108,7 +108,7 @@ async function ensureRuntime() {
         monitorRunDependencies: () => {},
         locateFile: (path) => {
           const p = String(path || '');
-          if (p.endsWith('.wasm')) return 'libmain.wasm';
+          if (p.endsWith('.wasm')) return self.__gshtWasmFile || 'libmain.wasm';
           return p;
         },
         onRuntimeInitialized: () => {
@@ -143,12 +143,12 @@ async function fetchArrayBuffer(path) {
   return await res.arrayBuffer();
 }
 
-async function loadModel(modelPath) {
+async function loadModel(modelPath, modelBuffer) {
   const M = await ensureRuntime();
   if (modelLoaded && whisperInstance) return;
-  if (!modelPath) throw new Error('Chưa có đường dẫn model Whisper .bin');
+  if (!modelPath && !modelBuffer) throw new Error('Chưa có đường dẫn hoặc dữ liệu model Whisper .bin');
 
-  const ab = await fetchArrayBuffer(modelPath);
+  const ab = modelBuffer ? modelBuffer : await fetchArrayBuffer(modelPath);
   const buf = new Uint8Array(ab);
   if (!buf.length) throw new Error('File model Whisper rỗng hoặc tải lỗi.');
 
@@ -223,7 +223,9 @@ self.onmessage = async (ev) => {
       currentTask = msg.task || 'transcribe';
       currentTranslate = !!msg.translate;
       currentThreads = Math.max(1, Math.min(4, Number(msg.threads || 1)));
-      await loadModel(msg.modelPath || msg.originalModelPath);
+      self.__gshtRuntimeJs = msg.runtimeJs || 'libmain.js';
+      self.__gshtWasmFile = msg.wasmFile || 'libmain.wasm';
+      await loadModel(msg.modelPath || msg.originalModelPath, msg.modelBuffer || null);
       post('inited', { message: 'Whisper đã nạp xong model và sẵn sàng.' });
       return;
     }
@@ -272,4 +274,4 @@ self.onmessage = async (ev) => {
   }
 };
 
-post('log', { message: 'whisper-worker.js đã tải. Chờ lệnh init...' });
+post('worker-ready', { message: 'whisper-worker.js đã tải. Chờ lệnh init...' });
