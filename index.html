@@ -872,7 +872,7 @@ function showUpdateNotification() {
                                 <div class="row g-2 align-items-end">
                                     <div class="col-12 col-sm-7">
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-url">Đường dẫn ngoài đã lưu</label>
-                                        <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
+                                        <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="https://drive.google.com/drive/folders/15-vcmtKgLUZzdhUh0TSnU8Z7xaO5QpBM?usp=drive_link" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
                                     </div>
                                     <div class="col-12 col-sm-5">
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-key">Tên lưu nội bộ</label>
@@ -4166,6 +4166,22 @@ ${timeText}` : viewerTitleText);
     function getOfflineSttModelKey() {
         return normalizeOfflineSttModelKey(document.getElementById('offline-stt-model-key')?.value || 'vosk-vn-small');
     }
+    function deriveOfflineSttModelKeyFromFileName(fileName, engine) {
+        const name = String(fileName || '').toLowerCase();
+        let base = name.replace(/\.(tar\.gz|tgz|zip|bin|wasm)$/i, '').replace(/^ggml[-_]?/i, '');
+        base = base.replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+        if (!base) base = engine === 'whisper' ? 'whisper-model' : 'vosk-model';
+        return normalizeOfflineSttModelKey((engine === 'whisper' ? 'whisper-' : 'vosk-') + base);
+    }
+    async function readRecordModelAsArrayBuffer(record) {
+        if (!record) throw new Error('Không có bản ghi model.');
+        if (record.data instanceof ArrayBuffer) return record.data;
+        if (ArrayBuffer.isView(record.data)) return record.data.buffer.slice(record.data.byteOffset, record.data.byteOffset + record.data.byteLength);
+        if (record.blob instanceof Blob) return await record.blob.arrayBuffer();
+        if (record.blob instanceof ArrayBuffer) return record.blob;
+        if (ArrayBuffer.isView(record.blob)) return record.blob.buffer.slice(record.blob.byteOffset, record.blob.byteOffset + record.blob.byteLength);
+        throw new Error('Model đã lưu không có dữ liệu hợp lệ. Hãy xóa model này và chọn lại file.');
+    }
     function normalizeExternalSttModelUrl(url) {
         let clean = String(url || '').trim();
         if (!clean) return '';
@@ -4414,12 +4430,23 @@ ${timeText}` : viewerTitleText);
         if (!rawPath.startsWith(OFFLINE_STT_IDB_PREFIX)) return rawPath;
         const key = normalizeOfflineSttModelKey(rawPath.slice(OFFLINE_STT_IDB_PREFIX.length));
         const record = await getOfflineSttModelRecord(key);
-        if (!record || !record.blob) throw new Error('Chưa có model đã lưu với tên: ' + key + '. Hãy bấm CHỌN FILE hoặc TẢI MODEL trước.');
+        if (!record || (!record.blob && !record.data)) throw new Error('Chưa có model đã lưu với tên: ' + key + '. Hãy bấm CHỌN FILE hoặc TẢI MODEL trước.');
         if (offlineSttModelBlobUrls[key]) return offlineSttModelBlobUrls[key];
-        const blob = record.blob instanceof Blob ? record.blob : new Blob([record.blob], { type: record.type || 'application/octet-stream' });
+        const ab = await readRecordModelAsArrayBuffer(record);
+        const blob = new Blob([ab], { type: record.type || 'application/octet-stream' });
         const blobUrl = URL.createObjectURL(blob);
         offlineSttModelBlobUrls[key] = blobUrl;
         return blobUrl;
+    }
+    async function resolveOfflineSttModelBufferForWorker(pref) {
+        const rawPath = String(pref?.modelPath || '').trim();
+        if (!rawPath.startsWith(OFFLINE_STT_IDB_PREFIX)) return null;
+        const key = normalizeOfflineSttModelKey(rawPath.slice(OFFLINE_STT_IDB_PREFIX.length));
+        const record = await getOfflineSttModelRecord(key);
+        if (!record || (!record.blob && !record.data)) throw new Error('Chưa có model đã lưu với tên: ' + key + '. Hãy bấm CHỌN FILE hoặc TẢI MODEL trước.');
+        const ab = await readRecordModelAsArrayBuffer(record);
+        if (!ab || !ab.byteLength) throw new Error('Model đã lưu rỗng. Hãy xóa và chọn lại file .bin.');
+        return { key, buffer: ab, size: ab.byteLength, fileName: record.fileName || key, engine: record.engine || '' };
     }
     async function downloadAndStoreOfflineSttModel() {
         saveOfflineSttPreference();
@@ -4475,28 +4502,50 @@ ${timeText}` : viewerTitleText);
     async function importOfflineSttModelFile(event) {
         let file = event?.target?.files?.[0];
         if (!file) return;
-        const key = getOfflineSttModelKey();
-        const originalName = file.name || key;
+        const originalName = file.name || 'model';
         const lower = originalName.toLowerCase();
+        const inferredEngine = lower.endsWith('.bin') || /ggml|whisper/i.test(originalName) ? 'whisper' : 'vosk';
+        let key = getOfflineSttModelKey();
+        const keyInput = document.getElementById('offline-stt-model-key');
+        if (!key || key === 'vosk-vn-small' || key === 'whisper-model' || (inferredEngine === 'whisper' && key.startsWith('vosk-'))) {
+            key = deriveOfflineSttModelKeyFromFileName(originalName, inferredEngine);
+            if (keyInput) keyInput.value = key;
+        }
         try {
             setOfflineSttModelProgress(10, true);
+            const engineInput = document.getElementById('offline-stt-engine');
+            if (engineInput) engineInput.value = inferredEngine;
+            if (inferredEngine === 'whisper') {
+                const workerInput = document.getElementById('offline-stt-worker-path');
+                if (workerInput && !workerInput.value) workerInput.value = 'stt/whisper/whisper-worker.js';
+            }
             if (lower.endsWith('.zip')) {
                 file = await maybeConvertVoskZipFileForStorage(file);
             }
-            const inferredEngine = lower.endsWith('.bin') || /ggml|whisper/i.test(originalName) ? 'whisper' : 'vosk';
-            const engineInput = document.getElementById('offline-stt-engine');
-            if (engineInput) engineInput.value = inferredEngine;
             setOfflineSttModelProgress(35, true);
-            setOfflineSttModelStoreStatus('⏳ Đang lưu file model vào kho nội bộ IndexedDB...', 'warning');
-            await putOfflineSttModelRecord({ key, blob:file, engine: inferredEngine, sourceUrl:'local-file:' + originalName, fileName: originalName, storedFileName: file.name || originalName, size:file.size, type:file.type || 'application/octet-stream', savedAt:Date.now() });
+            setOfflineSttModelStoreStatus('⏳ Đang đọc file model và lưu vào kho nội bộ IndexedDB...', 'warning');
+            let record;
+            if (inferredEngine === 'whisper') {
+                const ab = await file.arrayBuffer();
+                if (!ab || !ab.byteLength) throw new Error('File .bin rỗng hoặc trình duyệt không đọc được file.');
+                record = { key, data: ab, engine: inferredEngine, sourceUrl:'local-file:' + originalName, fileName: originalName, storedFileName: file.name || originalName, size:ab.byteLength, type:file.type || 'application/octet-stream', savedAt:Date.now() };
+            } else {
+                record = { key, blob:file, engine: inferredEngine, sourceUrl:'local-file:' + originalName, fileName: originalName, storedFileName: file.name || originalName, size:file.size, type:file.type || 'application/octet-stream', savedAt:Date.now() };
+            }
+            await putOfflineSttModelRecord(record);
             const modelInput = document.getElementById('offline-stt-model-path');
             if (modelInput) modelInput.value = OFFLINE_STT_IDB_PREFIX + key;
+            if (inferredEngine === 'whisper') {
+                setOfflineSttStatus('✅ Đã lưu model Whisper vào IndexedDB. Bấm DÙNG ĐÃ LƯU hoặc KIỂM TRA để nạp vào worker.', 'success');
+            }
             saveOfflineSttPreference();
             setOfflineSttModelProgress(100, true);
-            setOfflineSttModelStoreStatus(`✅ Đã lưu file "${originalName}" thành "${key}" (${(file.size/1024/1024).toFixed(1)} MB). Có thể bấm DÙNG ĐÃ LƯU hoặc KIỂM TRA.`, 'success');
+            setOfflineSttModelStoreStatus(`✅ Đã lưu file "${originalName}" thành "${key}" (${((record.size || 0)/1024/1024).toFixed(1)} MB). Có thể bấm DÙNG ĐÃ LƯU hoặc KIỂM TRA.`, 'success');
         } catch(err) {
             setOfflineSttModelProgress(0, false);
-            setOfflineSttModelStoreStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
+            const msg = err && err.message ? err.message : String(err);
+            setOfflineSttModelStoreStatus('❌ ' + msg, 'danger');
+            alert('Không lưu được model đã chọn:\n' + msg + '\n\nNếu dùng điện thoại, hãy thử model tiny-q5_1 trước và đảm bảo còn đủ bộ nhớ trình duyệt.');
         } finally {
             try { event.target.value = ''; } catch(e) {}
         }
@@ -4505,7 +4554,7 @@ ${timeText}` : viewerTitleText);
         const key = getOfflineSttModelKey();
         try {
             const record = await getOfflineSttModelRecord(key);
-            if (!record || !record.blob) return alert('Chưa có model đã lưu với tên: ' + key + '\n\nHãy bấm CHỌN FILE hoặc TẢI MODEL trước.');
+            if (!record || (!record.blob && !record.data)) return alert('Chưa có model đã lưu với tên: ' + key + '\n\nHãy bấm CHỌN FILE hoặc TẢI MODEL trước.');
             const modelInput = document.getElementById('offline-stt-model-path');
             if (modelInput) modelInput.value = OFFLINE_STT_IDB_PREFIX + key;
             const engineInput = document.getElementById('offline-stt-engine');
@@ -4580,7 +4629,7 @@ ${timeText}` : viewerTitleText);
         try { localStorage.setItem('gsht_offline_stt_pref_v67', JSON.stringify(pref)); if (pref.externalUrl) localStorage.setItem(OFFLINE_STT_EXTERNAL_URL_KEY, pref.externalUrl); if (pref.folderUrl) localStorage.setItem(OFFLINE_STT_FOLDER_URL_KEY, pref.folderUrl); if (pref.driveApiKey) localStorage.setItem(OFFLINE_STT_DRIVE_API_KEY, pref.driveApiKey); } catch(e) {}
         const modelInput = document.getElementById('offline-stt-model-path');
         if (modelInput && pref.engine === 'vosk' && (!modelInput.value || modelInput.value.includes('whisper'))) modelInput.value = 'models/vosk-model-small-vn/model.tar.gz';
-        if (modelInput && pref.engine === 'whisper' && (!modelInput.value || modelInput.value.includes('vosk'))) modelInput.value = 'models/whisper/ggml-small.bin';
+        if (modelInput && pref.engine === 'whisper' && (!modelInput.value || modelInput.value.includes('vosk'))) modelInput.value = 'stt/whisper/ggml-tiny-q5_1.bin';
         try { if (typeof scheduleOfflineConfigSave === 'function') scheduleOfflineConfigSave(); } catch(e) {}
     }
     function setOfflineSttStatus(msg, type='info') {
@@ -4685,17 +4734,32 @@ ${timeText}` : viewerTitleText);
                     }
                 };
                 worker.onerror = (err) => reject(new Error(err.message || 'Không tải được whisper worker'));
-                resolveOfflineSttModelPath(pref).then((resolvedModelPath) => {
-                    worker.postMessage({
-                        type:'init',
-                        modelPath: resolvedModelPath,
-                        originalModelPath: pref.modelPath,
-                        wasmPath: (pref.wasmPath || 'stt/whisper/whisper.wasm'),
-                        language:'vi',
-                        task:'transcribe',
-                        translate:false
-                    });
-                }).catch((err) => reject(err));
+                (async () => {
+                    const idbModel = await resolveOfflineSttModelBufferForWorker(pref);
+                    if (idbModel && idbModel.buffer) {
+                        worker.postMessage({
+                            type:'init',
+                            modelBuffer: idbModel.buffer,
+                            modelName: idbModel.fileName || idbModel.key || 'whisper.bin',
+                            originalModelPath: pref.modelPath,
+                            wasmPath: (pref.wasmPath || 'stt/whisper/whisper.wasm'),
+                            language:'vi',
+                            task:'transcribe',
+                            translate:false
+                        }, [idbModel.buffer]);
+                    } else {
+                        const resolvedModelPath = await resolveOfflineSttModelPath(pref);
+                        worker.postMessage({
+                            type:'init',
+                            modelPath: resolvedModelPath,
+                            originalModelPath: pref.modelPath,
+                            wasmPath: (pref.wasmPath || 'stt/whisper/whisper.wasm'),
+                            language:'vi',
+                            task:'transcribe',
+                            translate:false
+                        });
+                    }
+                })().catch((err) => reject(err));
             } catch(e) { reject(e); }
         });
     }
