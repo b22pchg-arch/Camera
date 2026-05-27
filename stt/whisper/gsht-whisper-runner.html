@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GSHT Whisper Runner</title>
+</head>
+<body>
+<script>
+(function(){
+  'use strict';
+  const VERSION = 'gsht-whisper-iframe-runner-v1-20260527';
+  let runtimePromise = null;
+  let instance = null;
+  let modelKey = '';
+  let logBuffer = [];
+
+  function post(type, payload){
+    try { parent.postMessage(Object.assign({ source:'gsht-whisper-runner', type }, payload || {}), '*'); } catch(e) {}
+  }
+  function log(){
+    const s = Array.prototype.slice.call(arguments).join(' ');
+    logBuffer.push(s);
+    post('log', { message: s });
+  }
+  function cleanTranscript(lines, ret){
+    const out = [];
+    (lines || []).forEach(line => {
+      const s = String(line || '').trim();
+      if (!s) return;
+      if (/^(whisper_|system_info|operator\(\)|main:|js:|storeFS:|\[GSHT Whisper\])/i.test(s)) return;
+      if (/^(whisper_print_timings|whisper_model_load|whisper_init_|whisper_backend_|whisper_full_|ggml_)/i.test(s)) return;
+      if (/^(load time|fallbacks|mel time|sample time|encode time|decode time|batchd time|prompt time|total time)/i.test(s)) return;
+      const m = s.match(/^\[[^\]]+\]\s*(.*)$/);
+      if (m && m[1]) out.push(m[1].trim());
+      else if (!/returned|processing|samples|threads|processors/i.test(s)) out.push(s);
+    });
+    return out.join('\n').trim();
+  }
+  function normalizeAudio(buffer, sampleRate){
+    let src = buffer instanceof Float32Array ? buffer : new Float32Array(buffer || []);
+    const fromRate = Number(sampleRate || 16000);
+    if (fromRate && Math.abs(fromRate - 16000) > 1 && src.length) {
+      const ratio = fromRate / 16000;
+      const out = new Float32Array(Math.max(1, Math.round(src.length / ratio)));
+      for (let i = 0; i < out.length; i++) {
+        const pos = i * ratio;
+        const i0 = Math.floor(pos);
+        const i1 = Math.min(i0 + 1, src.length - 1);
+        const f = pos - i0;
+        out[i] = src[i0] * (1 - f) + src[i1] * f;
+      }
+      src = out;
+    }
+    const maxSamples = 16000 * 10;
+    if (src.length > maxSamples) src = src.slice(0, maxSamples);
+    const clean = new Float32Array(src.length);
+    for (let i = 0; i < src.length; i++) {
+      let v = src[i];
+      if (!Number.isFinite(v)) v = 0;
+      clean[i] = Math.max(-1, Math.min(1, v));
+    }
+    return clean;
+  }
+  function loadRuntime(){
+    if (window.Module && window.Module.init && window.Module.full_default) return Promise.resolve(window.Module);
+    if (runtimePromise) return runtimePromise;
+    runtimePromise = new Promise((resolve, reject) => {
+      window.Module = {
+        print: log,
+        printErr: log,
+        setStatus: function(text){ post('status', { message: String(text || '') }); },
+        monitorRunDependencies: function(left){ post('deps', { left: left || 0 }); },
+        locateFile: function(path){
+          if (String(path || '').endsWith('.wasm')) return 'libmain.wasm?v=' + encodeURIComponent(VERSION);
+          return path;
+        },
+        onAbort: function(what){ post('abort', { message: String(what || '') }); },
+        onRuntimeInitialized: function(){
+          if (!window.Module.init || !window.Module.full_default || !window.Module.FS_createDataFile) {
+            reject(new Error('Runtime thiếu Module.init/full_default/FS_createDataFile'));
+            return;
+          }
+          post('runtime-ready', { version: VERSION });
+          resolve(window.Module);
+        }
+      };
+      const script = document.createElement('script');
+      script.src = 'libmain.js?v=' + encodeURIComponent(VERSION);
+      script.onload = function(){
+        setTimeout(function(){
+          if (window.Module && window.Module.init && window.Module.full_default) resolve(window.Module);
+        }, 250);
+      };
+      script.onerror = function(){ reject(new Error('Không tải được libmain.js')); };
+      document.head.appendChild(script);
+    });
+    return runtimePromise;
+  }
+  async function initModel(msg){
+    const M = await loadRuntime();
+    const key = msg.modelKey || 'whisper-model';
+    if (instance && modelKey === key) {
+      post('ready', { requestId: msg.requestId, message: 'Model đã nạp sẵn', instance });
+      return;
+    }
+    const u8 = msg.modelBuffer instanceof ArrayBuffer ? new Uint8Array(msg.modelBuffer) : new Uint8Array(msg.modelBuffer || []);
+    if (!u8.length) throw new Error('Model rỗng');
+    try { M.FS_unlink('/whisper.bin'); } catch(e) {}
+    try { M.FS_unlink('whisper.bin'); } catch(e) {}
+    log('storeFS: storing model: whisper.bin size: ' + u8.length);
+    M.FS_createDataFile('/', 'whisper.bin', u8, true, true);
+    instance = M.init('whisper.bin');
+    if (!instance) throw new Error('Module.init("whisper.bin") trả về rỗng');
+    modelKey = key;
+    post('ready', { requestId: msg.requestId, message: 'Whisper iframe đã nạp model', instance, modelKey });
+  }
+  async function transcribe(msg){
+    if (!instance) throw new Error('Chưa nạp model Whisper');
+    const M = await loadRuntime();
+    logBuffer = [];
+    M.print = log;
+    M.printErr = log;
+    const audio = normalizeAudio(msg.audioBuffer, msg.sampleRate || 16000);
+    post('progress', { requestId: msg.requestId, message: 'Whisper runner xử lý ' + (audio.length/16000).toFixed(1) + ' giây' });
+    const ret = M.full_default(instance, audio, msg.language || 'vi', 1, false);
+    const text = cleanTranscript(logBuffer, ret);
+    post('result', { requestId: msg.requestId, text, ret, logs: logBuffer.slice(-80) });
+  }
+  window.addEventListener('message', function(ev){
+    const msg = ev.data || {};
+    if (msg.target !== 'gsht-whisper-runner') return;
+    (async function(){
+      if (msg.command === 'ping') { post('pong', { requestId: msg.requestId, version: VERSION }); return; }
+      if (msg.command === 'init') { await initModel(msg); return; }
+      if (msg.command === 'transcribe') { await transcribe(msg); return; }
+      throw new Error('Lệnh Whisper runner không hợp lệ: ' + msg.command);
+    })().catch(function(err){
+      post('error', { requestId: msg.requestId, message: err && err.message ? err.message : String(err || 'Lỗi không xác định') });
+    });
+  });
+  post('loaded', { version: VERSION });
+})();
+</script>
+</body>
+</html>
