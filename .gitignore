@@ -1,0 +1,6 @@
+# Không đưa model lớn vào GitHub repo
+stt/vosk/*.zip
+stt/vosk/*.tar.gz
+stt/vosk/*.tgz
+stt/whisper/*.bin
+stt/whisper/*.wasm

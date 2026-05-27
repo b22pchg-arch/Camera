@@ -374,6 +374,32 @@
             #offlineImagesModal .modal-footer .btn { font-size: 11px; padding: 5px 8px; }
         }
 
+
+
+        /* --- V67: Bóc băng tiếng Việt offline bằng Vosk / Whisper --- */
+        .offline-stt-panel {
+            border: 1px solid #664d03;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.28);
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+        .offline-stt-panel .form-label { font-size: 10.5px; margin-bottom: 2px; }
+        .offline-stt-panel .form-control,
+        .offline-stt-panel .form-select { font-size: 11px; }
+        #offline-stt-status { font-size: 11px; line-height: 1.35; }
+        .offline-stt-partial {
+            min-height: 24px;
+            font-size: 11px;
+            line-height: 1.35;
+            color: #ffc107;
+            border: 1px dashed #6c757d;
+            border-radius: 6px;
+            padding: 5px 7px;
+            background: rgba(0,0,0,0.35);
+            word-break: break-word;
+        }
+
 </style>
     
     <script>
@@ -475,6 +501,7 @@ function showUpdateNotification() {
     </script>
     <script src="qrcode.min.js"></script>
 	<script src="jsQR.min.js"></script>
+    <script src="fflate.min.js"></script>
 </head>
 <body>
 
@@ -740,12 +767,80 @@ function showUpdateNotification() {
                 <div class="collapse mb-3" id="standalone-transcribe">
                     <div class="card card-body bg-dark border-warning p-2">
                         <p class="text-secondary small mb-2 text-warning" style="font-size: 11px; line-height: 1.4;"><i class="fa-solid fa-circle-info me-1"></i> <b>Giải pháp phần cứng di động:</b> Khi bật tính năng này, Camera hiện trường sẽ tạm ẩn để giải phóng khóa Microphone độc quyền của iOS/Android. Bạn hãy đưa nguồn phát ngoài (Máy bộ đàm, điện thoại thứ 2) sát cạnh điện thoại để dịch thành văn bản.</p>
+
+                        <div class="offline-stt-panel">
+                            <div class="small text-warning fw-bold mb-2"><i class="fa-solid fa-brain me-1"></i> NHẬN DẠNG TIẾNG VIỆT OFFLINE</div>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-sm-4">
+                                    <label class="form-label text-info fw-bold" for="offline-stt-engine">Bộ nhận dạng</label>
+                                    <select id="offline-stt-engine" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="saveOfflineSttPreference()">
+                                        <option value="vosk" selected>Vosk tiếng Việt offline</option>
+                                        <option value="whisper">Whisper offline local</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-sm-8">
+                                    <label class="form-label text-info fw-bold" for="offline-stt-model-path">Đường dẫn model đang dùng</label>
+                                    <input id="offline-stt-model-path" class="form-control form-control-sm bg-dark text-info border-secondary" value="stt/vosk/model-vn.tar.gz" onchange="saveOfflineSttPreference()" placeholder="VD: stt/vosk/model-vn.tar.gz hoặc gsht-idb://vosk-vn-small">
+                                </div>
+                                <div class="col-12 col-sm-8">
+                                    <label class="form-label text-info fw-bold" for="offline-stt-worker-path">Whisper worker local</label>
+                                    <input id="offline-stt-worker-path" class="form-control form-control-sm bg-dark text-info border-secondary" value="stt/whisper/whisper-worker.js" onchange="saveOfflineSttPreference()" placeholder="VD: stt/whisper/whisper-worker.js">
+                                </div>
+                                <div class="col-12 col-sm-4">
+                                    <button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="checkOfflineSttEngine()"><i class="fa-solid fa-circle-check me-1"></i>KIỂM TRA</button>
+                                </div>
+                            </div>
+
+                            <div class="border border-secondary rounded p-2 mt-2 bg-black bg-opacity-25">
+                                <div class="small text-success fw-bold mb-2"><i class="fa-solid fa-download me-1"></i> TẢI / LƯU MODEL OFFLINE LẦN ĐẦU</div>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-12 col-sm-7">
+                                        <label class="form-label text-secondary fw-bold" for="offline-stt-model-url">Đường dẫn ngoài đã lưu</label>
+                                        <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
+                                    </div>
+                                    <div class="col-12 col-sm-5">
+                                        <label class="form-label text-secondary fw-bold" for="offline-stt-model-key">Tên lưu nội bộ</label>
+                                        <input id="offline-stt-model-key" class="form-control form-control-sm bg-dark text-warning border-secondary" value="vosk-vn-small" onchange="saveOfflineSttPreference()" placeholder="VD: vosk-vn-small">
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="saveOfflineSttExternalUrl(true)"><i class="fa-solid fa-floppy-disk me-1"></i>LƯU LINK</button>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <button class="btn btn-sm btn-outline-light w-100 fw-bold" onclick="loadSavedOfflineSttExternalUrl()"><i class="fa-solid fa-rotate-left me-1"></i>DÙNG LINK</button>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <button class="btn btn-sm btn-outline-warning w-100 fw-bold" onclick="openOfflineSttExternalUrl()"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>MỞ LINK</button>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <button class="btn btn-sm btn-success w-100 fw-bold" onclick="downloadAndStoreOfflineSttModel()"><i class="fa-solid fa-cloud-arrow-down me-1"></i>TẢI MODEL</button>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <label class="btn btn-sm btn-outline-success w-100 fw-bold m-0 cursor-pointer"><i class="fa-solid fa-folder-open me-1"></i>CHỌN FILE
+                                            <input type="file" hidden accept=".tar,.gz,.tgz,.bin,.wasm,.zip,application/gzip,application/octet-stream" onchange="importOfflineSttModelFile(event)">
+                                        </label>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="useStoredOfflineSttModel()"><i class="fa-solid fa-database me-1"></i>DÙNG ĐÃ LƯU</button>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <button class="btn btn-sm btn-outline-danger w-100 fw-bold" onclick="deleteStoredOfflineSttModel()"><i class="fa-solid fa-trash me-1"></i>XÓA MODEL</button>
+                                    </div>
+                                </div>
+                                <progress id="offline-stt-model-progress" class="w-100 mt-2 d-none" value="0" max="100"></progress>
+                                <div id="offline-stt-model-store-status" class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;">Model lớn không đưa vào GitHub; hãy nhập/lưu đường dẫn ngoài hoặc chọn file một lần, app sẽ lưu vào kho nội bộ IndexedDB để dùng offline.</div>
+                            </div>
+
+                            <div id="offline-stt-status" class="text-secondary mt-2">Chưa kiểm tra engine. Có thể dùng đường dẫn file local hoặc model đã lưu trong kho nội bộ bằng dạng gsht-idb://tên-model.</div>
+                            <div id="offline-stt-partial" class="offline-stt-partial mt-2">Kết quả tạm thời sẽ hiện ở đây...</div>
+                        </div>
+
                         <button id="btn-standalone-stt" class="btn btn-warning text-dark w-100 fw-bold mb-2 py-2" onclick="toggleStandaloneTranscribe()">
-                            <i class="fa-solid fa-microphone me-1"></i> <span id="stt-btn-text">BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI</span>
+                            <i class="fa-solid fa-microphone me-1"></i> <span id="stt-btn-text">BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI OFFLINE</span>
                         </button>
-                        <textarea id="standalone-stt-result" class="form-control bg-secondary text-white border-secondary small" rows="5" placeholder="Văn bản bóc băng từ nguồn ngoài phát vào mic điện thoại sẽ hiển thị ở đây theo thời gian thực..."></textarea>
-                        <div class="d-flex gap-2 mt-2">
+                        <textarea id="standalone-stt-result" class="form-control bg-secondary text-white border-secondary small" rows="5" placeholder="Văn bản bóc băng offline từ Vosk/Whisper sẽ hiển thị ở đây theo thời gian thực..."></textarea>
+                        <div class="d-flex gap-2 mt-2 flex-wrap">
                             <button class="btn btn-sm btn-outline-light flex-fill" onclick="copyStandaloneSTT()"><i class="fa-solid fa-copy me-1"></i> Sao chép chữ</button>
+                            <button class="btn btn-sm btn-outline-info flex-fill" onclick="sendStandaloneSTTToNote()"><i class="fa-solid fa-pen-to-square me-1"></i> Đưa vào ghi chú</button>
                             <button class="btn btn-sm btn-outline-danger flex-fill" onclick="clearStandaloneSTT()"><i class="fa-solid fa-trash me-1"></i> Xóa bảng nội dung</button>
                         </div>
                     </div>
@@ -893,6 +988,17 @@ function showUpdateNotification() {
         <i class="fa-solid fa-rotate me-1" id="update-icon"></i> KIỂM TRA BẢN CẬP NHẬT MỚI
     </button>
 </div>
+            <div class="card bg-dark border-info p-3 mb-3 shadow-sm">
+                <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size:13px;"><i class="fa-solid fa-mobile-screen me-2"></i>Triển khai PWA offline hoàn chỉnh</h6>
+                <p class="text-secondary small mb-2" style="font-size:11px; line-height:1.45;">
+                    Khu vực này giúp kiểm tra nhanh các file cốt lõi trước khi cài PWA: HTML, Service Worker, Manifest, thư viện QR và thư viện nén model STT.
+                </p>
+                <div class="row g-2">
+                    <div class="col-6"><button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="checkPwaDeploymentAssets()"><i class="fa-solid fa-list-check me-1"></i>KIỂM TRA FILE PWA</button></div>
+                    <div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold" onclick="showPwaInstallGuide()"><i class="fa-solid fa-circle-info me-1"></i>HƯỚNG DẪN CÀI</button></div>
+                </div>
+                <div id="pwa-deploy-status" class="small text-secondary mt-2" style="font-size:10.5px; line-height:1.4;">Nên chạy bằng HTTPS hoặc localhost để dùng được Service Worker, Camera, Micro và lưu model offline.</div>
+            </div>
             <div class="card bg-dark border-secondary p-3 mb-3 shadow-sm">
     <h6 class="text-info fw-bold mb-2 text-uppercase" style="font-size: 13px;"><i class="fa-solid fa-file-sharing me-2"></i>Giải pháp 1: Xuất / Nhập File Offline</h6>
     <p class="text-secondary small mb-3" style="font-size:11px; line-height:1.4;">Phù hợp để truyền tải gói lớn nhiều ảnh hiện trường. Máy A xuất file tự động bật cửa sổ chia sẻ qua <b>Quick Share</b> hoặc <b>Bluetooth</b> bắn sang máy B để nhập vào.</p>
@@ -1149,7 +1255,14 @@ function showUpdateNotification() {
                 <ul class="text-secondary ps-3 mb-3">
                     <li><b>Ghi âm offline:</b> dùng khi chỉ cần lưu âm thanh hiện trường, không quay hình.</li>
                     <li><b>Phụ đề video:</b> nếu trình duyệt hỗ trợ nhận diện giọng nói, app có thể ghi phụ đề khi quay video.</li>
-                    <li><b>Bóc băng độc lập:</b> dùng cho nguồn phát ngoài như bộ đàm hoặc điện thoại thứ hai. Khi bật, camera hiện trường có thể tạm đóng để nhường micro cho chức năng nhận diện giọng nói.</li>
+                    <li><b>Bóc băng độc lập offline:</b> chọn <b>Vosk</b> hoặc <b>Whisper</b> trong khung Nhận dạng tiếng Việt offline. App sẽ dùng micro và xử lý trên thiết bị, không cần internet sau khi thư viện/model đã sẵn sàng.</li>
+                    <li><b>Tải model lần đầu:</b> không cần đưa model lớn lên GitHub. Nhập link ngoài vào ô <b>Đường dẫn ngoài đã lưu</b> như Google Drive, OneDrive, GitHub Release hoặc server nội bộ; bấm <b>LƯU LINK</b> để dùng lại lần sau, nhập <b>Tên lưu nội bộ</b>, rồi bấm <b>TẢI MODEL</b>. App lưu model vào kho IndexedDB và tự đổi đường dẫn sang dạng <code>gsht-idb://ten-model</code> để chạy offline.</li>
+                    <li><b>Khi link ngoài bị chặn tải trực tiếp:</b> bấm <b>MỞ LINK</b> để tải file model về máy, sau đó quay lại app và dùng <b>CHỌN FILE</b> để lưu vào kho nội bộ. Cách này phù hợp với một số link Google Drive/OneDrive không cho trình duyệt tải bằng <code>fetch()</code>.</li>
+                    <li><b>Chọn file model:</b> nếu đã tải model bằng máy tính hoặc điện thoại, bấm <b>CHỌN FILE</b> để lưu một lần vào kho nội bộ. Với Vosk Browser nên dùng model đã đóng gói dạng <code>model.tar.gz</code>; file ZIP chính thức thường cần đóng gói lại trước khi chạy.</li>
+                    <li><b>Vosk:</b> phù hợp điện thoại hiện trường vì nhẹ hơn, cần thư viện <code>vosk.js</code>/<code>vosk.wasm</code> và model tiếng Việt. Model nhỏ tiếng Việt của Vosk là lựa chọn nên thử trước.</li>
+                    <li><b>Whisper:</b> độ chính xác có thể tốt hơn nhưng nặng hơn, cần worker local như <code>whisper-worker.js</code> và model tương ứng. Nên dùng model nhỏ/quantized khi chạy trên điện thoại.</li>
+                    <li>Nút <b>KIỂM TRA</b> dùng để thử nạp engine/model trước khi ra hiện trường. Nếu kiểm tra báo lỗi, hãy kiểm tra lại tên file, đường dẫn model và cache Service Worker.</li>
+                    <li>Có thể bấm <b>Đưa vào ghi chú</b> để chuyển nội dung bóc băng sang ô Ghi chú của phiên chụp.</li>
                     <li>Sau khi dừng bóc băng độc lập, camera sẽ được mở lại nếu trước đó đang bật.</li>
                 </ul>
 
@@ -1327,6 +1440,14 @@ function showUpdateNotification() {
 
     let standaloneRecognition = null;
     let isStandaloneTranscribing = false;
+    let offlineSttEngine = null;
+    let offlineSttRuntime = null;
+    let offlineSttStream = null;
+    let offlineSttAudioContext = null;
+    let offlineSttProcessor = null;
+    let offlineSttSource = null;
+    let offlineSttWorker = null;
+    let offlineSttFinalText = '';
     
     let cachedVideoExtras = { compass: null, map: null, selfie: null };
     let windowAutoMatches = [];
@@ -3807,46 +3928,611 @@ ${timeText}` : viewerTitleText);
     }
     function stopAudioRecording() { if (!isAudioRecording) return; isAudioRecording = false; audioRecorder.stop(); clearInterval(audioInterval); const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-secondary w-100 py-2 fw-bold shadow border border-2 border-secondary"; btn.innerHTML = `<i class="fa-solid fa-microphone me-1"></i> GHI ÂM (OFFLINE)`; }
 
-    // --- MODULE BÓC BĂNG ĐỘC LẬP TẬP TRUNG ---
-    function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
-    function startStandaloneTranscribe() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) return alert("Thiết bị không hỗ trợ Speech-to-Text!");
-        if (localStream) { document.getElementById("video-preview").srcObject = null; localStream.getTracks().forEach(track => track.stop()); localStream = null; }
-        isStandaloneTranscribing = true; const btn = document.getElementById("btn-standalone-stt"); btn.classList.replace("btn-warning", "btn-danger"); btn.classList.add("storage-alarm"); 
-        document.getElementById("stt-btn-text").innerText = "ĐANG KẾT NỐI MICRO NỘI BỘ VÀO BỘ DỊCH AI...";
-        if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e){} standaloneRecognition = null; }
+    // --- V68: KHO LƯU MODEL STT OFFLINE TRONG INDEXEDDB ---
+    const OFFLINE_STT_DB_NAME = 'gsht_offline_stt_models_v1';
+    const OFFLINE_STT_STORE_NAME = 'models';
+    const OFFLINE_STT_IDB_PREFIX = 'gsht-idb://';
+    const OFFLINE_STT_EXTERNAL_URL_KEY = 'gsht_offline_stt_external_model_url_v1';
+    const DEFAULT_VOSK_VN_MODEL_ZIP_URL = 'https://alphacephei.com/vosk/models/vosk-model-small-vn-0.4.zip';
 
-        standaloneRecognition = new SpeechRecognition(); standaloneRecognition.lang = 'vi-VN'; standaloneRecognition.continuous = true; standaloneRecognition.interimResults = true;
-        const textArea = document.getElementById("standalone-stt-result"); let baseText = textArea.value.trim(); if (baseText) baseText += "\n";
-        
-        standaloneRecognition.onstart = () => { document.getElementById("stt-btn-text").innerText = "ĐANG NGHE NGUỒN PHÁT NGOÀI (BẤM DỪNG)"; };
-        standaloneRecognition.onresult = (event) => { 
-            let interimTranscript = '', finalTranscript = ''; 
-            for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } 
-            textArea.value = baseText + finalTranscript + interimTranscript; 
+    // --- V69: chuyển ZIP model Vosk chính thức thành model.tar.gz ngay trong PWA ---
+    function padTarOctal(value, length) {
+        const octal = Math.max(0, Number(value) || 0).toString(8);
+        return octal.padStart(length - 1, '0') + '\0';
+    }
+    function writeTarString(header, str, offset, length) {
+        const enc = new TextEncoder();
+        header.set(enc.encode(String(str || '')).slice(0, length), offset);
+    }
+    function makeTarHeader(name, size, isDir = false) {
+        const header = new Uint8Array(512);
+        writeTarString(header, name, 0, 100);
+        writeTarString(header, isDir ? '0000755\0' : '0000644\0', 100, 8);
+        writeTarString(header, '0000000\0', 108, 8);
+        writeTarString(header, '0000000\0', 116, 8);
+        writeTarString(header, padTarOctal(size, 12), 124, 12);
+        writeTarString(header, padTarOctal(Math.floor(Date.now() / 1000), 12), 136, 12);
+        for (let i = 148; i < 156; i++) header[i] = 32;
+        header[156] = isDir ? '5'.charCodeAt(0) : '0'.charCodeAt(0);
+        writeTarString(header, 'ustar', 257, 6);
+        writeTarString(header, '00', 263, 2);
+        let sum = 0;
+        for (let i = 0; i < 512; i++) sum += header[i];
+        writeTarString(header, sum.toString(8).padStart(6, '0') + '\0 ', 148, 8);
+        return header;
+    }
+    function concatUint8Arrays(parts) {
+        const total = parts.reduce((sum, p) => sum + p.length, 0);
+        const out = new Uint8Array(total);
+        let offset = 0;
+        for (const p of parts) { out.set(p, offset); offset += p.length; }
+        return out;
+    }
+    function normalizeVoskZipModelPath(zipPath) {
+        let clean = String(zipPath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+        const parts = clean.split('/').filter(Boolean);
+        if (!parts.length) return '';
+        if (parts.length > 1) parts.shift();
+        const rel = parts.join('/');
+        return rel ? ('model/' + rel) : '';
+    }
+    async function convertVoskZipBlobToTarGzBlob(zipBlob, onProgress) {
+        if (!window.fflate || typeof fflate.unzipSync !== 'function' || typeof fflate.gzipSync !== 'function') {
+            throw new Error('Thiếu fflate.min.js. Hãy đặt fflate.min.js cùng thư mục index.html để tự chuyển ZIP Vosk sang TAR.GZ.');
+        }
+        onProgress?.(10);
+        const zipBuffer = new Uint8Array(await zipBlob.arrayBuffer());
+        onProgress?.(25);
+        const unzipped = fflate.unzipSync(zipBuffer);
+        const parts = [];
+        const dirs = new Set();
+        const addDir = (dir) => {
+            if (!dir || dirs.has(dir)) return;
+            dirs.add(dir);
+            parts.push(makeTarHeader(dir.endsWith('/') ? dir : dir + '/', 0, true));
         };
-        standaloneRecognition.onerror = (e) => { if (e.error === 'not-allowed') { alert("Quyền truy cập Micro bị chặn!"); stopStandaloneTranscribe(); } };
-        standaloneRecognition.onend = () => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err) {} } };
-        try { standaloneRecognition.start(); } catch(e) { setTimeout(() => { if (isStandaloneTranscribing) { try { standaloneRecognition.start(); } catch(err){} } }, 300); }
+        addDir('model/');
+        const entries = Object.entries(unzipped).filter(([name, content]) => content && content.length && !name.endsWith('/'));
+        let done = 0;
+        for (const [zipPath, content] of entries) {
+            const tarPath = normalizeVoskZipModelPath(zipPath);
+            if (!tarPath || tarPath.endsWith('/')) continue;
+            const pathParts = tarPath.split('/');
+            pathParts.pop();
+            let dir = '';
+            for (const part of pathParts) { dir += part + '/'; addDir(dir); }
+            parts.push(makeTarHeader(tarPath, content.length, false));
+            parts.push(content);
+            const remainder = content.length % 512;
+            if (remainder) parts.push(new Uint8Array(512 - remainder));
+            done++;
+            if (done % 10 === 0) onProgress?.(25 + Math.round((done / Math.max(1, entries.length)) * 45));
+        }
+        parts.push(new Uint8Array(1024));
+        onProgress?.(75);
+        const tarData = concatUint8Arrays(parts);
+        const gzData = fflate.gzipSync(tarData, { level: 6 });
+        onProgress?.(100);
+        return new Blob([gzData], { type: 'application/gzip' });
     }
-    function stopStandaloneTranscribe() {
-        isStandaloneTranscribing = false; if (standaloneRecognition) { try { standaloneRecognition.stop(); } catch(e) {} standaloneRecognition = null; }
-        const btn = document.getElementById("btn-standalone-stt"); btn.classList.remove("storage-alarm"); btn.classList.replace("btn-danger", "btn-warning"); document.getElementById("stt-btn-text").innerText = "BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI";
-        if (isCameraOn) { initCamera(); }
+    async function maybeConvertVoskZipFileForStorage(file) {
+        const lower = String(file?.name || '').toLowerCase();
+        if (!lower.endsWith('.zip')) return file;
+        const ok = confirm('Đây là file ZIP chính thức của Vosk.\n\nỨng dụng sẽ thử chuyển ZIP → model.tar.gz và lưu vào kho nội bộ để Vosk Browser dùng offline. Tiếp tục?');
+        if (!ok) throw new Error('Đã hủy chuyển đổi ZIP Vosk.');
+        setOfflineSttModelStoreStatus('⏳ Đang chuyển ZIP Vosk sang model.tar.gz ngay trên thiết bị...', 'warning');
+        const converted = await convertVoskZipBlobToTarGzBlob(file, p => setOfflineSttModelProgress(p, true));
+        return new File([converted], file.name.replace(/\.zip$/i, '.tar.gz'), { type:'application/gzip' });
     }
-    function copyStandaloneSTT() { const txt = document.getElementById("standalone-stt-result"); txt.select(); document.execCommand("copy"); alert("Đã sao chép văn bản!"); }
-    function clearStandaloneSTT() { if(confirm("Xóa bảng nội dung?")) document.getElementById("standalone-stt-result").value = ""; }
+
+    function setOfflineSttModelStoreStatus(msg, type='info') {
+        const el = document.getElementById('offline-stt-model-store-status');
+        if (!el) return;
+        const color = type === 'danger' ? 'text-danger' : (type === 'success' ? 'text-success' : (type === 'warning' ? 'text-warning' : 'text-info'));
+        el.className = `small ${color} mt-1 fw-bold`;
+        el.style.fontSize = '10.5px';
+        el.style.lineHeight = '1.35';
+        el.textContent = msg;
+    }
+    function setOfflineSttModelProgress(percent, visible=true) {
+        const pg = document.getElementById('offline-stt-model-progress');
+        if (!pg) return;
+        pg.classList.toggle('d-none', !visible);
+        pg.value = Math.max(0, Math.min(100, Number(percent) || 0));
+    }
+    function normalizeOfflineSttModelKey(key) {
+        return String(key || '').trim().replace(/^gsht-idb:\/\//, '').replace(/[^a-zA-Z0-9._-]/g, '_') || 'vosk-vn-small';
+    }
+    function getOfflineSttModelKey() {
+        return normalizeOfflineSttModelKey(document.getElementById('offline-stt-model-key')?.value || 'vosk-vn-small');
+    }
+    function normalizeExternalSttModelUrl(url) {
+        let clean = String(url || '').trim();
+        if (!clean) return '';
+        const gDriveMatch = clean.match(/drive\.google\.com\/file\/d\/([^/]+)/i) || clean.match(/[?&]id=([^&]+)/i);
+        if (/drive\.google\.com/i.test(clean) && gDriveMatch && gDriveMatch[1]) {
+            clean = 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(gDriveMatch[1]);
+        } else if (/(onedrive\.live\.com|1drv\.ms)/i.test(clean) && !/[?&]download=1/i.test(clean)) {
+            clean += (clean.includes('?') ? '&' : '?') + 'download=1';
+        }
+        return clean;
+    }
+    function getSavedOfflineSttExternalUrl() {
+        try { return localStorage.getItem(OFFLINE_STT_EXTERNAL_URL_KEY) || ''; } catch(e) { return ''; }
+    }
+    function saveOfflineSttExternalUrl(showMessage = true) {
+        const input = document.getElementById('offline-stt-model-url');
+        if (!input) return '';
+        const normalized = normalizeExternalSttModelUrl(input.value);
+        if (normalized) input.value = normalized;
+        try { localStorage.setItem(OFFLINE_STT_EXTERNAL_URL_KEY, normalized); } catch(e) {}
+        try { saveOfflineSttPreference(); } catch(e) {}
+        if (showMessage) {
+            setOfflineSttModelStoreStatus(normalized ? '✅ Đã lưu đường dẫn ngoài để dùng lần sau.' : '⚠️ Chưa có đường dẫn ngoài để lưu.', normalized ? 'success' : 'warning');
+        }
+        return normalized;
+    }
+    function loadSavedOfflineSttExternalUrl() {
+        const saved = getSavedOfflineSttExternalUrl() || getOfflineSttPreference().modelUrl || '';
+        const input = document.getElementById('offline-stt-model-url');
+        if (input) input.value = saved;
+        if (saved) {
+            saveOfflineSttPreference();
+            setOfflineSttModelStoreStatus('✅ Đã nạp lại đường dẫn ngoài đã lưu.', 'success');
+        } else {
+            setOfflineSttModelStoreStatus('⚠️ Chưa có đường dẫn ngoài nào đã lưu.', 'warning');
+        }
+    }
+    function openOfflineSttExternalUrl() {
+        const url = saveOfflineSttExternalUrl(false) || getSavedOfflineSttExternalUrl();
+        if (!url) return alert('Chưa có đường dẫn ngoài để mở.');
+        window.open(url, '_blank', 'noopener');
+        setOfflineSttModelStoreStatus('ℹ️ Đã mở đường dẫn ngoài. Nếu trình duyệt tải file về máy, hãy quay lại app và dùng nút CHỌN FILE để lưu vào kho nội bộ.', 'info');
+    }
+    function openOfflineSttDb() {
+        return new Promise((resolve, reject) => {
+            if (!('indexedDB' in window)) return reject(new Error('Trình duyệt không hỗ trợ IndexedDB để lưu model offline.'));
+            const req = indexedDB.open(OFFLINE_STT_DB_NAME, 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(OFFLINE_STT_STORE_NAME)) db.createObjectStore(OFFLINE_STT_STORE_NAME, { keyPath: 'key' });
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error || new Error('Không mở được kho model IndexedDB.'));
+        });
+    }
+    async function putOfflineSttModelRecord(record) {
+        const db = await openOfflineSttDb();
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(OFFLINE_STT_STORE_NAME, 'readwrite');
+            tx.objectStore(OFFLINE_STT_STORE_NAME).put(record);
+            tx.oncomplete = () => { try { db.close(); } catch(e) {} resolve(true); };
+            tx.onerror = () => { try { db.close(); } catch(e) {} reject(tx.error || new Error('Không lưu được model.')); };
+        });
+    }
+    async function getOfflineSttModelRecord(key) {
+        const db = await openOfflineSttDb();
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(OFFLINE_STT_STORE_NAME, 'readonly');
+            const req = tx.objectStore(OFFLINE_STT_STORE_NAME).get(normalizeOfflineSttModelKey(key));
+            req.onsuccess = () => { try { db.close(); } catch(e) {} resolve(req.result || null); };
+            req.onerror = () => { try { db.close(); } catch(e) {} reject(req.error || new Error('Không đọc được model đã lưu.')); };
+        });
+    }
+    async function deleteOfflineSttModelRecord(key) {
+        const db = await openOfflineSttDb();
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(OFFLINE_STT_STORE_NAME, 'readwrite');
+            tx.objectStore(OFFLINE_STT_STORE_NAME).delete(normalizeOfflineSttModelKey(key));
+            tx.oncomplete = () => { try { db.close(); } catch(e) {} resolve(true); };
+            tx.onerror = () => { try { db.close(); } catch(e) {} reject(tx.error || new Error('Không xóa được model.')); };
+        });
+    }
+    async function resolveOfflineSttModelPath(pref) {
+        const rawPath = String(pref.modelPath || '').trim();
+        if (!rawPath.startsWith(OFFLINE_STT_IDB_PREFIX)) return rawPath;
+        const key = normalizeOfflineSttModelKey(rawPath.slice(OFFLINE_STT_IDB_PREFIX.length));
+        const record = await getOfflineSttModelRecord(key);
+        if (!record || !record.blob) throw new Error('Chưa có model đã lưu với tên: ' + key);
+        const blobUrl = URL.createObjectURL(record.blob);
+        return blobUrl;
+    }
+    async function downloadAndStoreOfflineSttModel() {
+        saveOfflineSttPreference();
+        const key = getOfflineSttModelKey();
+        const urlInput = document.getElementById('offline-stt-model-url');
+        let url = normalizeExternalSttModelUrl(String(urlInput?.value || getSavedOfflineSttExternalUrl() || '').trim());
+        if (urlInput && url) urlInput.value = url;
+        if (!url) return alert('Anh hãy nhập đường dẫn ngoài hoặc dùng nút DÙNG LINK để nạp lại link đã lưu. Với Vosk trong trình duyệt nên dùng file model.tar.gz đã chuẩn hóa.');
+        try { localStorage.setItem(OFFLINE_STT_EXTERNAL_URL_KEY, url); } catch(e) {}
+        if (!/^https?:\/\//i.test(url) && !url.startsWith('./') && !url.startsWith('/')) return alert('Đường dẫn model không hợp lệ. Nên dùng link tải trực tiếp https://... hoặc đường dẫn nội bộ ./...');
+        const isLikelyVoskZip = /vosk-model.*\.zip(\?|$)/i.test(url);
+        if (isLikelyVoskZip && !confirm('URL này có vẻ là file ZIP chính thức của Vosk. vosk-browser thường cần model dạng .tar.gz.\n\nVẫn tải và lưu file này? Nếu nạp không được, hãy đóng gói lại thành model.tar.gz rồi chọn file lưu lại.')) return;
+        try {
+            setOfflineSttModelProgress(0, true);
+            setOfflineSttModelStoreStatus('⏳ Đang tải model về thiết bị...', 'warning');
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error('Không tải được model: HTTP ' + res.status);
+            const total = Number(res.headers.get('content-length') || 0);
+            let blob;
+            if (res.body && total) {
+                const reader = res.body.getReader();
+                const chunks = [];
+                let received = 0;
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    received += value.length;
+                    setOfflineSttModelProgress(Math.round(received * 100 / total), true);
+                    setOfflineSttModelStoreStatus(`⏳ Đang tải model: ${(received/1024/1024).toFixed(1)} / ${(total/1024/1024).toFixed(1)} MB`, 'warning');
+                }
+                blob = new Blob(chunks, { type: res.headers.get('content-type') || 'application/octet-stream' });
+            } else {
+                blob = await res.blob();
+                setOfflineSttModelProgress(100, true);
+            }
+            await putOfflineSttModelRecord({ key, blob, sourceUrl:url, size:blob.size, type:blob.type || 'application/octet-stream', savedAt:Date.now() });
+            const modelInput = document.getElementById('offline-stt-model-path');
+            if (modelInput) modelInput.value = OFFLINE_STT_IDB_PREFIX + key;
+            saveOfflineSttPreference();
+            setOfflineSttModelProgress(100, true);
+            setOfflineSttModelStoreStatus(`✅ Đã lưu model "${key}" vào kho nội bộ (${(blob.size/1024/1024).toFixed(1)} MB). Có thể dùng offline.`, 'success');
+        } catch(err) {
+            setOfflineSttModelProgress(0, false);
+            setOfflineSttModelStoreStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
+            alert('Không tải/lưu được model:\n' + (err && err.message ? err.message : err) + '\n\nNếu dùng Google Drive/OneDrive bị chặn tải trực tiếp, hãy bấm MỞ LINK để tải file về máy rồi dùng CHỌN FILE để lưu vào app.');
+        }
+    }
+    async function importOfflineSttModelFile(event) {
+        const file = event?.target?.files?.[0];
+        if (!file) return;
+        const key = getOfflineSttModelKey();
+        const lower = file.name.toLowerCase();
+        if (lower.endsWith('.zip') && !confirm('File này là .zip. Vosk Browser thường cần model .tar.gz; Whisper dùng .bin.\n\nVẫn lưu file ZIP này?')) { event.target.value = ''; return; }
+        try {
+            setOfflineSttModelProgress(35, true);
+            setOfflineSttModelStoreStatus('⏳ Đang lưu file model vào kho nội bộ...', 'warning');
+            await putOfflineSttModelRecord({ key, blob:file, sourceUrl:'local-file:' + file.name, size:file.size, type:file.type || 'application/octet-stream', savedAt:Date.now() });
+            const modelInput = document.getElementById('offline-stt-model-path');
+            if (modelInput) modelInput.value = OFFLINE_STT_IDB_PREFIX + key;
+            saveOfflineSttPreference();
+            setOfflineSttModelProgress(100, true);
+            setOfflineSttModelStoreStatus(`✅ Đã lưu file "${file.name}" thành "${key}" (${(file.size/1024/1024).toFixed(1)} MB).`, 'success');
+        } catch(err) {
+            setOfflineSttModelProgress(0, false);
+            setOfflineSttModelStoreStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
+        } finally {
+            try { event.target.value = ''; } catch(e) {}
+        }
+    }
+    async function useStoredOfflineSttModel() {
+        const key = getOfflineSttModelKey();
+        try {
+            const record = await getOfflineSttModelRecord(key);
+            if (!record) return alert('Chưa có model đã lưu với tên: ' + key);
+            const modelInput = document.getElementById('offline-stt-model-path');
+            if (modelInput) modelInput.value = OFFLINE_STT_IDB_PREFIX + key;
+            saveOfflineSttPreference();
+            setOfflineSttModelStoreStatus(`✅ Đang dùng model đã lưu "${key}" (${((record.size || record.blob?.size || 0)/1024/1024).toFixed(1)} MB).`, 'success');
+        } catch(err) {
+            setOfflineSttModelStoreStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
+        }
+    }
+    async function deleteStoredOfflineSttModel() {
+        const key = getOfflineSttModelKey();
+        if (!confirm('Xóa model đã lưu "' + key + '" khỏi kho nội bộ của app?')) return;
+        try {
+            await deleteOfflineSttModelRecord(key);
+            setOfflineSttModelProgress(0, false);
+            setOfflineSttModelStoreStatus('✅ Đã xóa model "' + key + '". Ảnh và dữ liệu hiện trường không bị ảnh hưởng.', 'success');
+        } catch(err) {
+            setOfflineSttModelStoreStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
+        }
+    }
+    // --- MODULE BÓC BĂNG ĐỘC LẬP TẬP TRUNG + V67 OFFLINE STT VOSK/WHISPER ---
+    function getOfflineSttPreference() {
+        try {
+            const saved = JSON.parse(localStorage.getItem('gsht_offline_stt_pref_v67') || '{}');
+            return {
+                engine: saved.engine || document.getElementById('offline-stt-engine')?.value || 'vosk',
+                modelPath: saved.modelPath || document.getElementById('offline-stt-model-path')?.value || 'stt/vosk/model-vn.tar.gz',
+                workerPath: saved.workerPath || document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js',
+                modelUrl: saved.modelUrl || saved.externalUrl || getSavedOfflineSttExternalUrl() || document.getElementById('offline-stt-model-url')?.value || '',
+                externalUrl: saved.externalUrl || saved.modelUrl || getSavedOfflineSttExternalUrl() || '',
+                modelKey: saved.modelKey || document.getElementById('offline-stt-model-key')?.value || 'vosk-vn-small'
+            };
+        } catch(e) {
+            return { engine:'vosk', modelPath:'stt/vosk/model-vn.tar.gz', workerPath:'stt/whisper/whisper-worker.js', modelUrl:getSavedOfflineSttExternalUrl(), externalUrl:getSavedOfflineSttExternalUrl(), modelKey:'vosk-vn-small' };
+        }
+    }
+    function initOfflineSttPreferenceUI() {
+        const pref = getOfflineSttPreference();
+        const engine = document.getElementById('offline-stt-engine');
+        const model = document.getElementById('offline-stt-model-path');
+        const worker = document.getElementById('offline-stt-worker-path');
+        const url = document.getElementById('offline-stt-model-url');
+        const key = document.getElementById('offline-stt-model-key');
+        if (engine) engine.value = pref.engine;
+        if (model) model.value = pref.modelPath;
+        if (worker) worker.value = pref.workerPath;
+        if (url) url.value = pref.externalUrl || pref.modelUrl || getSavedOfflineSttExternalUrl() || '';
+        if (key) key.value = normalizeOfflineSttModelKey(pref.modelKey || 'vosk-vn-small');
+    }
+    function saveOfflineSttPreference() {
+        const pref = {
+            engine: document.getElementById('offline-stt-engine')?.value || 'vosk',
+            modelPath: document.getElementById('offline-stt-model-path')?.value || 'stt/vosk/model-vn.tar.gz',
+            workerPath: document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js',
+            modelUrl: normalizeExternalSttModelUrl(document.getElementById('offline-stt-model-url')?.value || ''),
+            externalUrl: normalizeExternalSttModelUrl(document.getElementById('offline-stt-model-url')?.value || ''),
+            modelKey: normalizeOfflineSttModelKey(document.getElementById('offline-stt-model-key')?.value || 'vosk-vn-small')
+        };
+        try { localStorage.setItem('gsht_offline_stt_pref_v67', JSON.stringify(pref)); if (pref.externalUrl) localStorage.setItem(OFFLINE_STT_EXTERNAL_URL_KEY, pref.externalUrl); } catch(e) {}
+        const modelInput = document.getElementById('offline-stt-model-path');
+        if (modelInput && pref.engine === 'vosk' && (!modelInput.value || modelInput.value.includes('whisper'))) modelInput.value = 'stt/vosk/model-vn.tar.gz';
+        if (modelInput && pref.engine === 'whisper' && (!modelInput.value || modelInput.value.includes('vosk'))) modelInput.value = 'stt/whisper/ggml-tiny-q5_1.bin';
+        try { if (typeof scheduleOfflineConfigSave === 'function') scheduleOfflineConfigSave(); } catch(e) {}
+    }
+    function setOfflineSttStatus(msg, type='info') {
+        const el = document.getElementById('offline-stt-status');
+        if (!el) return;
+        const color = type === 'danger' ? 'text-danger' : (type === 'success' ? 'text-success' : (type === 'warning' ? 'text-warning' : 'text-info'));
+        el.className = `${color} mt-2 fw-bold`;
+        el.textContent = msg;
+    }
+    function setOfflineSttPartial(text) {
+        const el = document.getElementById('offline-stt-partial');
+        if (el) el.textContent = text || '...';
+    }
+    async function loadVoskBrowserApi() {
+        if (window.Vosk && typeof window.Vosk.createModel === 'function') return window.Vosk;
+        if (typeof window.createModel === 'function') return { createModel: window.createModel };
+        try {
+            const mod = await import('./stt/vosk/vosk.js').catch(() => import('./vosk.js'));
+            if (mod && typeof mod.createModel === 'function') return { createModel: mod.createModel };
+            if (mod && mod.default && typeof mod.default.createModel === 'function') return mod.default;
+        } catch(e) {}
+        throw new Error('Chưa có thư viện Vosk local. Hãy chạy tools/download_stt_assets.ps1 hoặc đặt stt/vosk/vosk.js vào đúng thư mục PWA.');
+    }
+    async function prepareVoskOfflineRecognizer(sampleRate = 16000) {
+        const pref = getOfflineSttPreference();
+        if (offlineSttRuntime && offlineSttRuntime.kind === 'vosk' && offlineSttRuntime.model && offlineSttRuntime.modelPath === pref.modelPath) return offlineSttRuntime;
+        setOfflineSttStatus('⏳ Đang nạp Vosk model tiếng Việt offline...', 'warning');
+        const VoskApi = await loadVoskBrowserApi();
+        const resolvedModelPath = await resolveOfflineSttModelPath(pref);
+        const model = await VoskApi.createModel(resolvedModelPath);
+        offlineSttRuntime = { kind:'vosk', model, modelPath: pref.modelPath, resolvedModelPath };
+        setOfflineSttStatus('✅ Vosk đã sẵn sàng offline.', 'success');
+        return offlineSttRuntime;
+    }
+    async function prepareWhisperOfflineWorker() {
+        const pref = getOfflineSttPreference();
+        if (offlineSttWorker) return offlineSttWorker;
+        setOfflineSttStatus('⏳ Đang khởi tạo Whisper worker offline...', 'warning');
+        return await new Promise((resolve, reject) => {
+            try {
+                const worker = new Worker(pref.workerPath);
+                const timer = setTimeout(() => reject(new Error('Whisper worker không phản hồi. Kiểm tra file ' + pref.workerPath)), 20000);
+                worker.onmessage = (ev) => {
+                    const data = ev.data || {};
+                    if (data.type === 'ready') {
+                        clearTimeout(timer);
+                        offlineSttWorker = worker;
+                        setOfflineSttStatus('✅ Whisper worker đã sẵn sàng offline.', 'success');
+                        resolve(worker);
+                    } else if (data.type === 'partial') {
+                        setOfflineSttPartial(data.text || '');
+                    } else if (data.type === 'result') {
+                        appendStandaloneTranscript(data.text || '');
+                        setOfflineSttPartial('');
+                    } else if (data.type === 'error') {
+                        setOfflineSttStatus('❌ Whisper: ' + (data.message || 'lỗi không xác định'), 'danger');
+                    }
+                };
+                worker.onerror = (err) => reject(new Error(err.message || 'Không tải được whisper worker'));
+                resolveOfflineSttModelPath(pref).then((resolvedModelPath) => {
+                    worker.postMessage({ type:'init', modelPath: resolvedModelPath, originalModelPath: pref.modelPath, language:'vi', task:'transcribe' });
+                }).catch((err) => reject(err));
+            } catch(e) { reject(e); }
+        });
+    }
+    async function checkOfflineSttEngine() {
+        saveOfflineSttPreference();
+        const pref = getOfflineSttPreference();
+        try {
+            if (pref.engine === 'vosk') {
+                await prepareVoskOfflineRecognizer(16000);
+                alert('✅ Vosk tiếng Việt offline đã sẵn sàng.');
+            } else {
+                await prepareWhisperOfflineWorker();
+                alert('✅ Whisper offline worker đã sẵn sàng.');
+            }
+        } catch(err) {
+            setOfflineSttStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
+            alert('Không khởi tạo được engine offline:\n' + (err && err.message ? err.message : err));
+        }
+    }
+    function appendStandaloneTranscript(text) {
+        if (!text || !String(text).trim()) return;
+        const textArea = document.getElementById('standalone-stt-result');
+        if (!textArea) return;
+        const clean = String(text).trim();
+        const prefix = textArea.value.trim() ? '\n' : '';
+        textArea.value += prefix + clean;
+        textArea.scrollTop = textArea.scrollHeight;
+    }
+    function updateStandaloneTranscript(baseText, finalText, partialText) {
+        const textArea = document.getElementById('standalone-stt-result');
+        if (!textArea) return;
+        const finalClean = (finalText || '').trim();
+        const partialClean = (partialText || '').trim();
+        textArea.value = baseText + finalClean + (partialClean ? (finalClean ? ' ' : '') + partialClean : '');
+        textArea.scrollTop = textArea.scrollHeight;
+        setOfflineSttPartial(partialClean || 'Đang nghe...');
+    }
+    async function startVoskMicTranscribe() {
+        const runtime = await prepareVoskOfflineRecognizer(16000);
+        offlineSttStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true, channelCount:1 } });
+        offlineSttAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const sampleRate = offlineSttAudioContext.sampleRate || 16000;
+        const recognizer = new runtime.model.KaldiRecognizer(sampleRate);
+        try { recognizer.setWords(true); } catch(e) {}
+        standaloneRecognition = recognizer;
+        const textArea = document.getElementById('standalone-stt-result');
+        let baseText = textArea && textArea.value.trim() ? textArea.value.trim() + '\n' : '';
+        let finalText = '';
+        recognizer.on && recognizer.on('result', (message) => {
+            const text = message?.result?.text || message?.text || '';
+            if (text && text.trim()) {
+                finalText += (finalText ? ' ' : '') + text.trim() + '.';
+                updateStandaloneTranscript(baseText, finalText, '');
+            }
+        });
+        recognizer.on && recognizer.on('partialresult', (message) => {
+            const partial = message?.result?.partial || message?.partial || '';
+            updateStandaloneTranscript(baseText, finalText, partial);
+        });
+        offlineSttSource = offlineSttAudioContext.createMediaStreamSource(offlineSttStream);
+        offlineSttProcessor = offlineSttAudioContext.createScriptProcessor(4096, 1, 1);
+        offlineSttProcessor.onaudioprocess = (event) => {
+            if (!isStandaloneTranscribing || !standaloneRecognition) return;
+            try { standaloneRecognition.acceptWaveform(event.inputBuffer); } catch(e) {}
+        };
+        offlineSttSource.connect(offlineSttProcessor);
+        offlineSttProcessor.connect(offlineSttAudioContext.destination);
+        offlineSttEngine = 'vosk';
+        setOfflineSttStatus('🎙 Vosk đang nghe offline từ micro...', 'success');
+    }
+    async function startWhisperMicTranscribe() {
+        const worker = await prepareWhisperOfflineWorker();
+        offlineSttStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true, channelCount:1 } });
+        offlineSttAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        offlineSttSource = offlineSttAudioContext.createMediaStreamSource(offlineSttStream);
+        offlineSttProcessor = offlineSttAudioContext.createScriptProcessor(4096, 1, 1);
+        offlineSttProcessor.onaudioprocess = (event) => {
+            if (!isStandaloneTranscribing || !worker) return;
+            const input = event.inputBuffer.getChannelData(0);
+            const copy = new Float32Array(input.length);
+            copy.set(input);
+            try { worker.postMessage({ type:'audio', sampleRate: offlineSttAudioContext.sampleRate || 16000, audio: copy }, [copy.buffer]); } catch(e) {}
+        };
+        worker.postMessage({ type:'start', sampleRate: offlineSttAudioContext.sampleRate || 16000 });
+        offlineSttSource.connect(offlineSttProcessor);
+        offlineSttProcessor.connect(offlineSttAudioContext.destination);
+        offlineSttEngine = 'whisper';
+        setOfflineSttStatus('🎙 Whisper worker đang nghe offline từ micro...', 'success');
+    }
+    function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
+    async function startStandaloneTranscribe() {
+        saveOfflineSttPreference();
+        const pref = getOfflineSttPreference();
+        if (localStream) { document.getElementById('video-preview').srcObject = null; localStream.getTracks().forEach(track => track.stop()); localStream = null; }
+        isStandaloneTranscribing = true;
+        const btn = document.getElementById('btn-standalone-stt');
+        if (btn) { btn.classList.replace('btn-warning', 'btn-danger'); btn.classList.add('storage-alarm'); }
+        const txt = document.getElementById('stt-btn-text');
+        if (txt) txt.innerText = pref.engine === 'vosk' ? 'ĐANG NGHE OFFLINE BẰNG VOSK...' : 'ĐANG NGHE OFFLINE BẰNG WHISPER...';
+        setOfflineSttPartial('Đang khởi tạo micro...');
+        try {
+            if (pref.engine === 'vosk') await startVoskMicTranscribe();
+            else await startWhisperMicTranscribe();
+        } catch(err) {
+            isStandaloneTranscribing = false;
+            stopStandaloneTranscribe(false);
+            const msg = err && err.message ? err.message : String(err);
+            setOfflineSttStatus('❌ Không khởi động được nhận dạng offline: ' + msg, 'danger');
+            alert('Không khởi động được nhận dạng offline:\n' + msg + '\n\nGợi ý: kiểm tra quyền Micro, file model và thư viện local.');
+        }
+    }
+    function stopStandaloneTranscribe(restartCamera=true) {
+        isStandaloneTranscribing = false;
+        if (standaloneRecognition) {
+            try { if (typeof standaloneRecognition.finalResult === 'function') appendStandaloneTranscript(standaloneRecognition.finalResult()?.text || ''); } catch(e) {}
+            try { if (typeof standaloneRecognition.remove === 'function') standaloneRecognition.remove(); } catch(e) {}
+            try { if (typeof standaloneRecognition.free === 'function') standaloneRecognition.free(); } catch(e) {}
+            try { if (typeof standaloneRecognition.stop === 'function') standaloneRecognition.stop(); } catch(e) {}
+            standaloneRecognition = null;
+        }
+        if (offlineSttWorker) { try { offlineSttWorker.postMessage({ type:'stop' }); } catch(e) {} }
+        if (offlineSttProcessor) { try { offlineSttProcessor.disconnect(); } catch(e) {} offlineSttProcessor = null; }
+        if (offlineSttSource) { try { offlineSttSource.disconnect(); } catch(e) {} offlineSttSource = null; }
+        if (offlineSttAudioContext) { try { offlineSttAudioContext.close(); } catch(e) {} offlineSttAudioContext = null; }
+        if (offlineSttStream) { try { offlineSttStream.getTracks().forEach(t => t.stop()); } catch(e) {} offlineSttStream = null; }
+        const btn = document.getElementById('btn-standalone-stt');
+        if (btn) { btn.classList.remove('storage-alarm'); btn.classList.replace('btn-danger', 'btn-warning'); }
+        const txt = document.getElementById('stt-btn-text');
+        if (txt) txt.innerText = 'BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI OFFLINE';
+        setOfflineSttPartial('Đã dừng nhận dạng.');
+        if (restartCamera && isCameraOn) { try { initCamera(); } catch(e) {} }
+    }
+    function copyStandaloneSTT() { const txt = document.getElementById('standalone-stt-result'); txt.select(); document.execCommand('copy'); alert('Đã sao chép văn bản!'); }
+    function clearStandaloneSTT() { if(confirm('Xóa bảng nội dung?')) { document.getElementById('standalone-stt-result').value = ''; setOfflineSttPartial('Kết quả tạm thời sẽ hiện ở đây...'); } }
+    function sendStandaloneSTTToNote() {
+        const text = (document.getElementById('standalone-stt-result')?.value || '').trim();
+        if (!text) return alert('Chưa có nội dung bóc băng để đưa vào ghi chú.');
+        const note1 = document.getElementById('tab1-note');
+        const note2 = document.getElementById('tab2-note');
+        const target = note1 || note2;
+        if (!target) return;
+        target.value = target.value.trim() ? (target.value.trim() + ' | ' + text) : text;
+        if (note2 && note2 !== target) note2.value = target.value;
+        if (note1 && note1 !== target) note1.value = target.value;
+        try { if (typeof scheduleOfflineConfigSave === 'function') scheduleOfflineConfigSave(); } catch(e) {}
+        alert('Đã đưa nội dung bóc băng vào ô Ghi chú.');
+    }
     function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width:100%; max-height:400px;"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width:90%; margin:20px 0;"></audio>`; transcribeBox.classList.remove("d-none"); } openModal('mediaPreviewModal'); }
     function discardMedia() { const player = document.getElementById("preview-player"); if(player) { player.pause(); player.src = ""; } if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl); currentMediaBlobUrl = null; closeModal('mediaPreviewModal'); }
     function downloadMedia() { if (!currentMediaBlobUrl) return; const a = document.createElement('a'); a.style.display = 'none'; a.href = currentMediaBlobUrl; a.download = currentMediaFilename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); }, 100); discardMedia(); }
-    function startAudioTranscription() {
-        const player = document.getElementById("preview-player"); if(!player) return; const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) return alert("Không hỗ trợ bóc băng.");
-        offlineRecognition = new SpeechRecognition(); offlineRecognition.lang = 'vi-VN'; offlineRecognition.continuous = true; offlineRecognition.interimResults = true; const textArea = document.getElementById("transcribe-result"); textArea.value = "⏳ Đang trích xuất chữ..."; let finalTranscript = '';
-        offlineRecognition.onresult = (event) => { let interimTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + '. '; else interimTranscript += event.results[i][0].transcript; } textArea.value = finalTranscript + interimTranscript; };
-        offlineRecognition.onstart = () => { player.play(); }; offlineRecognition.onend = () => { document.getElementById("btn-start-transcribe").innerHTML = `PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; document.getElementById("btn-start-transcribe").classList.replace("btn-danger", "btn-outline-info"); };
-        try { offlineRecognition.start(); const btn = document.getElementById("btn-start-transcribe"); btn.innerHTML = `ĐANG TRÍCH XUẤT CHỮ...`; btn.classList.replace("btn-outline-info", "btn-danger"); } catch(e) {}
+    async function startAudioTranscription() {
+        const player = document.getElementById("preview-player");
+        const textArea = document.getElementById("transcribe-result");
+        const btn = document.getElementById("btn-start-transcribe");
+        if (!player || !currentMediaBlobUrl) return;
+        if (textArea) textArea.value = "⏳ Đang bóc băng offline từ file âm thanh...";
+        if (btn) { btn.innerHTML = `ĐANG BÓC BĂNG OFFLINE...`; btn.classList.replace("btn-outline-info", "btn-danger"); }
+        try {
+            const pref = getOfflineSttPreference();
+            const response = await fetch(currentMediaBlobUrl);
+            const buf = await response.arrayBuffer();
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const tmpCtx = new AudioCtx();
+            const audioBuffer = await tmpCtx.decodeAudioData(buf.slice(0));
+            if (pref.engine === 'vosk') {
+                const runtime = await prepareVoskOfflineRecognizer(audioBuffer.sampleRate || 16000);
+                const recognizer = new runtime.model.KaldiRecognizer(audioBuffer.sampleRate || 16000);
+                try { recognizer.setWords(true); } catch(e) {}
+                let finalText = '';
+                recognizer.on && recognizer.on('result', (message) => {
+                    const t = message?.result?.text || '';
+                    if (t) { finalText += (finalText ? ' ' : '') + t.trim() + '.'; if (textArea) textArea.value = finalText; }
+                });
+                try { recognizer.acceptWaveform(audioBuffer); } catch(e) {
+                    throw new Error('Bản Vosk hiện tại không hỗ trợ bóc băng trực tiếp từ file audio. Hãy dùng chế độ micro offline hoặc cập nhật vosk-browser.');
+                }
+                try { const r = recognizer.finalResult(); if (r && r.text) finalText += (finalText ? ' ' : '') + r.text; } catch(e) {}
+                if (textArea) textArea.value = finalText || 'Không nhận được nội dung từ file.';
+                try { recognizer.remove?.(); recognizer.free?.(); } catch(e) {}
+            } else {
+                const worker = await prepareWhisperOfflineWorker();
+                const channel = audioBuffer.getChannelData(0);
+                const copy = new Float32Array(channel.length); copy.set(channel);
+                if (textArea) textArea.value = '⏳ Đã gửi file sang Whisper worker, đang xử lý...';
+                worker.postMessage({ type:'transcribeFile', sampleRate: audioBuffer.sampleRate, audio: copy }, [copy.buffer]);
+            }
+            try { await tmpCtx.close(); } catch(e) {}
+        } catch(err) {
+            if (textArea) textArea.value = '❌ Không bóc băng offline được file này: ' + (err && err.message ? err.message : err);
+        } finally {
+            if (btn) { btn.innerHTML = `PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; btn.classList.replace("btn-danger", "btn-outline-info"); }
+        }
     }
     
+
+    document.addEventListener('DOMContentLoaded', () => {
+        try { initOfflineSttPreferenceUI(); } catch(e) {}
+    });
+
     function initLiveSubtitle() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -4764,6 +5450,11 @@ function cancelImportFile() {
         { id:'animated-qr-delay', type:'value' },
         { id:'animated-qr-chunk-size', type:'value' },
         { id:'animated-qr-replay-list', type:'value' },
+        { id:'offline-stt-engine', type:'value' },
+        { id:'offline-stt-model-path', type:'value' },
+        { id:'offline-stt-worker-path', type:'value' },
+        { id:'offline-stt-model-url', type:'value' },
+        { id:'offline-stt-model-key', type:'value' },
         { id:'toggle-extra-selfie', type:'checked' },
         { id:'toggle-extra-map', type:'checked' },
         { id:'toggle-extra-compass', type:'checked' }
@@ -4881,6 +5572,7 @@ function cancelImportFile() {
             try { if (typeof applyCameraQualitySetting === 'function') applyCameraQualitySetting(false); } catch(e) {}
             try { if (typeof initLocationQrPreference === 'function') initLocationQrPreference(); } catch(e) {}
             try { if (typeof initExtraInsertPreferences === 'function') initExtraInsertPreferences(); } catch(e) {}
+            try { if (typeof saveOfflineSttPreference === 'function') saveOfflineSttPreference(); } catch(e) {}
             try { if (typeof renderGallery === 'function' && qs('gallery-content')?.classList.contains('active')) renderGallery(); } catch(e) {}
 
             // Áp trạng thái ẩn/hiện khung công cụ sau khi các shell đã được tạo
@@ -4934,7 +5626,7 @@ function cancelImportFile() {
         panel.className = 'card bg-dark border-success p-3 mb-3 shadow-sm';
         panel.innerHTML = `
             <h6 class="text-success fw-bold mb-2 text-uppercase" style="font-size:13px;"><i class="fa-solid fa-floppy-disk me-2"></i>Lưu cấu hình offline người dùng</h6>
-            <p class="text-secondary small mb-2" style="font-size:11px; line-height:1.45;">Tự nhớ các thiết lập hay dùng trên chính thiết bị này: tổ đội, mã hiện trường, ghi chú, chất lượng ảnh/video, chế độ ghép, QR vị trí, chèn selfie/bản đồ/la bàn, chế độ đồng bộ và trạng thái ẩn/hiện giao diện. Không lưu ảnh hiện trường trong mục này.</p>
+            <p class="text-secondary small mb-2" style="font-size:11px; line-height:1.45;">Tự nhớ các thiết lập hay dùng trên chính thiết bị này: tổ đội, mã hiện trường, ghi chú, chất lượng ảnh/video, chế độ ghép, QR vị trí, chèn selfie/bản đồ/la bàn, cấu hình nhận dạng tiếng Việt offline Vosk/Whisper, chế độ đồng bộ và trạng thái ẩn/hiện giao diện. Không lưu ảnh hiện trường hoặc model nhận dạng trong mục này.</p>
             <div class="form-check form-switch border border-secondary rounded p-2 mb-2 bg-black bg-opacity-25 d-flex justify-content-between align-items-center">
                 <label class="form-check-label small text-info fw-bold ms-1" for="offline-config-auto"><i class="fa-solid fa-rotate me-1"></i>TỰ ĐỘNG LƯU KHI THAY ĐỔI CẤU HÌNH</label>
                 <input class="form-check-input me-1" type="checkbox" id="offline-config-auto" checked onchange="setOfflineConfigAutoSave(this.checked)">
