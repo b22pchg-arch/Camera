@@ -1,5 +1,5 @@
 /*
- * GSHT Whisper Worker adapter for whisper.cpp WASM (libmain.js/libmain.wasm)
+ * GSHT Whisper Worker adapter SAFE MODE for whisper.cpp WASM (libmain.js/libmain.wasm)
  * Place this file in: stt/whisper/whisper-worker.js
  * Required in the same folder:
  *   - libmain.js
@@ -29,7 +29,7 @@ let isMicMode = false;
 let isProcessing = false;
 let pendingStop = false;
 const TARGET_SAMPLE_RATE = 16000;
-const MIC_SEGMENT_SECONDS = 18;
+const MIC_SEGMENT_SECONDS = 8; // safe mode: short chunks reduce mobile WASM memory pressure
 
 function post(type, payload = {}) {
   self.postMessage({ type, ...payload });
@@ -41,6 +41,21 @@ function toErrorMessage(err) {
 
 function normalizePath(p) {
   return String(p || '').replace(/\\/g, '/');
+}
+
+function getAsciiHeader(u8, n = 8) {
+  try {
+    return Array.from(u8.slice(0, n)).map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.').join('');
+  } catch (_) { return ''; }
+}
+
+function looksLikeWhisperModel(u8) {
+  if (!u8 || u8.length < 16) return false;
+  const head4 = getAsciiHeader(u8, 4).toLowerCase();
+  const head8 = getAsciiHeader(u8, 8).toLowerCase();
+  if (head4 === 'ggml' || head4 === 'ggmf' || head4 === 'ggjt' || head4 === 'gguf') return true;
+  if (head4.startsWith('<!do') || head4.startsWith('<htm') || head4.startsWith('pk..') || head8.startsWith('{')) return false;
+  return true;
 }
 
 function joinFloat32(chunks, totalSamples) {
@@ -101,7 +116,7 @@ async function ensureRuntime() {
     try {
       const runtimeJs = self.__gshtRuntimeJs || 'libmain.js';
       Module = {
-        noInitialRun: true,
+        // Safe mode: keep runtime close to official whisper.wasm demo; do not set noInitialRun.
         print: (text) => post('log', { message: String(text || '') }),
         printErr: (text) => post('log', { message: String(text || '') }),
         setStatus: (text) => post('progress', { message: String(text || '') }),
@@ -151,13 +166,22 @@ async function loadModel(modelPath, modelBuffer) {
   const ab = modelBuffer ? modelBuffer : await fetchArrayBuffer(modelPath);
   const buf = new Uint8Array(ab);
   if (!buf.length) throw new Error('File model Whisper rỗng hoặc tải lỗi.');
+  const head = getAsciiHeader(buf, 12);
+  if (!looksLikeWhisperModel(buf)) {
+    throw new Error('File model Whisper không đúng định dạng .bin ggml/gguf. Phần đầu file: "' + head + '". Có thể anh đã chọn nhầm file, tải nhầm trang HTML, file ZIP, hoặc link HuggingFace/Drive chưa phải link tải trực tiếp.');
+  }
+  post('progress', { message: 'Kiểm tra model Whisper: header=' + head + ', size=' + (buf.length / 1024 / 1024).toFixed(1) + ' MB' });
 
   try { M.FS_unlink('/whisper.bin'); } catch (_) {}
   try { M.FS_unlink('whisper.bin'); } catch (_) {}
   M.FS_createDataFile('/', 'whisper.bin', buf, true, true);
   post('progress', { message: 'Đã đưa model vào FS WASM: ' + (buf.length / 1024 / 1024).toFixed(1) + ' MB' });
 
-  whisperInstance = M.init('whisper.bin');
+  try {
+    whisperInstance = M.init('whisper.bin');
+  } catch (e) {
+    throw new Error('Module.init("whisper.bin") bị abort/lỗi native. Hãy thử model tiny-q5_1, build libmain single-thread, và dùng đoạn âm thanh 5-10 giây. Chi tiết: ' + toErrorMessage(e));
+  }
   if (!whisperInstance) throw new Error('Module.init("whisper.bin") thất bại. Kiểm tra model .bin có đúng định dạng ggml/whisper.cpp không.');
   modelLoaded = true;
 }
@@ -178,7 +202,9 @@ function runWhisper(audioFloat32, sampleRate, language, translate, sourceLabel =
   post('progress', { message: 'Whisper đang xử lý ' + sourceLabel + ' (' + (audio16.length / TARGET_SAMPLE_RATE).toFixed(1) + ' giây)...' });
   let ret = null;
   try {
-    ret = M.full_default(whisperInstance, audio16, language || currentLanguage || 'vi', currentThreads || 1, !!translate);
+    ret = M.full_default(whisperInstance, audio16, language || currentLanguage || 'vi', 1, !!translate);
+  } catch (e) {
+    throw new Error('Module.full_default() bị abort/lỗi native khi xử lý âm thanh. Hãy thử audio 5-10 giây, model tiny-q5_1, và bản libmain build single-thread. Chi tiết: ' + toErrorMessage(e));
   } finally {
     M.print = oldPrint;
     M.printErr = oldErr;
@@ -222,7 +248,7 @@ self.onmessage = async (ev) => {
       currentLanguage = msg.language || 'vi';
       currentTask = msg.task || 'transcribe';
       currentTranslate = !!msg.translate;
-      currentThreads = Math.max(1, Math.min(4, Number(msg.threads || 1)));
+      currentThreads = 1; // safe mode: force single-thread to avoid SharedArrayBuffer/COI aborts on PWA mobile
       self.__gshtRuntimeJs = msg.runtimeJs || 'libmain.js';
       self.__gshtWasmFile = msg.wasmFile || 'libmain.wasm';
       await loadModel(msg.modelPath || msg.originalModelPath, msg.modelBuffer || null);
@@ -274,4 +300,4 @@ self.onmessage = async (ev) => {
   }
 };
 
-post('worker-ready', { message: 'whisper-worker.js đã tải. Chờ lệnh init...' });
+post('worker-ready', { message: 'whisper-worker.js SAFE MODE đã tải. Chờ lệnh init... Threads=1, đoạn micro=8 giây.' });
