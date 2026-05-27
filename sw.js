@@ -1,7 +1,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v81-whisper-local-model-20260527';
+const GSHT_CACHE = 'gsht-pwa-v83-whisper-local-model-20260527';
 const APP_SHELL = [
   './',
   './index.html',
