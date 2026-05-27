@@ -7033,5 +7033,299 @@ window.addEventListener('load', () => {
 })();
 </script>
 
+
+
+<script>
+// --- GSHT V80: Whisper worker runner + tùy chọn chất lượng/độ mượt ---
+(function(){
+  'use strict';
+  const V80 = 'whisper-worker-v80-20260527';
+  const workerPathName = 'gsht-whisper-worker-runner.js';
+
+  function $(id){ return document.getElementById(id); }
+  function uiStatus(msg, kind){ try { setOfflineSttStatus(msg, kind || 'info'); } catch(e) { console.log('[GSHT STT]', msg); } }
+  function uiPartial(msg){ try { setOfflineSttPartial(msg || ''); } catch(e) {} }
+  function transcriptEl(){ return $('standalone-stt-result'); }
+  function setTranscript(text){ const el = transcriptEl(); if (el) el.value = text || ''; }
+  function appendTranscript(text){
+    const s = String(text || '').trim();
+    if (!s) return;
+    if (typeof appendStandaloneTranscript === 'function') { try { appendStandaloneTranscript(s); return; } catch(e) {} }
+    const el = transcriptEl(); if (el) el.value = (el.value ? el.value.trim() + '\n' : '') + s;
+  }
+  function getPref(){
+    if (typeof getOfflineSttPreference === 'function') return getOfflineSttPreference();
+    return {
+      modelPath: $('offline-stt-model-path')?.value || $('offline-stt-whisper-model-path')?.value || 'stt/whisper/ggml-tiny-q5_1.bin',
+      modelKey: $('offline-stt-model-key')?.value || 'whisper-tiny-q5_1'
+    };
+  }
+  function getRunnerBase(){
+    const workerInput = $('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js';
+    let p = String(workerInput || '').replace(/\\/g, '/');
+    if (p.includes('/')) p = p.slice(0, p.lastIndexOf('/') + 1); else p = 'stt/whisper/';
+    return p;
+  }
+  function getSetting(id, fallback){
+    try { const v = localStorage.getItem('gsht_' + id); if (v !== null && v !== '') return v; } catch(e) {}
+    return fallback;
+  }
+  function setSetting(id, value){ try { localStorage.setItem('gsht_' + id, String(value)); } catch(e) {} }
+  function getWhisperMode(){ return $('offline-stt-whisper-run-mode')?.value || getSetting('offline-stt-whisper-run-mode', 'worker'); }
+  function getSegmentSeconds(){ return Math.max(3, Math.min(15, parseFloat($('offline-stt-whisper-segment-seconds')?.value || getSetting('offline-stt-whisper-segment-seconds', '5')) || 5)); }
+  function getMicProfile(){ return $('offline-stt-whisper-mic-profile')?.value || getSetting('offline-stt-whisper-mic-profile', 'field'); }
+
+  function insertWhisperQualityPanel(){
+    if ($('gsht-whisper-quality-panel')) return;
+    const status = $('offline-stt-status');
+    if (!status) return;
+    const box = document.createElement('div');
+    box.id = 'gsht-whisper-quality-panel';
+    box.className = 'border border-warning rounded p-2 mt-2 bg-black bg-opacity-25';
+    box.innerHTML = `
+      <div class="small text-warning fw-bold mb-2"><i class="fa-solid fa-sliders me-1"></i> TÙY CHỌN WHISPER - CHẤT LƯỢNG / ĐỘ MƯỢT</div>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-sm-4">
+          <label class="form-label text-secondary fw-bold" for="offline-stt-whisper-run-mode">Cách chạy Whisper</label>
+          <select id="offline-stt-whisper-run-mode" class="form-select form-select-sm bg-dark text-info border-secondary">
+            <option value="worker">Worker - ít treo giao diện</option>
+            <option value="iframe">Iframe demo - ổn định hơn nhưng dễ treo</option>
+          </select>
+        </div>
+        <div class="col-6 col-sm-4">
+          <label class="form-label text-secondary fw-bold" for="offline-stt-whisper-segment-seconds">Độ dài mỗi đoạn</label>
+          <select id="offline-stt-whisper-segment-seconds" class="form-select form-select-sm bg-dark text-warning border-secondary">
+            <option value="5">5 giây - an toàn mobile</option>
+            <option value="8">8 giây - cân bằng</option>
+            <option value="10">10 giây - ít ngắt câu hơn</option>
+          </select>
+        </div>
+        <div class="col-6 col-sm-4">
+          <label class="form-label text-secondary fw-bold" for="offline-stt-whisper-mic-profile">Xử lý micro</label>
+          <select id="offline-stt-whisper-mic-profile" class="form-select form-select-sm bg-dark text-warning border-secondary">
+            <option value="field">Hiện trường - lọc ồn/AGC</option>
+            <option value="raw">Nguyên âm - ít méo tiếng</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-sm btn-outline-info flex-fill fw-bold" onclick="gshtSetWhisperModelQuick('tiny')">Tiny - nhanh</button>
+            <button type="button" class="btn btn-sm btn-outline-warning flex-fill fw-bold" onclick="gshtSetWhisperModelQuick('base')">Base - rõ hơn</button>
+            <button type="button" class="btn btn-sm btn-outline-success flex-fill fw-bold" onclick="gshtSetWhisperModelQuick('small')">Small - tốt hơn, chậm</button>
+          </div>
+          <div class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;">Chất lượng kém thường do dùng model Tiny hoặc âm thanh TTS/ồn. Nên thử Base Q5_1 trước; Small tốt hơn nhưng nặng hơn nhiều trên điện thoại.</div>
+        </div>
+      </div>`;
+    status.insertAdjacentElement('beforebegin', box);
+    const run = $('offline-stt-whisper-run-mode');
+    const seg = $('offline-stt-whisper-segment-seconds');
+    const mic = $('offline-stt-whisper-mic-profile');
+    if (run) { run.value = getSetting('offline-stt-whisper-run-mode', 'worker'); run.onchange = () => setSetting('offline-stt-whisper-run-mode', run.value); }
+    if (seg) { seg.value = getSetting('offline-stt-whisper-segment-seconds', '5'); seg.onchange = () => setSetting('offline-stt-whisper-segment-seconds', seg.value); }
+    if (mic) { mic.value = getSetting('offline-stt-whisper-mic-profile', 'field'); mic.onchange = () => setSetting('offline-stt-whisper-mic-profile', mic.value); }
+  }
+  window.gshtSetWhisperModelQuick = function(kind){
+    const pathEl = $('offline-stt-model-path');
+    const keyEl = $('offline-stt-model-key');
+    let file = 'ggml-tiny-q5_1.bin', key = 'whisper-tiny-q5_1';
+    if (kind === 'base') { file = 'ggml-base-q5_1.bin'; key = 'whisper-base-q5_1'; }
+    if (kind === 'small') { file = 'ggml-small-q5_1.bin'; key = 'whisper-small-q5_1'; }
+    if (pathEl) pathEl.value = 'stt/whisper/' + file;
+    if (keyEl) keyEl.value = key;
+    try { saveOfflineSttPreference(); } catch(e) {}
+    uiStatus('Đã chọn model Whisper: ' + file + '. Nếu file chưa có trong GitHub, hãy chọn/lưu model tương ứng trước.', 'info');
+  };
+
+  let worker = null, workerReady = false, workerSeq = 1, workerModelKey = '', workerModelReady = false;
+  const workerPending = new Map();
+  const iframePrepareFallback = window.prepareWhisperMainThreadRuntime;
+  const iframeTranscribeFallback = window.gshtTranscribeWithWhisperMainThread;
+
+  function workerUrl(){ return getRunnerBase() + workerPathName + '?v=' + encodeURIComponent(V80); }
+  function ensureWorker(){
+    if (worker && workerReady) return Promise.resolve(worker);
+    return new Promise((resolve, reject) => {
+      if (worker) { try { worker.terminate(); } catch(e) {} worker = null; workerReady = false; workerModelReady = false; }
+      const w = new Worker(workerUrl());
+      const timer = setTimeout(() => reject(new Error('Whisper worker V80 không phản hồi')), 20000);
+      w.onmessage = function(ev){
+        const d = ev.data || {};
+        if (d.source !== 'gsht-whisper-worker-runner') return;
+        if (d.type === 'loaded' || d.type === 'runtime-ready') { clearTimeout(timer); worker = w; workerReady = true; uiPartial('Whisper worker V80 đã tải.'); resolve(w); return; }
+        handleWorkerMessage(d);
+      };
+      w.onerror = function(e){ clearTimeout(timer); reject(new Error(e.message || 'Whisper worker V80 lỗi')); };
+    });
+  }
+  function handleWorkerMessage(d){
+    if (d.type === 'log') { try { console.log('[GSHT Whisper worker V80]', d.message || ''); } catch(e) {} return; }
+    if (d.type === 'progress' || d.type === 'status') { uiPartial(d.message || ''); return; }
+    if (d.type === 'abort') { uiStatus('❌ Whisper worker V80 abort: ' + (d.message || ''), 'danger'); return; }
+    if (!d.requestId || !workerPending.has(d.requestId)) return;
+    const item = workerPending.get(d.requestId);
+    if (d.type === 'ready' || d.type === 'result' || d.type === 'pong') { clearTimeout(item.timer); workerPending.delete(d.requestId); item.resolve(d); }
+    else if (d.type === 'error') { clearTimeout(item.timer); workerPending.delete(d.requestId); item.reject(new Error(d.message || 'Whisper worker V80 lỗi')); }
+  }
+  function workerRequest(command, payload, transfer){
+    return ensureWorker().then(w => new Promise((resolve, reject) => {
+      const requestId = 'w80_' + (workerSeq++);
+      const timer = setTimeout(() => { workerPending.delete(requestId); reject(new Error('Whisper worker V80 timeout: ' + command)); }, command === 'transcribe' ? 240000 : 120000);
+      workerPending.set(requestId, { resolve, reject, timer, command });
+      w.postMessage(Object.assign({ target:'gsht-whisper-worker-runner', command, requestId }, payload || {}), transfer || []);
+    }));
+  }
+  async function resolveModelBuffer(){
+    const pref = getPref();
+    if (typeof gshtResolveWhisperModelBuffer === 'function') {
+      const model = await gshtResolveWhisperModelBuffer(pref);
+      const buf = model.buffer instanceof ArrayBuffer ? model.buffer.slice(0) : model.buffer;
+      const key = pref.modelPath || pref.modelKey || model.key || 'whisper-model';
+      return { key, buffer: buf };
+    }
+    const path = pref.modelPath || 'stt/whisper/ggml-tiny-q5_1.bin';
+    const res = await fetch(path, { cache:'no-store' });
+    if (!res.ok) throw new Error('Không tải được model Whisper: ' + path);
+    return { key:path, buffer: await res.arrayBuffer() };
+  }
+  async function prepareWorkerWhisper(){
+    if (getWhisperMode() === 'iframe') {
+      if (typeof iframePrepareFallback === 'function') return iframePrepareFallback();
+      throw new Error('Chưa có iframe fallback.');
+    }
+    uiStatus('⏳ Đang nạp Whisper bằng worker V80...', 'warning');
+    await ensureWorker();
+    const model = await resolveModelBuffer();
+    if (workerModelReady && workerModelKey === model.key) { uiStatus('✅ Whisper worker V80 đã sẵn sàng.', 'success'); return { kind:'whisper-worker-v80' }; }
+    const buf = model.buffer.slice(0);
+    await workerRequest('init', { modelKey:model.key, modelBuffer:buf }, [buf]);
+    workerModelReady = true; workerModelKey = model.key;
+    uiStatus('✅ Whisper worker V80 đã nạp model.', 'success');
+    return { kind:'whisper-worker-v80' };
+  }
+  async function transcribeWorkerWhisper(audio, sampleRate, label){
+    if (getWhisperMode() === 'iframe') {
+      if (typeof iframeTranscribeFallback === 'function') return iframeTranscribeFallback(audio, sampleRate, label);
+      throw new Error('Chưa có iframe fallback.');
+    }
+    await prepareWorkerWhisper();
+    const src = audio instanceof Float32Array ? audio : new Float32Array(audio || []);
+    const buf = src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength);
+    uiStatus('⏳ Whisper worker V80 đang xử lý ' + (src.length / (sampleRate || 16000)).toFixed(1) + ' giây...', 'warning');
+    const res = await workerRequest('transcribe', { audioBuffer:buf, sampleRate:sampleRate || 16000, language:'vi', label:label || 'audio' }, [buf]);
+    const text = String(res.text || '').trim();
+    if (text) appendTranscript(text);
+    uiStatus('✅ Whisper worker V80 xử lý xong.', 'success');
+    uiPartial(text || 'Whisper xử lý xong nhưng chưa nhận được văn bản rõ ràng.');
+    return text;
+  }
+
+  function monoFromAudioBuffer(audioBuffer){
+    const channels = audioBuffer.numberOfChannels || 1;
+    const len = audioBuffer.length || 0;
+    const out = new Float32Array(len);
+    for (let c = 0; c < channels; c++) { const ch = audioBuffer.getChannelData(c); for (let i = 0; i < len; i++) out[i] += ch[i] / channels; }
+    return { audio: out, sampleRate: audioBuffer.sampleRate || 44100 };
+  }
+  async function decodeAudioFile(file, maxSeconds){
+    const arrayBuffer = await file.arrayBuffer();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('Trình duyệt không hỗ trợ AudioContext.');
+    const ctx = new AC();
+    let audioBuffer;
+    try { audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0)); } finally { try { await ctx.close(); } catch(e) {} }
+    const mono = monoFromAudioBuffer(audioBuffer);
+    const max = Math.floor((maxSeconds || 10) * mono.sampleRate);
+    if (mono.audio.length > max) mono.audio = mono.audio.slice(0, max);
+    return mono;
+  }
+  async function handleAudioFile(ev){
+    const input = ev && ev.target;
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    try {
+      setTranscript('⏳ Đang test file bằng Whisper worker V80: ' + file.name);
+      uiStatus('⏳ Đang decode file âm thanh...', 'warning');
+      const decoded = await decodeAudioFile(file, 10);
+      const text = await transcribeWorkerWhisper(decoded.audio, decoded.sampleRate, 'file-test-' + file.name);
+      setTranscript(text || 'Whisper xử lý xong nhưng không có văn bản rõ ràng.');
+    } catch(err) {
+      const msg = err && err.message ? err.message : String(err || 'Lỗi không xác định');
+      uiStatus('❌ Test file Whisper worker V80 lỗi: ' + msg, 'danger');
+      setTranscript('❌ Test file Whisper worker V80 lỗi: ' + msg);
+    } finally { if (input) input.value = ''; }
+  }
+
+  let micRunning=false, micCtx=null, micStream=null, micSource=null, micProcessor=null, micBuffer=[], micSamples=0, micProcessing=false;
+  function micConstraints(){
+    const prof = getMicProfile();
+    if (prof === 'raw') return { echoCancellation:false, noiseSuppression:false, autoGainControl:false };
+    return { echoCancellation:true, noiseSuppression:true, autoGainControl:true };
+  }
+  async function startMic(){
+    await prepareWorkerWhisper();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('Trình duyệt không hỗ trợ AudioContext.');
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints(), video:false });
+    micCtx = new AC();
+    micSource = micCtx.createMediaStreamSource(micStream);
+    micProcessor = micCtx.createScriptProcessor(4096, 1, 1);
+    micBuffer=[]; micSamples=0; micProcessing=false; micRunning=true;
+    const segmentSeconds = getSegmentSeconds();
+    const targetSamples = Math.floor(micCtx.sampleRate * segmentSeconds);
+    micProcessor.onaudioprocess = async function(e){
+      if (!micRunning || micProcessing) return;
+      const data = e.inputBuffer.getChannelData(0);
+      micBuffer.push(new Float32Array(data)); micSamples += data.length;
+      uiPartial('Đang gom âm thanh Whisper worker V80: ' + (micSamples / micCtx.sampleRate).toFixed(1) + '/' + segmentSeconds + ' giây');
+      if (micSamples >= targetSamples) {
+        micProcessing = true;
+        const merged = new Float32Array(micSamples); let off=0; for (const part of micBuffer) { merged.set(part, off); off += part.length; }
+        micBuffer=[]; micSamples=0;
+        try { await transcribeWorkerWhisper(merged.slice(0, targetSamples), micCtx.sampleRate, 'micro-' + segmentSeconds + 's'); }
+        catch(err) { uiStatus('❌ Whisper worker V80 mic lỗi: ' + (err && err.message ? err.message : err), 'danger'); }
+        finally { micProcessing = false; }
+      }
+    };
+    micSource.connect(micProcessor);
+    // Connect to a muted gain node instead of destination to reduce audible feedback while keeping the processor alive.
+    const gain = micCtx.createGain(); gain.gain.value = 0;
+    micProcessor.connect(gain); gain.connect(micCtx.destination);
+    uiStatus('🎙️ Whisper worker V80 đang nhận diện. Giao diện sẽ ít treo hơn. Mỗi đoạn ' + segmentSeconds + ' giây xử lý một lần.', 'success');
+  }
+  async function stopMic(){
+    micRunning=false;
+    try { if (micProcessor) micProcessor.disconnect(); } catch(e) {}
+    try { if (micSource) micSource.disconnect(); } catch(e) {}
+    try { if (micStream) micStream.getTracks().forEach(t => t.stop()); } catch(e) {}
+    try { if (micCtx) await micCtx.close(); } catch(e) {}
+    micCtx=micStream=micSource=micProcessor=null; micBuffer=[]; micSamples=0; micProcessing=false;
+    uiStatus('Đã dừng Whisper worker V80.', 'secondary');
+  }
+
+  window.prepareWhisperMainThreadRuntime = prepareWorkerWhisper;
+  window.prepareWhisperOfflineWorker = prepareWorkerWhisper;
+  window.gshtTranscribeWithWhisperMainThread = transcribeWorkerWhisper;
+  window.handleStandaloneWhisperAudioFile = handleAudioFile;
+  window.startWhisperMicTranscribe = startMic;
+  window.stopWhisperMicTranscribe = stopMic;
+
+  const oldToggle = window.toggleStandaloneTranscribe;
+  window.toggleStandaloneTranscribe = async function(){
+    const engine = ($('offline-stt-engine')?.value || '').toLowerCase();
+    if (engine === 'whisper') {
+      if (micRunning) { await stopMic(); return; }
+      try { await startMic(); } catch(err) { uiStatus('❌ Không khởi động được Whisper worker V80: ' + (err && err.message ? err.message : err), 'danger'); }
+      return;
+    }
+    if (typeof oldToggle === 'function') return oldToggle.apply(this, arguments);
+    uiStatus('Chưa có hàm nhận diện cho engine này.', 'danger');
+  };
+
+  window.addEventListener('load', insertWhisperQualityPanel);
+  setTimeout(insertWhisperQualityPanel, 500);
+  try { console.log('[GSHT] Whisper V80 worker runner loaded'); } catch(e) {}
+})();
+</script>
+
 </body>
 </html>
