@@ -1,5 +1,5 @@
 // GSHT PWA Service Worker - update-check fixed, cache app shell, không cache model STT lớn mặc định
-const GSHT_CACHE = 'gsht-pwa-v72-update-check-fixed-20260527';
+const GSHT_CACHE = 'gsht-pwa-v72-update-check-fixed-202605271457';
 const APP_SHELL = [
   './',
   './index.html',
