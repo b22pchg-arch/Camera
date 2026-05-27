@@ -1,0 +1,14 @@
+{
+  "files": [
+    {
+      "name": "model-vn.tar.gz",
+      "url": "stt/vosk/model-vn.tar.gz",
+      "size": 33554432
+    },
+    {
+      "name": "ggml-tiny-q5_1.bin",
+      "url": "stt/whisper/ggml-tiny-q5_1.bin",
+      "size": 32505856
+    }
+  ]
+}

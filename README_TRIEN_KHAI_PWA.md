@@ -74,3 +74,9 @@ STT_ASSETS_REQUIRED.md
 ```
 
 Chạy script để tải `stt/vosk/vosk.js` và `fflate.min.js`. Model lớn không commit vào GitHub; dùng nút tải/chọn model trong app để lưu vào IndexedDB.
+
+## Bổ sung: chọn model từ thư mục chia sẻ
+
+Trong mục **Nhận dạng tiếng Việt offline**, app có khung **Chọn model từ thư mục chia sẻ / kho model**.
+
+Ưu tiên triển khai bằng `stt-models.json` để PWA đọc danh sách file ổn định nhất. Xem `STT_SHARED_FOLDER_GUIDE.md` và `stt-models.sample.json`.

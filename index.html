@@ -780,11 +780,11 @@ function showUpdateNotification() {
                                 </div>
                                 <div class="col-12 col-sm-8">
                                     <label class="form-label text-info fw-bold" for="offline-stt-model-path">Đường dẫn model đang dùng</label>
-                                    <input id="offline-stt-model-path" class="form-control form-control-sm bg-dark text-info border-secondary" value="stt/vosk/model-vn.tar.gz" onchange="saveOfflineSttPreference()" placeholder="VD: stt/vosk/model-vn.tar.gz hoặc gsht-idb://vosk-vn-small">
+                                    <input id="offline-stt-model-path" class="form-control form-control-sm bg-dark text-info border-secondary" value="models/vosk-model-small-vn/model.tar.gz" onchange="saveOfflineSttPreference()" placeholder="VD: models/vosk-model-small-vn/model.tar.gz hoặc gsht-idb://vosk-vn-small">
                                 </div>
                                 <div class="col-12 col-sm-8">
                                     <label class="form-label text-info fw-bold" for="offline-stt-worker-path">Whisper worker local</label>
-                                    <input id="offline-stt-worker-path" class="form-control form-control-sm bg-dark text-info border-secondary" value="stt/whisper/whisper-worker.js" onchange="saveOfflineSttPreference()" placeholder="VD: stt/whisper/whisper-worker.js">
+                                    <input id="offline-stt-worker-path" class="form-control form-control-sm bg-dark text-info border-secondary" value="whisper-worker.js" onchange="saveOfflineSttPreference()" placeholder="VD: whisper-worker.js">
                                 </div>
                                 <div class="col-12 col-sm-4">
                                     <button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="checkOfflineSttEngine()"><i class="fa-solid fa-circle-check me-1"></i>KIỂM TRA</button>
@@ -796,12 +796,49 @@ function showUpdateNotification() {
                                 <div class="row g-2 align-items-end">
                                     <div class="col-12 col-sm-7">
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-url">Đường dẫn ngoài đã lưu</label>
-                                        <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="https://drive.google.com/drive/folders/15-vcmtKgLUZzdhUh0TSnU8Z7xaO5QpBM?usp=sharing" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
+                                        <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
                                     </div>
                                     <div class="col-12 col-sm-5">
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-key">Tên lưu nội bộ</label>
                                         <input id="offline-stt-model-key" class="form-control form-control-sm bg-dark text-warning border-secondary" value="vosk-vn-small" onchange="saveOfflineSttPreference()" placeholder="VD: vosk-vn-small">
                                     </div>
+
+                                    <div class="col-12">
+                                        <div class="border border-info rounded p-2 mt-1 bg-dark bg-opacity-50">
+                                            <div class="small text-info fw-bold mb-2"><i class="fa-solid fa-folder-tree me-1"></i> CHỌN MODEL TỪ THƯ MỤC CHIA SẺ / KHO MODEL</div>
+                                            <div class="row g-2 align-items-end">
+                                                <div class="col-12 col-sm-7">
+                                                    <label class="form-label text-secondary fw-bold" for="offline-stt-folder-url">Đường dẫn thư mục chia sẻ</label>
+                                                    <input id="offline-stt-folder-url" class="form-control form-control-sm bg-black text-info border-secondary" value="" onchange="saveOfflineSttFolderSettings(false); saveOfflineSttPreference()" placeholder="VD: GitHub folder, Google Drive folder, hoặc URL stt-models.json">
+                                                </div>
+                                                <div class="col-12 col-sm-5">
+                                                    <label class="form-label text-secondary fw-bold" for="offline-stt-drive-api-key">Google Drive API key <span class="text-muted">(nếu dùng Drive folder)</span></label>
+                                                    <input id="offline-stt-drive-api-key" class="form-control form-control-sm bg-black text-warning border-secondary" value="" onchange="saveOfflineSttFolderSettings(false); saveOfflineSttPreference()" placeholder="Tùy chọn - chỉ cần khi muốn quét thư mục Drive">
+                                                </div>
+                                                <div class="col-6 col-sm-3">
+                                                    <button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="saveOfflineSttFolderSettings(true)"><i class="fa-solid fa-floppy-disk me-1"></i>LƯU THƯ MỤC</button>
+                                                </div>
+                                                <div class="col-6 col-sm-3">
+                                                    <button class="btn btn-sm btn-outline-success w-100 fw-bold" onclick="scanOfflineSttSharedFolder()"><i class="fa-solid fa-magnifying-glass me-1"></i>QUÉT FILE</button>
+                                                </div>
+                                                <div class="col-6 col-sm-3">
+                                                    <button class="btn btn-sm btn-outline-warning w-100 fw-bold" onclick="openOfflineSttSharedFolder()"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>MỞ THƯ MỤC</button>
+                                                </div>
+                                                <div class="col-6 col-sm-3">
+                                                    <button class="btn btn-sm btn-success w-100 fw-bold" onclick="useSelectedOfflineSttFolderFile(true)"><i class="fa-solid fa-check me-1"></i>DÙNG FILE</button>
+                                                </div>
+                                                <div class="col-12">
+                                                    <select id="offline-stt-folder-file-select" class="form-select form-select-sm bg-black text-info border-secondary" onchange="useSelectedOfflineSttFolderFile(false)">
+                                                        <option value="">Chưa quét thư mục / chưa có danh sách file model</option>
+                                                    </select>
+                                                    <div id="offline-stt-folder-status" class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;">
+                                                        Hỗ trợ tốt nhất: file stt-models.json, GitHub public folder, hoặc Google Drive public folder kèm API key. OneDrive/Drive nếu chặn tải trực tiếp thì mở thư mục rồi chọn file local.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div class="col-6 col-sm-3">
                                         <button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="saveOfflineSttExternalUrl(true)"><i class="fa-solid fa-floppy-disk me-1"></i>LƯU LINK</button>
                                     </div>
@@ -1257,6 +1294,7 @@ function showUpdateNotification() {
                     <li><b>Phụ đề video:</b> nếu trình duyệt hỗ trợ nhận diện giọng nói, app có thể ghi phụ đề khi quay video.</li>
                     <li><b>Bóc băng độc lập offline:</b> chọn <b>Vosk</b> hoặc <b>Whisper</b> trong khung Nhận dạng tiếng Việt offline. App sẽ dùng micro và xử lý trên thiết bị, không cần internet sau khi thư viện/model đã sẵn sàng.</li>
                     <li><b>Tải model lần đầu:</b> không cần đưa model lớn lên GitHub. Nhập link ngoài vào ô <b>Đường dẫn ngoài đã lưu</b> như Google Drive, OneDrive, GitHub Release hoặc server nội bộ; bấm <b>LƯU LINK</b> để dùng lại lần sau, nhập <b>Tên lưu nội bộ</b>, rồi bấm <b>TẢI MODEL</b>. App lưu model vào kho IndexedDB và tự đổi đường dẫn sang dạng <code>gsht-idb://ten-model</code> để chạy offline.</li>
+                    <li><b>Chọn từ thư mục chia sẻ:</b> nhập link thư mục vào ô <b>Đường dẫn thư mục chia sẻ</b>, bấm <b>LƯU THƯ MỤC</b> rồi <b>QUÉT FILE</b>. App hỗ trợ tốt nhất với <code>stt-models.json</code>, GitHub public folder, hoặc Google Drive public folder có API key. Nếu Drive/OneDrive chặn tải trực tiếp, hãy bấm <b>MỞ THƯ MỤC</b>, tải file về máy rồi dùng <b>CHỌN FILE</b>.</li>
                     <li><b>Khi link ngoài bị chặn tải trực tiếp:</b> bấm <b>MỞ LINK</b> để tải file model về máy, sau đó quay lại app và dùng <b>CHỌN FILE</b> để lưu vào kho nội bộ. Cách này phù hợp với một số link Google Drive/OneDrive không cho trình duyệt tải bằng <code>fetch()</code>.</li>
                     <li><b>Chọn file model:</b> nếu đã tải model bằng máy tính hoặc điện thoại, bấm <b>CHỌN FILE</b> để lưu một lần vào kho nội bộ. Với Vosk Browser nên dùng model đã đóng gói dạng <code>model.tar.gz</code>; file ZIP chính thức thường cần đóng gói lại trước khi chạy.</li>
                     <li><b>Vosk:</b> phù hợp điện thoại hiện trường vì nhẹ hơn, cần thư viện <code>vosk.js</code>/<code>vosk.wasm</code> và model tiếng Việt. Model nhỏ tiếng Việt của Vosk là lựa chọn nên thử trước.</li>
@@ -3933,6 +3971,9 @@ ${timeText}` : viewerTitleText);
     const OFFLINE_STT_STORE_NAME = 'models';
     const OFFLINE_STT_IDB_PREFIX = 'gsht-idb://';
     const OFFLINE_STT_EXTERNAL_URL_KEY = 'gsht_offline_stt_external_model_url_v1';
+    const OFFLINE_STT_FOLDER_URL_KEY = 'gsht_offline_stt_external_folder_url_v1';
+    const OFFLINE_STT_DRIVE_API_KEY = 'gsht_offline_stt_drive_api_key_v1';
+    let offlineSttFolderFiles = [];
     const DEFAULT_VOSK_VN_MODEL_ZIP_URL = 'https://alphacephei.com/vosk/models/vosk-model-small-vn-0.4.zip';
 
     // --- V69: chuyển ZIP model Vosk chính thức thành model.tar.gz ngay trong PWA ---
@@ -4056,6 +4097,167 @@ ${timeText}` : viewerTitleText);
             clean += (clean.includes('?') ? '&' : '?') + 'download=1';
         }
         return clean;
+    }
+    function normalizeExternalSttFolderUrl(url) {
+        return String(url || '').trim();
+    }
+    function getSavedOfflineSttFolderUrl() {
+        try { return localStorage.getItem(OFFLINE_STT_FOLDER_URL_KEY) || ''; } catch(e) { return ''; }
+    }
+    function getSavedOfflineSttDriveApiKey() {
+        try { return localStorage.getItem(OFFLINE_STT_DRIVE_API_KEY) || ''; } catch(e) { return ''; }
+    }
+    function saveOfflineSttFolderSettings(showMessage = true) {
+        const folderInput = document.getElementById('offline-stt-folder-url');
+        const apiKeyInput = document.getElementById('offline-stt-drive-api-key');
+        const folderUrl = normalizeExternalSttFolderUrl(folderInput?.value || '');
+        const apiKey = String(apiKeyInput?.value || '').trim();
+        try { localStorage.setItem(OFFLINE_STT_FOLDER_URL_KEY, folderUrl); } catch(e) {}
+        try { localStorage.setItem(OFFLINE_STT_DRIVE_API_KEY, apiKey); } catch(e) {}
+        try { saveOfflineSttPreference(); } catch(e) {}
+        if (showMessage) setOfflineSttFolderStatus(folderUrl ? '✅ Đã lưu đường dẫn thư mục chia sẻ để dùng lần sau.' : '⚠️ Chưa nhập đường dẫn thư mục để lưu.', folderUrl ? 'success' : 'warning');
+        return { folderUrl, apiKey };
+    }
+    function setOfflineSttFolderStatus(msg, type='info') {
+        const el = document.getElementById('offline-stt-folder-status');
+        if (!el) return;
+        const color = type === 'danger' ? 'text-danger' : (type === 'success' ? 'text-success' : (type === 'warning' ? 'text-warning' : 'text-info'));
+        el.className = `small ${color} mt-1 fw-bold`;
+        el.style.fontSize = '10.5px';
+        el.style.lineHeight = '1.35';
+        el.textContent = msg;
+    }
+    function openOfflineSttSharedFolder() {
+        const folderUrl = saveOfflineSttFolderSettings(false).folderUrl || getSavedOfflineSttFolderUrl();
+        if (!folderUrl) return alert('Chưa có đường dẫn thư mục chia sẻ để mở.');
+        window.open(folderUrl, '_blank', 'noopener');
+        setOfflineSttFolderStatus('ℹ️ Đã mở thư mục chia sẻ. Nếu không quét được danh sách file do CORS/xác thực, hãy tải file về máy rồi dùng CHỌN FILE.', 'info');
+    }
+    function extractGoogleDriveFolderId(url) {
+        const clean = String(url || '');
+        const m = clean.match(/drive\.google\.com\/drive\/folders\/([^/?#]+)/i) || clean.match(/drive\.google\.com\/.*[?&]id=([^&]+)/i) || clean.match(/folders\/([^/?#]+)/i);
+        return m && m[1] ? decodeURIComponent(m[1]) : '';
+    }
+    function parseGithubFolderUrl(url) {
+        const m = String(url || '').match(/https?:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)\/?(.*)$/i);
+        if (!m) return null;
+        return { owner:m[1], repo:m[2], ref:m[3], path:(m[4] || '').replace(/^\/+|\/+$/g, '') };
+    }
+    function isLikelyModelFileName(name) {
+        return /\.(tar\.gz|tgz|gz|zip|bin|wasm)$/i.test(String(name || '')) || /vosk|whisper|ggml/i.test(String(name || ''));
+    }
+    function normalizeFolderFileItem(item, baseUrl='') {
+        if (!item) return null;
+        const name = item.name || item.filename || item.path || item.title || '';
+        let url = item.url || item.downloadUrl || item.download_url || item.href || item.webContentLink || '';
+        if (!url && baseUrl && name) url = new URL(name, baseUrl.endsWith('/') ? baseUrl : baseUrl + '/').href;
+        if (!name || !url) return null;
+        return { name:String(name), url:String(url), size:item.size || item.fileSize || 0, source:item.source || 'manifest' };
+    }
+    async function fetchJsonForSttFolder(url) {
+        const res = await fetch(url, { cache:'no-store' });
+        if (!res.ok) throw new Error('Không đọc được danh mục: HTTP ' + res.status);
+        return await res.json();
+    }
+    async function listSttFilesFromManifest(folderUrl) {
+        const clean = normalizeExternalSttFolderUrl(folderUrl);
+        const candidates = [];
+        if (/\.json(\?|$)/i.test(clean)) candidates.push(clean);
+        else {
+            const base = clean.endsWith('/') ? clean : clean + '/';
+            candidates.push(base + 'stt-models.json');
+            candidates.push(base + 'models.json');
+        }
+        let lastErr = null;
+        for (const url of candidates) {
+            try {
+                const json = await fetchJsonForSttFolder(url);
+                const base = url.replace(/[^/]*$/, '');
+                const rawFiles = Array.isArray(json) ? json : (json.files || json.models || []);
+                const files = rawFiles.map(x => normalizeFolderFileItem(x, base)).filter(Boolean).filter(x => isLikelyModelFileName(x.name));
+                if (files.length) return files.map(x => ({...x, source:'manifest'}));
+            } catch(e) { lastErr = e; }
+        }
+        throw lastErr || new Error('Không tìm thấy stt-models.json trong thư mục.');
+    }
+    async function listSttFilesFromGithubFolder(folderUrl) {
+        const gh = parseGithubFolderUrl(folderUrl);
+        if (!gh) throw new Error('Không phải link thư mục GitHub dạng /tree/branch/path.');
+        const api = `https://api.github.com/repos/${encodeURIComponent(gh.owner)}/${encodeURIComponent(gh.repo)}/contents/${encodeURIComponent(gh.path).replace(/%2F/g,'/')}?ref=${encodeURIComponent(gh.ref)}`;
+        const res = await fetch(api, { cache:'no-store', headers:{ 'Accept':'application/vnd.github+json' } });
+        if (!res.ok) throw new Error('Không đọc được GitHub folder: HTTP ' + res.status);
+        const arr = await res.json();
+        return (Array.isArray(arr) ? arr : []).filter(x => x.type === 'file' && x.download_url && isLikelyModelFileName(x.name)).map(x => ({ name:x.name, url:x.download_url, size:x.size || 0, source:'github' }));
+    }
+    async function listSttFilesFromGoogleDriveFolder(folderUrl, apiKey) {
+        const folderId = extractGoogleDriveFolderId(folderUrl);
+        if (!folderId) throw new Error('Không nhận diện được ID thư mục Google Drive.');
+        if (!apiKey) throw new Error('Google Drive folder cần API key để liệt kê file trực tiếp trong PWA. Không có API key thì hãy dùng MỞ THƯ MỤC rồi CHỌN FILE local.');
+        const q = `'${folderId}' in parents and trashed=false`;
+        const api = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=${encodeURIComponent('files(id,name,mimeType,size)')}&key=${encodeURIComponent(apiKey)}`;
+        const res = await fetch(api, { cache:'no-store' });
+        if (!res.ok) throw new Error('Không đọc được Google Drive folder: HTTP ' + res.status);
+        const json = await res.json();
+        return (json.files || []).filter(x => isLikelyModelFileName(x.name)).map(x => ({
+            name:x.name,
+            url:'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(x.id),
+            size:x.size || 0,
+            source:'google-drive'
+        }));
+    }
+    function renderOfflineSttFolderFiles(files) {
+        offlineSttFolderFiles = Array.isArray(files) ? files : [];
+        const sel = document.getElementById('offline-stt-folder-file-select');
+        if (!sel) return;
+        if (!offlineSttFolderFiles.length) {
+            sel.innerHTML = '<option value="">Không tìm thấy file model phù hợp trong thư mục</option>';
+            return;
+        }
+        sel.innerHTML = offlineSttFolderFiles.map((f, idx) => {
+            const mb = f.size ? ` - ${(Number(f.size)/1024/1024).toFixed(1)} MB` : '';
+            const label = `${f.name}${mb} [${f.source || 'folder'}]`;
+            return `<option value="${idx}">${escapeHtml(label)}</option>`;
+        }).join('');
+        useSelectedOfflineSttFolderFile(false);
+    }
+    async function scanOfflineSttSharedFolder() {
+        const { folderUrl, apiKey } = saveOfflineSttFolderSettings(false);
+        if (!folderUrl) return alert('Anh hãy nhập đường dẫn thư mục chia sẻ hoặc URL stt-models.json.');
+        setOfflineSttFolderStatus('⏳ Đang quét danh sách model trong thư mục...', 'warning');
+        const attempts = [];
+        if (/github\.com\/[^/]+\/[^/]+\/tree\//i.test(folderUrl)) attempts.push(() => listSttFilesFromGithubFolder(folderUrl));
+        if (/drive\.google\.com/i.test(folderUrl)) attempts.push(() => listSttFilesFromGoogleDriveFolder(folderUrl, apiKey));
+        attempts.push(() => listSttFilesFromManifest(folderUrl));
+        let lastErr = null;
+        for (const fn of attempts) {
+            try {
+                const files = await fn();
+                if (files && files.length) {
+                    renderOfflineSttFolderFiles(files);
+                    setOfflineSttFolderStatus(`✅ Tìm thấy ${files.length} file model. Chọn file trong danh sách rồi bấm DÙNG FILE hoặc TẢI MODEL.`, 'success');
+                    return;
+                }
+            } catch(e) { lastErr = e; }
+        }
+        renderOfflineSttFolderFiles([]);
+        setOfflineSttFolderStatus('⚠️ Không quét được danh sách file: ' + (lastErr?.message || lastErr || 'thư mục không hỗ trợ liệt kê/CORS/xác thực. Hãy mở thư mục và chọn file local.'), 'warning');
+    }
+    function useSelectedOfflineSttFolderFile(showMessage = true) {
+        const sel = document.getElementById('offline-stt-folder-file-select');
+        const idx = Number(sel?.value);
+        const item = offlineSttFolderFiles[idx];
+        if (!item) {
+            if (showMessage) alert('Chưa chọn được file model trong thư mục.');
+            return null;
+        }
+        const urlInput = document.getElementById('offline-stt-model-url');
+        const keyInput = document.getElementById('offline-stt-model-key');
+        if (urlInput) urlInput.value = normalizeExternalSttModelUrl(item.url);
+        if (keyInput && item.name) keyInput.value = normalizeOfflineSttModelKey(item.name.replace(/\.(tar\.gz|tgz|gz|zip|bin|wasm)$/i, ''));
+        saveOfflineSttExternalUrl(false);
+        saveOfflineSttPreference();
+        if (showMessage) setOfflineSttFolderStatus('✅ Đã chọn file: ' + item.name + '. Có thể bấm TẢI MODEL để lưu offline.', 'success');
+        return item;
     }
     function getSavedOfflineSttExternalUrl() {
         try { return localStorage.getItem(OFFLINE_STT_EXTERNAL_URL_KEY) || ''; } catch(e) { return ''; }
@@ -4236,14 +4438,16 @@ ${timeText}` : viewerTitleText);
             const saved = JSON.parse(localStorage.getItem('gsht_offline_stt_pref_v67') || '{}');
             return {
                 engine: saved.engine || document.getElementById('offline-stt-engine')?.value || 'vosk',
-                modelPath: saved.modelPath || document.getElementById('offline-stt-model-path')?.value || 'stt/vosk/model-vn.tar.gz',
-                workerPath: saved.workerPath || document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js',
+                modelPath: saved.modelPath || document.getElementById('offline-stt-model-path')?.value || 'models/vosk-model-small-vn/model.tar.gz',
+                workerPath: saved.workerPath || document.getElementById('offline-stt-worker-path')?.value || 'whisper-worker.js',
                 modelUrl: saved.modelUrl || saved.externalUrl || getSavedOfflineSttExternalUrl() || document.getElementById('offline-stt-model-url')?.value || '',
                 externalUrl: saved.externalUrl || saved.modelUrl || getSavedOfflineSttExternalUrl() || '',
+                folderUrl: saved.folderUrl || getSavedOfflineSttFolderUrl() || document.getElementById('offline-stt-folder-url')?.value || '',
+                driveApiKey: saved.driveApiKey || getSavedOfflineSttDriveApiKey() || document.getElementById('offline-stt-drive-api-key')?.value || '',
                 modelKey: saved.modelKey || document.getElementById('offline-stt-model-key')?.value || 'vosk-vn-small'
             };
         } catch(e) {
-            return { engine:'vosk', modelPath:'stt/vosk/model-vn.tar.gz', workerPath:'stt/whisper/whisper-worker.js', modelUrl:getSavedOfflineSttExternalUrl(), externalUrl:getSavedOfflineSttExternalUrl(), modelKey:'vosk-vn-small' };
+            return { engine:'vosk', modelPath:'models/vosk-model-small-vn/model.tar.gz', workerPath:'whisper-worker.js', modelUrl:getSavedOfflineSttExternalUrl(), externalUrl:getSavedOfflineSttExternalUrl(), folderUrl:getSavedOfflineSttFolderUrl(), driveApiKey:getSavedOfflineSttDriveApiKey(), modelKey:'vosk-vn-small' };
         }
     }
     function initOfflineSttPreferenceUI() {
@@ -4252,26 +4456,32 @@ ${timeText}` : viewerTitleText);
         const model = document.getElementById('offline-stt-model-path');
         const worker = document.getElementById('offline-stt-worker-path');
         const url = document.getElementById('offline-stt-model-url');
+        const folderUrl = document.getElementById('offline-stt-folder-url');
+        const driveKey = document.getElementById('offline-stt-drive-api-key');
         const key = document.getElementById('offline-stt-model-key');
         if (engine) engine.value = pref.engine;
         if (model) model.value = pref.modelPath;
         if (worker) worker.value = pref.workerPath;
         if (url) url.value = pref.externalUrl || pref.modelUrl || getSavedOfflineSttExternalUrl() || '';
+        if (folderUrl) folderUrl.value = pref.folderUrl || getSavedOfflineSttFolderUrl() || '';
+        if (driveKey) driveKey.value = pref.driveApiKey || getSavedOfflineSttDriveApiKey() || '';
         if (key) key.value = normalizeOfflineSttModelKey(pref.modelKey || 'vosk-vn-small');
     }
     function saveOfflineSttPreference() {
         const pref = {
             engine: document.getElementById('offline-stt-engine')?.value || 'vosk',
-            modelPath: document.getElementById('offline-stt-model-path')?.value || 'stt/vosk/model-vn.tar.gz',
-            workerPath: document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js',
+            modelPath: document.getElementById('offline-stt-model-path')?.value || 'models/vosk-model-small-vn/model.tar.gz',
+            workerPath: document.getElementById('offline-stt-worker-path')?.value || 'whisper-worker.js',
             modelUrl: normalizeExternalSttModelUrl(document.getElementById('offline-stt-model-url')?.value || ''),
             externalUrl: normalizeExternalSttModelUrl(document.getElementById('offline-stt-model-url')?.value || ''),
+            folderUrl: normalizeExternalSttFolderUrl(document.getElementById('offline-stt-folder-url')?.value || ''),
+            driveApiKey: String(document.getElementById('offline-stt-drive-api-key')?.value || '').trim(),
             modelKey: normalizeOfflineSttModelKey(document.getElementById('offline-stt-model-key')?.value || 'vosk-vn-small')
         };
-        try { localStorage.setItem('gsht_offline_stt_pref_v67', JSON.stringify(pref)); if (pref.externalUrl) localStorage.setItem(OFFLINE_STT_EXTERNAL_URL_KEY, pref.externalUrl); } catch(e) {}
+        try { localStorage.setItem('gsht_offline_stt_pref_v67', JSON.stringify(pref)); if (pref.externalUrl) localStorage.setItem(OFFLINE_STT_EXTERNAL_URL_KEY, pref.externalUrl); if (pref.folderUrl) localStorage.setItem(OFFLINE_STT_FOLDER_URL_KEY, pref.folderUrl); if (pref.driveApiKey) localStorage.setItem(OFFLINE_STT_DRIVE_API_KEY, pref.driveApiKey); } catch(e) {}
         const modelInput = document.getElementById('offline-stt-model-path');
-        if (modelInput && pref.engine === 'vosk' && (!modelInput.value || modelInput.value.includes('whisper'))) modelInput.value = 'stt/vosk/model-vn.tar.gz';
-        if (modelInput && pref.engine === 'whisper' && (!modelInput.value || modelInput.value.includes('vosk'))) modelInput.value = 'stt/whisper/ggml-tiny-q5_1.bin';
+        if (modelInput && pref.engine === 'vosk' && (!modelInput.value || modelInput.value.includes('whisper'))) modelInput.value = 'models/vosk-model-small-vn/model.tar.gz';
+        if (modelInput && pref.engine === 'whisper' && (!modelInput.value || modelInput.value.includes('vosk'))) modelInput.value = 'models/whisper/ggml-small.bin';
         try { if (typeof scheduleOfflineConfigSave === 'function') scheduleOfflineConfigSave(); } catch(e) {}
     }
     function setOfflineSttStatus(msg, type='info') {
@@ -4289,11 +4499,11 @@ ${timeText}` : viewerTitleText);
         if (window.Vosk && typeof window.Vosk.createModel === 'function') return window.Vosk;
         if (typeof window.createModel === 'function') return { createModel: window.createModel };
         try {
-            const mod = await import('./stt/vosk/vosk.js').catch(() => import('./vosk.js'));
+            const mod = await import('./vosk.js');
             if (mod && typeof mod.createModel === 'function') return { createModel: mod.createModel };
             if (mod && mod.default && typeof mod.default.createModel === 'function') return mod.default;
         } catch(e) {}
-        throw new Error('Chưa có thư viện Vosk local. Hãy chạy tools/download_stt_assets.ps1 hoặc đặt stt/vosk/vosk.js vào đúng thư mục PWA.');
+        throw new Error('Chưa có thư viện Vosk local. Hãy đặt vosk.js/vosk.wasm hoặc bản vosk-browser trong thư mục PWA.');
     }
     async function prepareVoskOfflineRecognizer(sampleRate = 16000) {
         const pref = getOfflineSttPreference();
@@ -5454,6 +5664,8 @@ function cancelImportFile() {
         { id:'offline-stt-model-path', type:'value' },
         { id:'offline-stt-worker-path', type:'value' },
         { id:'offline-stt-model-url', type:'value' },
+        { id:'offline-stt-folder-url', type:'value' },
+        { id:'offline-stt-drive-api-key', type:'value' },
         { id:'offline-stt-model-key', type:'value' },
         { id:'toggle-extra-selfie', type:'checked' },
         { id:'toggle-extra-map', type:'checked' },
