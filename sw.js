@@ -1,54 +1,76 @@
-// 🛠️ MẸO QUẢN LÝ CỦA ANH: Không cần sửa tên Cache cứng.
-// Mỗi lần anh sửa code HTML xong đưa lên Host, anh chỉ cần vào đây gõ thêm hoặc sửa vài chữ 
-// ở dòng bình luận ngày tháng này (Ví dụ đổi ngày: 19/05/2026). File sw.js thay đổi 1 byte là app bắt được.
-// Nhật ký cập nhật: Bản vá lỗi đồng bộ và nút check thủ công - Ngày 19/05/2026
-
-const CACHE_NAME = 'AirGapCamera-Static-Storage'; 
-
-const ASSETS = [
-    './',
+// GSHT PWA Service Worker - cache app shell, không cache model STT lớn mặc định
+const GSHT_CACHE = 'gsht-pwa-v69-20260527';
+const APP_SHELL = [
+  './',
   './index.html',
   './manifest.json',
+  './offline.html',
+  './bootstrap.min.css',
+  './bootstrap.bundle.min.js',
+  './all.min.css',
+  './qrcode.min.js',
+  './jsQR.min.js',
+  './fflate.min.js',
   './icon-192.png',
   './icon-512.png',
-  'qrcode.min.js',
-  'bootstrap.min.css',
-  'all.min.css',
-  'bootstrap.bundle.min.js',
-    'webfonts/fa-solid-900.woff2',  // <-- Khóa cứng file font icon hay dùng dưới hiện trường
-    'webfonts/fa-regular-400.woff2' // <-- Khóa cứng file font icon hay dùng dưới hiện trường
+  'webfonts/fa-solid-900.woff2',  // <-- Khóa cứng file font icon hay dùng dưới hiện trường
+  'webfonts/fa-regular-400.woff2'
 ];
 
-// Cài đặt và tải tài nguyên hoàn toàn mới từ Server
-self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            // 🚀 BẺ GÃY BẪY HTTP CACHE: Ép trình duyệt luôn tải bản mới nhất từ server mạng
-            const refreshRequests = ASSETS.map(asset => new Request(asset, { cache: 'reload' }));
-            return cache.addAll(refreshRequests);
-        }).then(() => self.skipWaiting())
-    );
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(GSHT_CACHE).then(cache => Promise.allSettled(
+      APP_SHELL.map(url => cache.add(url))
+    )).then(() => self.skipWaiting())
+  );
 });
 
-self.addEventListener('activate', (event) => {
-    event.waitUntil(self.clients.claim());
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k.startsWith('gsht-pwa-') && k !== GSHT_CACHE).map(k => caches.delete(k))
+    )).then(() => self.clients.claim())
+  );
 });
 
-self.addEventListener('message', (event) => {
-    if (event.data && event.data.action === 'skipWaiting') {
-        self.skipWaiting();
-    }
+self.addEventListener('message', event => {
+  if (event.data && event.data.action === 'skipWaiting') self.skipWaiting();
 });
 
-// 🌟 CHIẾN LƯỢC ĐỘC QUYỀN HIỆN TRƯỜNG: 100% CACHE-FIRST (Tốc độ tối thượng)
-self.addEventListener('fetch', (event) => {
+function isLargeModelRequest(url) {
+  return /\.(tar\.gz|tgz|zip|bin|wasm)$/i.test(url.pathname) && /stt|model|vosk|whisper/i.test(url.pathname + url.search);
+}
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+
+  // Model STT lớn: để app tự tải và lưu IndexedDB; không ép cache ở SW để tránh đầy Cache Storage.
+  if (isLargeModelRequest(url)) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    return;
+  }
+
+  // HTML: network-first để nhận bản cập nhật nhanh, fallback cache/offline.
+  if (event.request.mode === 'navigate' || /index\.html$/i.test(url.pathname)) {
     event.respondWith(
-        caches.match(event.request).then((cachedResponse) => {
-            // Nếu tìm thấy file trong bộ nhớ đệm PWA, trả kết quả lập tức trong 0.01 giây, không màng tới mạng mạng
-            if (cachedResponse) return cachedResponse;
-            
-            // Nếu là tài nguyên phát sinh ngoài danh mục (Ví dụ ảnh bản đồ từ OpenStreetMap trực tuyến)
-            return fetch(event.request);
-        })
+      fetch(event.request).then(res => {
+        const copy = res.clone();
+        caches.open(GSHT_CACHE).then(cache => cache.put('./index.html', copy));
+        return res;
+      }).catch(() => caches.match('./index.html').then(r => r || caches.match('./offline.html')))
     );
+    return;
+  }
+
+  // Asset nhỏ: cache-first, update nền.
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      const network = fetch(event.request).then(res => {
+        if (res && res.ok) caches.open(GSHT_CACHE).then(cache => cache.put(event.request, res.clone()));
+        return res;
+      }).catch(() => cached || caches.match('./offline.html'));
+      return cached || network;
+    })
+  );
 });
