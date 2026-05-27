@@ -2,7 +2,7 @@
   "name": "Giám Sát Hiện Trường PC Tuyên Quang",
   "short_name": "GiámSátHT",
   "description": "PWA giám sát hiện trường: camera, ghép ảnh, QR, đồng bộ offline, STT offline.",
-  "start_url": "./index.html",
+ "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
