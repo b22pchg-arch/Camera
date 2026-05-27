@@ -1,19 +1,21 @@
-# Whisper runtime cho PWA
+# Whisper offline local cho PWA
 
-Thư mục này dành cho Whisper chạy trong trình duyệt bằng WebAssembly.
+Thư mục này dành cho runtime Whisper chạy cục bộ trong trình duyệt/PWA.
 
-Cần có nếu muốn bật Whisper:
+Cần có ít nhất:
 
-- `whisper-worker.js`
-- `whisper.wasm`
-- model dạng `ggml-*.bin`, ví dụ `ggml-tiny-q5_1.bin`
+```text
+stt/whisper/whisper-worker.js
+stt/whisper/whisper.wasm
+stt/whisper/ggml-tiny-q5_1.bin  (hoặc model tương thích khác)
+```
 
-Không có một file `whisper-worker.js` chuẩn duy nhất cho mọi dự án. Worker phải khớp với bản build `whisper.wasm` của `whisper.cpp` hoặc wrapper WASM mà anh chọn. Vì vậy gói PWA này không tạo file giả để tránh báo chạy được nhưng thực tế không nhận dạng.
+Bản HTML đã gọi worker qua giao thức mô tả trong:
 
-Nguồn tham khảo:
+```text
+stt/whisper/WHISPER_WORKER_PROTOCOL.md
+```
 
-- Demo browser: https://ggml.ai/whisper.cpp/
-- Source whisper.cpp: https://github.com/ggml-org/whisper.cpp
-- Model ggml: https://huggingface.co/ggerganov/whisper.cpp/tree/main
+Không nên dùng file `whisper-worker.js` giả. Worker phải tương thích với bản `whisper.wasm` và model đã chọn.
 
-Khuyến nghị hiện trường: dùng Vosk trước. Whisper chỉ nên bật trên máy Android mạnh hoặc khi đã có bản worker/wasm đã kiểm thử.
+Khuyến nghị trên điện thoại: dùng model tiny/base quantized trước, vì Whisper nặng hơn Vosk nhiều.
