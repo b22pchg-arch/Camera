@@ -1,65 +1,95 @@
 /*
- * GSHT Whisper Worker adapter SAFE MODE for whisper.cpp WASM (libmain.js/libmain.wasm)
- * Place this file in: stt/whisper/whisper-worker.js
- * Required in the same folder:
- *   - libmain.js
- *   - libmain.wasm
- * Optional model path:
- *   - ggml-tiny-q5_1.bin (or use gsht-idb://... from the main app)
+ * GSHT Whisper Worker - DEMO COMPATIBLE MODE
  *
- * Worker protocol used by GSHT PWA:
- *   init { modelPath, language='vi', task='transcribe', translate=false }
- *   start { sampleRate, language, task }
- *   audio { sampleRate, audio: Float32Array }
- *   stop
- *   transcribeFile { sampleRate, audio: Float32Array }
+ * Place this file as: stt/whisper/whisper-worker.js
+ * Required beside it:
+ *   - libmain.js      (from whisper.cpp examples/whisper.wasm build)
+ *   - libmain.wasm    (matching libmain.js)
+ *
+ * This worker follows the same runtime flow that worked in the official demo:
+ *   FS_createDataFile('/', 'whisper.bin', model, true, true)
+ *   Module.init('whisper.bin')
+ *   Module.full_default(instance, Float32Array, 'vi', 1, false)
+ *
+ * It also cache-busts libmain.js/libmain.wasm to avoid Service Worker/browser using old runtime.
  */
 
-var Module = null;
-let runtimeReadyPromise = null;
+var Module;
+let runtimePromise = null;
 let whisperInstance = null;
-let modelLoaded = false;
+let modelReady = false;
 let currentLanguage = 'vi';
-let currentTask = 'transcribe';
 let currentTranslate = false;
-let currentThreads = 1;
 let micChunks = [];
 let micSamples = 0;
-let isMicMode = false;
-let isProcessing = false;
-let pendingStop = false;
+let micMode = false;
+let processing = false;
+let stopAfterProcessing = false;
+
 const TARGET_SAMPLE_RATE = 16000;
-const MIC_SEGMENT_SECONDS = 8; // safe mode: short chunks reduce mobile WASM memory pressure
+const MIC_SEGMENT_SECONDS = 6; // closer to the successful 5-second demo test
+const RUNTIME_VERSION = 'gsht-demo-compatible-20260527-v1';
 
 function post(type, payload = {}) {
   self.postMessage({ type, ...payload });
 }
 
-function toErrorMessage(err) {
+function msgOf(err) {
   return err && err.message ? err.message : String(err || 'Unknown error');
 }
 
-function normalizePath(p) {
-  return String(p || '').replace(/\\/g, '/');
+function safeText(s) {
+  return String(s == null ? '' : s);
 }
 
-function getAsciiHeader(u8, n = 8) {
+function asciiHead(u8, n = 8) {
   try {
     return Array.from(u8.slice(0, n)).map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.').join('');
   } catch (_) { return ''; }
 }
 
-function looksLikeWhisperModel(u8) {
+function isLikelyModel(u8) {
   if (!u8 || u8.length < 16) return false;
-  const head4 = getAsciiHeader(u8, 4).toLowerCase();
-  const head8 = getAsciiHeader(u8, 8).toLowerCase();
-  if (head4 === 'ggml' || head4 === 'ggmf' || head4 === 'ggjt' || head4 === 'gguf') return true;
-  if (head4.startsWith('<!do') || head4.startsWith('<htm') || head4.startsWith('pk..') || head8.startsWith('{')) return false;
+  const h4 = asciiHead(u8, 4).toLowerCase();
+  const h8 = asciiHead(u8, 8).toLowerCase();
+  if (h4 === 'ggml' || h4 === 'ggmf' || h4 === 'ggjt' || h4 === 'gguf') return true;
+  if (h4.startsWith('<!do') || h4.startsWith('<htm') || h4.startsWith('pk..') || h8.startsWith('{')) return false;
+  // Older/quantized whisper.cpp model headers can still be accepted by whisper.cpp even when not ASCII ggml.
   return true;
 }
 
-function joinFloat32(chunks, totalSamples) {
-  const out = new Float32Array(totalSamples);
+function sanitizeAudio(input) {
+  const src = input instanceof Float32Array ? input : new Float32Array(input || []);
+  const out = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) {
+    let v = src[i];
+    if (!Number.isFinite(v)) v = 0;
+    if (v > 1) v = 1;
+    else if (v < -1) v = -1;
+    out[i] = v;
+  }
+  return out;
+}
+
+function resampleLinear(input, fromRate, toRate = TARGET_SAMPLE_RATE) {
+  const src = sanitizeAudio(input);
+  fromRate = Number(fromRate || toRate);
+  if (!src.length || Math.abs(fromRate - toRate) < 1) return src;
+  const ratio = fromRate / toRate;
+  const newLen = Math.max(1, Math.round(src.length / ratio));
+  const out = new Float32Array(newLen);
+  for (let i = 0; i < newLen; i++) {
+    const pos = i * ratio;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(i0 + 1, src.length - 1);
+    const f = pos - i0;
+    out[i] = src[i0] * (1 - f) + src[i1] * f;
+  }
+  return out;
+}
+
+function joinChunks(chunks, total) {
+  const out = new Float32Array(total);
   let off = 0;
   for (const ch of chunks) {
     out.set(ch, off);
@@ -68,174 +98,153 @@ function joinFloat32(chunks, totalSamples) {
   return out;
 }
 
-function resampleFloat32(input, fromRate, toRate = TARGET_SAMPLE_RATE) {
-  fromRate = Number(fromRate || toRate);
-  if (!input || !input.length || Math.abs(fromRate - toRate) < 1) return input;
-  const ratio = fromRate / toRate;
-  const newLen = Math.max(1, Math.round(input.length / ratio));
-  const out = new Float32Array(newLen);
-  for (let i = 0; i < newLen; i++) {
-    const srcPos = i * ratio;
-    const i0 = Math.floor(srcPos);
-    const i1 = Math.min(i0 + 1, input.length - 1);
-    const frac = srcPos - i0;
-    out[i] = input[i0] * (1 - frac) + input[i1] * frac;
+function cleanTranscript(lines, ret) {
+  const src = [];
+  if (Array.isArray(lines)) src.push(...lines);
+  if (typeof ret === 'string') src.push(ret);
+  const out = [];
+  for (const raw of src) {
+    let s = safeText(raw).trim();
+    if (!s) continue;
+    if (/^(whisper_|system_info|operator\(\)|main:|js:|storeFS:)/i.test(s)) continue;
+    if (/^(whisper_print_timings|whisper_model_load|whisper_init_|whisper_backend_)/i.test(s)) continue;
+    // keep transcript timestamp lines, but remove timestamp prefix
+    s = s.replace(/^\[[0-9:.\s\-\>]+\]\s*/g, '').trim();
+    if (!s) continue;
+    if (out[out.length - 1] !== s) out.push(s);
   }
-  return out;
+  return out.join('\n').trim();
 }
 
-function cleanWhisperOutput(lines, ret) {
-  const all = [];
-  if (Array.isArray(lines)) all.push(...lines);
-  if (typeof ret === 'string' && ret.trim()) all.push(ret);
-
-  const cleaned = all
-    .map(x => String(x || '').trim())
-    .filter(Boolean)
-    .filter(line => !/^whisper_/i.test(line))
-    .filter(line => !/^main:/i.test(line))
-    .filter(line => !/^system_info/i.test(line))
-    .filter(line => !/^storeFS:/i.test(line))
-    .filter(line => !/^js:/i.test(line))
-    .filter(line => !/^\[[A-Z]+\]/.test(line))
-    .map(line => line.replace(/^\[[0-9:.\s\-\>]+\]\s*/g, '').trim())
-    .filter(Boolean);
-
-  // Remove duplicated adjacent lines and join readable transcript lines.
-  const uniq = [];
-  for (const line of cleaned) {
-    if (uniq[uniq.length - 1] !== line) uniq.push(line);
-  }
-  return uniq.join('\n').trim();
+function runtimeBaseUrl() {
+  // Relative to this worker file: stt/whisper/whisper-worker.js
+  return './';
 }
 
 async function ensureRuntime() {
-  if (runtimeReadyPromise) return runtimeReadyPromise;
-
-  runtimeReadyPromise = new Promise((resolve, reject) => {
+  if (runtimePromise) return runtimePromise;
+  runtimePromise = new Promise((resolve, reject) => {
+    const logs = [];
     try {
-      const runtimeJs = self.__gshtRuntimeJs || 'libmain.js';
       Module = {
-        // Safe mode: keep runtime close to official whisper.wasm demo; do not set noInitialRun.
-        print: (text) => post('log', { message: String(text || '') }),
-        printErr: (text) => post('log', { message: String(text || '') }),
-        setStatus: (text) => post('progress', { message: String(text || '') }),
+        print: (text) => { const s = safeText(text); logs.push(s); post('log', { message: s }); },
+        printErr: (text) => { const s = safeText(text); logs.push(s); post('log', { message: s }); },
+        setStatus: (text) => post('progress', { message: safeText(text) }),
         monitorRunDependencies: () => {},
         locateFile: (path) => {
-          const p = String(path || '');
-          if (p.endsWith('.wasm')) return self.__gshtWasmFile || 'libmain.wasm';
-          return p;
+          const p = safeText(path);
+          if (p.endsWith('.wasm')) return runtimeBaseUrl() + 'libmain.wasm?v=' + encodeURIComponent(RUNTIME_VERSION);
+          return runtimeBaseUrl() + p;
         },
         onRuntimeInitialized: () => {
-          try {
-            if (!Module.init || !Module.full_default) {
-              reject(new Error('Runtime đã tải nhưng thiếu Module.init hoặc Module.full_default. Hãy dùng đúng libmain.js/libmain.wasm từ ví dụ whisper.wasm.'));
-              return;
-            }
-            post('progress', { message: 'Whisper WASM runtime đã sẵn sàng.' });
-            resolve(Module);
-          } catch (e) { reject(e); }
+          if (!Module.init || !Module.full_default || !Module.FS_createDataFile) {
+            reject(new Error('Runtime libmain đã tải nhưng thiếu Module.init/full_default/FS_createDataFile. Hãy dùng đúng libmain.js/libmain.wasm từ demo whisper.wasm đã test thành công.'));
+            return;
+          }
+          post('progress', { message: 'Whisper runtime demo-compatible đã sẵn sàng: ' + RUNTIME_VERSION });
+          resolve(Module);
         }
       };
       self.Module = Module;
-      importScripts(runtimeJs);
-      // Some builds initialize synchronously.
+      importScripts(runtimeBaseUrl() + 'libmain.js?v=' + encodeURIComponent(RUNTIME_VERSION));
+      // fallback for sync init
       setTimeout(() => {
-        if (Module && Module.calledRun && Module.init && Module.full_default) resolve(Module);
+        if (Module && Module.init && Module.full_default && Module.FS_createDataFile) resolve(Module);
       }, 0);
     } catch (e) {
-      reject(new Error('Không tải được libmain.js/libmain.wasm trong stt/whisper. Chi tiết: ' + toErrorMessage(e)));
+      reject(new Error('Không tải được libmain.js/libmain.wasm: ' + msgOf(e)));
     }
   });
-  return runtimeReadyPromise;
+  return runtimePromise;
 }
 
-async function fetchArrayBuffer(path) {
-  const url = normalizePath(path);
-  post('progress', { message: 'Đang tải model Whisper: ' + url });
-  const res = await fetch(url, { cache: 'force-cache' });
-  if (!res.ok) throw new Error('Không tải được model Whisper từ ' + url + ' - HTTP ' + res.status);
+async function fetchModel(path) {
+  if (!path) throw new Error('Chưa có đường dẫn model Whisper .bin');
+  post('progress', { message: 'Đang tải model Whisper: ' + path });
+  const res = await fetch(path, { cache: 'no-store' });
+  if (!res.ok) throw new Error('Không tải được model Whisper: HTTP ' + res.status);
   return await res.arrayBuffer();
 }
 
 async function loadModel(modelPath, modelBuffer) {
   const M = await ensureRuntime();
-  if (modelLoaded && whisperInstance) return;
-  if (!modelPath && !modelBuffer) throw new Error('Chưa có đường dẫn hoặc dữ liệu model Whisper .bin');
-
-  const ab = modelBuffer ? modelBuffer : await fetchArrayBuffer(modelPath);
-  const buf = new Uint8Array(ab);
-  if (!buf.length) throw new Error('File model Whisper rỗng hoặc tải lỗi.');
-  const head = getAsciiHeader(buf, 12);
-  if (!looksLikeWhisperModel(buf)) {
-    throw new Error('File model Whisper không đúng định dạng .bin ggml/gguf. Phần đầu file: "' + head + '". Có thể anh đã chọn nhầm file, tải nhầm trang HTML, file ZIP, hoặc link HuggingFace/Drive chưa phải link tải trực tiếp.');
+  if (modelReady && whisperInstance) return;
+  const ab = modelBuffer ? modelBuffer : await fetchModel(modelPath);
+  const u8 = new Uint8Array(ab);
+  if (!u8.byteLength) throw new Error('Model Whisper rỗng. Hãy chọn lại file .bin.');
+  if (!isLikelyModel(u8)) {
+    throw new Error('File model không giống .bin Whisper hợp lệ. Header=' + asciiHead(u8, 16));
   }
-  post('progress', { message: 'Kiểm tra model Whisper: header=' + head + ', size=' + (buf.length / 1024 / 1024).toFixed(1) + ' MB' });
+  post('progress', { message: 'Đưa model vào WASM FS: ' + (u8.byteLength / 1024 / 1024).toFixed(1) + ' MB; header=' + asciiHead(u8, 8) });
 
   try { M.FS_unlink('/whisper.bin'); } catch (_) {}
   try { M.FS_unlink('whisper.bin'); } catch (_) {}
-  M.FS_createDataFile('/', 'whisper.bin', buf, true, true);
-  post('progress', { message: 'Đã đưa model vào FS WASM: ' + (buf.length / 1024 / 1024).toFixed(1) + ' MB' });
+
+  // This is the same method used by the official demo that has already worked for the user.
+  M.FS_createDataFile('/', 'whisper.bin', u8, true, true);
 
   try {
     whisperInstance = M.init('whisper.bin');
   } catch (e) {
-    throw new Error('Module.init("whisper.bin") bị abort/lỗi native. Hãy thử model tiny-q5_1, build libmain single-thread, và dùng đoạn âm thanh 5-10 giây. Chi tiết: ' + toErrorMessage(e));
+    throw new Error('Module.init("whisper.bin") lỗi: ' + msgOf(e));
   }
-  if (!whisperInstance) throw new Error('Module.init("whisper.bin") thất bại. Kiểm tra model .bin có đúng định dạng ggml/whisper.cpp không.');
-  modelLoaded = true;
+  if (!whisperInstance) throw new Error('Module.init("whisper.bin") trả về rỗng/0.');
+  modelReady = true;
+  post('progress', { message: 'Whisper model đã nạp xong. Instance=' + whisperInstance });
 }
 
-function runWhisper(audioFloat32, sampleRate, language, translate, sourceLabel = 'audio') {
-  if (!modelLoaded || !whisperInstance) throw new Error('Whisper chưa khởi tạo model.');
-  const M = Module;
-  const src = audioFloat32 instanceof Float32Array ? audioFloat32 : new Float32Array(audioFloat32 || []);
-  if (!src.length) throw new Error('Không có dữ liệu âm thanh để bóc băng.');
-  const audio16 = resampleFloat32(src, sampleRate || TARGET_SAMPLE_RATE, TARGET_SAMPLE_RATE);
+function runFullDefault(audio, sampleRate, language = currentLanguage, translate = currentTranslate, label = 'audio') {
+  if (!modelReady || !whisperInstance) throw new Error('Whisper chưa sẵn sàng model.');
+  const audio16 = resampleLinear(audio, sampleRate || TARGET_SAMPLE_RATE, TARGET_SAMPLE_RATE);
+  if (!audio16.length) throw new Error('Không có dữ liệu audio.');
+  // Limit very long chunks for mobile safety.
+  const maxSamples = TARGET_SAMPLE_RATE * 12;
+  const finalAudio = audio16.length > maxSamples ? audio16.slice(0, maxSamples) : audio16;
 
+  const M = Module;
   const captured = [];
   const oldPrint = M.print;
   const oldErr = M.printErr;
-  M.print = (text) => { const s = String(text || ''); captured.push(s); post('log', { message: s }); };
-  M.printErr = (text) => { const s = String(text || ''); captured.push(s); post('log', { message: s }); };
+  M.print = (text) => { const s = safeText(text); captured.push(s); post('log', { message: s }); };
+  M.printErr = (text) => { const s = safeText(text); captured.push(s); post('log', { message: s }); };
 
-  post('progress', { message: 'Whisper đang xử lý ' + sourceLabel + ' (' + (audio16.length / TARGET_SAMPLE_RATE).toFixed(1) + ' giây)...' });
-  let ret = null;
+  let ret;
   try {
-    ret = M.full_default(whisperInstance, audio16, language || currentLanguage || 'vi', 1, !!translate);
+    post('progress', { message: 'Whisper xử lý ' + label + ': ' + (finalAudio.length / TARGET_SAMPLE_RATE).toFixed(1) + ' giây, lang=' + (language || 'vi') + ', threads=1' });
+    // Same signature as the working demo.
+    ret = M.full_default(whisperInstance, finalAudio, language || 'vi', 1, !!translate);
   } catch (e) {
-    throw new Error('Module.full_default() bị abort/lỗi native khi xử lý âm thanh. Hãy thử audio 5-10 giây, model tiny-q5_1, và bản libmain build single-thread. Chi tiết: ' + toErrorMessage(e));
+    throw new Error('Module.full_default() lỗi native: ' + msgOf(e));
   } finally {
     M.print = oldPrint;
     M.printErr = oldErr;
   }
-  const text = cleanWhisperOutput(captured, ret);
-  return text || (typeof ret === 'string' ? ret : '');
+  const text = cleanTranscript(captured, ret);
+  return text || (typeof ret === 'string' ? ret.trim() : '');
 }
 
-async function processMicBuffer(force = false) {
-  if (isProcessing) return;
-  const minSamples = TARGET_SAMPLE_RATE * MIC_SEGMENT_SECONDS;
-  if (!force && micSamples < minSamples) return;
+async function flushMic(force = false) {
+  if (processing) return;
+  const need = TARGET_SAMPLE_RATE * MIC_SEGMENT_SECONDS;
+  if (!force && micSamples < need) return;
   if (!micSamples) return;
-
-  isProcessing = true;
+  processing = true;
   const chunks = micChunks;
   const total = micSamples;
   micChunks = [];
   micSamples = 0;
   try {
-    const audio = joinFloat32(chunks, total);
-    const text = runWhisper(audio, TARGET_SAMPLE_RATE, currentLanguage, currentTranslate, 'đoạn micro');
-    if (text && text.trim()) post('result', { text: text.trim() });
-    else post('partial', { text: 'Whisper chưa nhận được nội dung rõ ràng trong đoạn vừa xử lý.' });
+    const audio = joinChunks(chunks, total);
+    const text = runFullDefault(audio, TARGET_SAMPLE_RATE, currentLanguage, currentTranslate, 'đoạn micro');
+    if (text) post('result', { text });
+    else post('partial', { text: 'Whisper chưa nhận rõ nội dung trong đoạn vừa xử lý.' });
   } catch (e) {
-    post('error', { message: toErrorMessage(e) });
+    post('error', { message: msgOf(e) });
   } finally {
-    isProcessing = false;
-    if (pendingStop) {
-      pendingStop = false;
-      await processMicBuffer(true);
+    processing = false;
+    if (stopAfterProcessing) {
+      stopAfterProcessing = false;
+      await flushMic(true);
       post('final', { text: '' });
     }
   }
@@ -246,58 +255,48 @@ self.onmessage = async (ev) => {
   try {
     if (msg.type === 'init') {
       currentLanguage = msg.language || 'vi';
-      currentTask = msg.task || 'transcribe';
       currentTranslate = !!msg.translate;
-      currentThreads = 1; // safe mode: force single-thread to avoid SharedArrayBuffer/COI aborts on PWA mobile
-      self.__gshtRuntimeJs = msg.runtimeJs || 'libmain.js';
-      self.__gshtWasmFile = msg.wasmFile || 'libmain.wasm';
       await loadModel(msg.modelPath || msg.originalModelPath, msg.modelBuffer || null);
-      post('inited', { message: 'Whisper đã nạp xong model và sẵn sàng.' });
+      post('inited', { message: 'Whisper demo-compatible worker đã nạp xong model.' });
       return;
     }
-
     if (msg.type === 'start') {
       currentLanguage = msg.language || currentLanguage || 'vi';
-      currentTask = msg.task || currentTask || 'transcribe';
       currentTranslate = msg.translate != null ? !!msg.translate : currentTranslate;
-      isMicMode = true;
       micChunks = [];
       micSamples = 0;
-      pendingStop = false;
-      post('ready', { message: 'Whisper bắt đầu nhận âm thanh. Kết quả sẽ trả về theo từng đoạn ' + MIC_SEGMENT_SECONDS + ' giây.' });
+      micMode = true;
+      stopAfterProcessing = false;
+      post('ready', { message: 'Whisper bắt đầu gom âm thanh, mỗi đoạn ' + MIC_SEGMENT_SECONDS + ' giây.' });
       return;
     }
-
     if (msg.type === 'audio') {
-      if (!isMicMode) return;
+      if (!micMode) return;
       const input = msg.audio instanceof Float32Array ? msg.audio : new Float32Array(msg.audio || []);
-      const audio16 = resampleFloat32(input, msg.sampleRate || TARGET_SAMPLE_RATE, TARGET_SAMPLE_RATE);
+      const audio16 = resampleLinear(input, msg.sampleRate || TARGET_SAMPLE_RATE, TARGET_SAMPLE_RATE);
       micChunks.push(audio16);
       micSamples += audio16.length;
-      if (micSamples >= TARGET_SAMPLE_RATE * MIC_SEGMENT_SECONDS) processMicBuffer(false);
+      if (micSamples >= TARGET_SAMPLE_RATE * MIC_SEGMENT_SECONDS) flushMic(false);
       else post('partial', { text: 'Đang gom âm thanh cho Whisper: ' + (micSamples / TARGET_SAMPLE_RATE).toFixed(1) + '/' + MIC_SEGMENT_SECONDS + ' giây' });
       return;
     }
-
     if (msg.type === 'stop') {
-      if (isProcessing) pendingStop = true;
-      else await processMicBuffer(true);
-      isMicMode = false;
+      if (processing) stopAfterProcessing = true;
+      else await flushMic(true);
+      micMode = false;
       post('final', { text: '' });
       return;
     }
-
     if (msg.type === 'transcribeFile') {
       const input = msg.audio instanceof Float32Array ? msg.audio : new Float32Array(msg.audio || []);
-      const text = runWhisper(input, msg.sampleRate || TARGET_SAMPLE_RATE, msg.language || currentLanguage || 'vi', !!msg.translate, 'file âm thanh');
+      const text = runFullDefault(input, msg.sampleRate || TARGET_SAMPLE_RATE, msg.language || currentLanguage || 'vi', !!msg.translate, 'file âm thanh');
       post('result', { text: text || 'Không nhận được nội dung từ file âm thanh.' });
       return;
     }
-
-    post('log', { message: 'Bỏ qua lệnh worker không xác định: ' + msg.type });
+    post('log', { message: 'Lệnh worker không xác định: ' + msg.type });
   } catch (e) {
-    post('error', { message: toErrorMessage(e) });
+    post('error', { message: msgOf(e) });
   }
 };
 
-post('worker-ready', { message: 'whisper-worker.js SAFE MODE đã tải. Chờ lệnh init... Threads=1, đoạn micro=8 giây.' });
+post('worker-ready', { message: 'whisper-worker.js DEMO-COMPATIBLE đã tải. Version=' + RUNTIME_VERSION });
