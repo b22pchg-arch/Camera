@@ -872,9 +872,9 @@ function showUpdateNotification() {
                                 <div class="row g-2 align-items-end">
                                     <div class="col-12 col-sm-7">
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-url">Đường dẫn ngoài đã lưu</label>
-                                         <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="https://drive.google.com/drive/folders/15-vcmtKgLUZzdhUh0TSnU8Z7xaO5QpBM?usp=sharing" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
+                                        <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="https://drive.google.com/drive/folders/15-vcmtKgLUZzdhUh0TSnU8Z7xaO5QpBM?usp=sharing" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
                                     </div>
-                                     <div class="col-12 col-sm-5">
+                                    <div class="col-12 col-sm-5">
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-key">Tên lưu nội bộ</label>
                                         <input id="offline-stt-model-key" class="form-control form-control-sm bg-dark text-warning border-secondary" value="vosk-vn-small" onchange="saveOfflineSttPreference()" placeholder="VD: vosk-vn-small">
                                     </div>
@@ -4885,388 +4885,111 @@ ${timeText}` : viewerTitleText);
         offlineSttEngine = 'vosk';
         setOfflineSttStatus('🎙 Vosk đang nghe offline từ micro...', 'success');
     }
-    async function startWhisperMicTranscribe() {
-        const worker = await prepareWhisperOfflineWorker();
-        offlineSttStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true, channelCount:1 } });
-        offlineSttAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        offlineSttSource = offlineSttAudioContext.createMediaStreamSource(offlineSttStream);
-        offlineSttProcessor = offlineSttAudioContext.createScriptProcessor(4096, 1, 1);
-        offlineSttProcessor.onaudioprocess = (event) => {
-            if (!isStandaloneTranscribing || !worker) return;
-            const input = event.inputBuffer.getChannelData(0);
-            const copy = new Float32Array(input.length);
-            copy.set(input);
-            try { worker.postMessage({ type:'audio', sampleRate: offlineSttAudioContext.sampleRate || 16000, audio: copy }, [copy.buffer]); } catch(e) {}
-        };
-        worker.postMessage({ type:'start', sampleRate: offlineSttAudioContext.sampleRate || 16000, language:'vi', task:'transcribe' });
-        offlineSttSource.connect(offlineSttProcessor);
-        offlineSttProcessor.connect(offlineSttAudioContext.destination);
-        offlineSttEngine = 'whisper';
-        setOfflineSttStatus('🎙 Whisper worker đang nghe offline từ micro. Nếu worker dùng chế độ xử lý theo đoạn, kết quả có thể trả về chậm hơn Vosk.', 'success');
-    }
-    async function startSystemPhoneTranscribe() {
-        const SpeechRecognition = await checkSystemPhoneSpeechRecognizer();
-        const rec = new SpeechRecognition();
-        rec.lang = 'vi-VN';
-        rec.continuous = true;
-        rec.interimResults = true;
-        rec.maxAlternatives = 1;
-        const textArea = document.getElementById('standalone-stt-result');
-        let baseText = textArea && textArea.value.trim() ? textArea.value.trim() + '\n' : '';
-        let finalText = '';
-        rec.onstart = () => {
-            offlineSttEngine = 'system';
-            setOfflineSttStatus('🎙 Đang nghe bằng công cụ nhận dạng sẵn có của điện thoại/trình duyệt...', 'success');
-            setOfflineSttPartial('Đang nghe...');
-        };
-        rec.onresult = (event) => {
-            let interim = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const txt = event.results[i][0]?.transcript || '';
-                if (event.results[i].isFinal) finalText += (finalText ? ' ' : '') + txt.trim() + '.';
-                else interim += txt;
-            }
-            updateStandaloneTranscript(baseText, finalText, interim);
-        };
-        rec.onerror = (event) => {
-            const msg = event?.error || 'lỗi không xác định';
-            setOfflineSttStatus('⚠️ Công cụ sẵn có báo lỗi: ' + msg, msg === 'no-speech' ? 'warning' : 'danger');
-        };
-        rec.onend = () => {
-            if (isStandaloneTranscribing && offlineSttEngine === 'system') {
-                try { setTimeout(() => { if (isStandaloneTranscribing && standaloneRecognition === rec) rec.start(); }, 300); } catch(e) {}
-            }
-        };
-        standaloneRecognition = rec;
-        rec.start();
-    }
-    function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
-    async function startStandaloneTranscribe() {
-        saveOfflineSttPreference();
-        const pref = getOfflineSttPreference();
-        if (localStream) { document.getElementById('video-preview').srcObject = null; localStream.getTracks().forEach(track => track.stop()); localStream = null; }
-        isStandaloneTranscribing = true;
-        const btn = document.getElementById('btn-standalone-stt');
-        if (btn) { btn.classList.replace('btn-warning', 'btn-danger'); btn.classList.add('storage-alarm'); }
-        const txt = document.getElementById('stt-btn-text');
-        if (txt) txt.innerText = pref.engine === 'vosk' ? 'ĐANG NGHE OFFLINE BẰNG VOSK...' : (pref.engine === 'whisper' ? 'ĐANG NGHE OFFLINE BẰNG WHISPER...' : 'ĐANG NGHE BẰNG CÔNG CỤ ĐIỆN THOẠI...');
-        setOfflineSttPartial('Đang khởi tạo micro...');
+    async function gshtDecodeAudioArrayBufferLikeWhisperDemo(arrayBuffer) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        if (!AudioCtx) throw new Error('Trình duyệt không hỗ trợ AudioContext.');
+        let ctx = null;
+        try { ctx = new AudioCtx({ sampleRate: 16000, channelCount: 1, echoCancellation: false, autoGainControl: true, noiseSuppression: true }); }
+        catch(e) { ctx = new AudioCtx(); }
         try {
-            if (pref.engine === 'vosk') await startVoskMicTranscribe();
-            else if (pref.engine === 'whisper') await startWhisperMicTranscribe();
-            else await startSystemPhoneTranscribe();
-        } catch(err) {
-            isStandaloneTranscribing = false;
-            stopStandaloneTranscribe(false);
-            const msg = err && err.message ? err.message : String(err);
-            setOfflineSttStatus('❌ Không khởi động được nhận dạng offline: ' + msg, 'danger');
-            alert('Không khởi động được nhận dạng offline:\n' + msg + '\n\nGợi ý: kiểm tra quyền Micro, file model và thư viện local.');
-        }
-    }
-    function stopStandaloneTranscribe(restartCamera=true) {
-        isStandaloneTranscribing = false;
-        if (standaloneRecognition) {
-            try { if (typeof standaloneRecognition.finalResult === 'function') appendStandaloneTranscript(standaloneRecognition.finalResult()?.text || ''); } catch(e) {}
-            try { if (typeof standaloneRecognition.remove === 'function') standaloneRecognition.remove(); } catch(e) {}
-            try { if (typeof standaloneRecognition.free === 'function') standaloneRecognition.free(); } catch(e) {}
-            try { if (typeof standaloneRecognition.stop === 'function') standaloneRecognition.stop(); } catch(e) {}
-            standaloneRecognition = null;
-        }
-        if (offlineSttWorker) { try { offlineSttWorker.postMessage({ type:'stop' }); } catch(e) {} }
-        if (offlineSttProcessor) { try { offlineSttProcessor.disconnect(); } catch(e) {} offlineSttProcessor = null; }
-        if (offlineSttSource) { try { offlineSttSource.disconnect(); } catch(e) {} offlineSttSource = null; }
-        if (offlineSttAudioContext) { try { offlineSttAudioContext.close(); } catch(e) {} offlineSttAudioContext = null; }
-        if (offlineSttStream) { try { offlineSttStream.getTracks().forEach(t => t.stop()); } catch(e) {} offlineSttStream = null; }
-        const btn = document.getElementById('btn-standalone-stt');
-        if (btn) { btn.classList.remove('storage-alarm'); btn.classList.replace('btn-danger', 'btn-warning'); }
-        const txt = document.getElementById('stt-btn-text');
-        if (txt) txt.innerText = 'BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI';
-        setOfflineSttPartial('Đã dừng nhận dạng.');
-        if (restartCamera && isCameraOn) { try { initCamera(); } catch(e) {} }
-    }
-    function copyStandaloneSTT() { const txt = document.getElementById('standalone-stt-result'); txt.select(); document.execCommand('copy'); alert('Đã sao chép văn bản!'); }
-    function clearStandaloneSTT() { if(confirm('Xóa bảng nội dung?')) { document.getElementById('standalone-stt-result').value = ''; setOfflineSttPartial('Kết quả tạm thời sẽ hiện ở đây...'); } }
-    function sendStandaloneSTTToNote() {
-        const text = (document.getElementById('standalone-stt-result')?.value || '').trim();
-        if (!text) return alert('Chưa có nội dung bóc băng để đưa vào ghi chú.');
-        const note1 = document.getElementById('tab1-note');
-        const note2 = document.getElementById('tab2-note');
-        const target = note1 || note2;
-        if (!target) return;
-        target.value = target.value.trim() ? (target.value.trim() + ' | ' + text) : text;
-        if (note2 && note2 !== target) note2.value = target.value;
-        if (note1 && note1 !== target) note1.value = target.value;
-        try { if (typeof scheduleOfflineConfigSave === 'function') scheduleOfflineConfigSave(); } catch(e) {}
-        alert('Đã đưa nội dung bóc băng vào ô Ghi chú.');
-    }
-    function showMediaPreview() { const container = document.getElementById("media-player-container"); const transcribeBox = document.getElementById("transcribe-container"); document.getElementById("transcribe-result").value = ""; if (currentMediaType === 'video') { container.innerHTML = `<video id="preview-player" src="${currentMediaBlobUrl}" controls playsinline style="max-width:100%; max-height:400px;"></video>`; transcribeBox.classList.add("d-none"); } else { container.innerHTML = `<audio id="preview-player" src="${currentMediaBlobUrl}" controls style="width:90%; margin:20px 0;"></audio>`; transcribeBox.classList.remove("d-none"); } openModal('mediaPreviewModal'); }
-    function discardMedia() { const player = document.getElementById("preview-player"); if(player) { player.pause(); player.src = ""; } if (currentMediaBlobUrl) URL.revokeObjectURL(currentMediaBlobUrl); currentMediaBlobUrl = null; closeModal('mediaPreviewModal'); }
-    function downloadMedia() { if (!currentMediaBlobUrl) return; const a = document.createElement('a'); a.style.display = 'none'; a.href = currentMediaBlobUrl; a.download = currentMediaFilename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); }, 100); discardMedia(); }
-    async function startAudioTranscription() {
-        const player = document.getElementById("preview-player");
-        const textArea = document.getElementById("transcribe-result");
-        const btn = document.getElementById("btn-start-transcribe");
-        if (!player || !currentMediaBlobUrl) return;
-        if (textArea) textArea.value = "⏳ Đang bóc băng offline từ file âm thanh...";
-        if (btn) { btn.innerHTML = `ĐANG BÓC BĂNG OFFLINE...`; btn.classList.replace("btn-outline-info", "btn-danger"); }
-        try {
-            const pref = getOfflineSttPreference();
-            const response = await fetch(currentMediaBlobUrl);
-            const buf = await response.arrayBuffer();
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            const tmpCtx = new AudioCtx();
-            const audioBuffer = await tmpCtx.decodeAudioData(buf.slice(0));
-            if (pref.engine === 'system') {
-                throw new Error('Công cụ nhận dạng sẵn có của điện thoại/trình duyệt chỉ hỗ trợ nghe trực tiếp từ micro, không bóc băng từ file âm thanh đã ghi. Hãy chọn Vosk hoặc Whisper để xử lý file.');
-            } else if (pref.engine === 'vosk') {
-                const runtime = await prepareVoskOfflineRecognizer(audioBuffer.sampleRate || 16000);
-                const recognizer = new runtime.model.KaldiRecognizer(audioBuffer.sampleRate || 16000);
-                try { recognizer.setWords(true); } catch(e) {}
-                let finalText = '';
-                recognizer.on && recognizer.on('result', (message) => {
-                    const t = message?.result?.text || '';
-                    if (t) { finalText += (finalText ? ' ' : '') + t.trim() + '.'; if (textArea) textArea.value = finalText; }
-                });
-                try { recognizer.acceptWaveform(audioBuffer); } catch(e) {
-                    throw new Error('Bản Vosk hiện tại không hỗ trợ bóc băng trực tiếp từ file audio. Hãy dùng chế độ micro offline hoặc cập nhật vosk-browser.');
-                }
-                try { const r = recognizer.finalResult(); if (r && r.text) finalText += (finalText ? ' ' : '') + r.text; } catch(e) {}
-                if (textArea) textArea.value = finalText || 'Không nhận được nội dung từ file.';
-                try { recognizer.remove?.(); recognizer.free?.(); } catch(e) {}
-            } else {
-                const worker = await prepareWhisperOfflineWorker();
-                const channel = audioBuffer.getChannelData(0);
-                const copy = new Float32Array(channel.length); copy.set(channel);
-                if (textArea) textArea.value = '⏳ Đã gửi file sang Whisper worker, đang xử lý...';
-                worker.postMessage({ type:'transcribeFile', sampleRate: audioBuffer.sampleRate, audio: copy }, [copy.buffer]);
+            const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+            if (OfflineCtx) {
+                const outLen = Math.max(1, Math.ceil(audioBuffer.duration * 16000));
+                const offline = new OfflineCtx(1, outLen, 16000);
+                const src = offline.createBufferSource();
+                src.buffer = audioBuffer;
+                src.connect(offline.destination);
+                src.start(0);
+                const rendered = await offline.startRendering();
+                const ch = rendered.getChannelData(0);
+                const out = new Float32Array(ch.length);
+                out.set(ch);
+                return { audio: out, sampleRate: 16000 };
             }
-            try { await tmpCtx.close(); } catch(e) {}
-        } catch(err) {
-            if (textArea) textArea.value = '❌ Không bóc băng offline được file này: ' + (err && err.message ? err.message : err);
-        } finally {
-            if (btn) { btn.innerHTML = `PHÁT ÂM THANH NỘI BỘ & BẮT ĐẦU DỊCH`; btn.classList.replace("btn-danger", "btn-outline-info"); }
-        }
-    }
-    
-
-
-
-    // --- GSHT V75: Whisper chạy main-thread theo đúng demo gốc, bỏ Worker khi transcribe ---
-    // Lý do: demo whisper.wasm đã chạy thành công trên main thread, trong khi Worker adapter vẫn abort ở full_default().
-    // Runtime yêu cầu: stt/whisper/libmain.js + stt/whisper/libmain.wasm cùng bản build inline/no-thread đã test thành công.
-    let gshtWhisperModulePromise = null;
-    let gshtWhisperInstance = null;
-    let gshtWhisperModelKey = '';
-    let gshtWhisperModelReady = false;
-    let gshtWhisperLogBuffer = [];
-    let gshtWhisperMediaRecorder = null;
-    let gshtWhisperMicTimer = null;
-    let gshtWhisperProcessing = false;
-    const GSHT_WHISPER_RUNTIME_VERSION = 'inline-mainthread-v75-20260527';
-
-    function gshtWhisperLog(text) {
-        const s = String(text == null ? '' : text);
-        gshtWhisperLogBuffer.push(s);
-        try { console.log('[GSHT Whisper]', s); } catch(e) {}
-        if (/^\[[0-9:.\s\-\>]+\]/.test(s) || /processing|model|timings|system_info/i.test(s)) {
-            try { setOfflineSttPartial(s); } catch(e) {}
-        }
-    }
-    function gshtCleanWhisperTranscript(lines, ret) {
-        const src = [];
-        if (Array.isArray(lines)) src.push(...lines);
-        if (typeof ret === 'string') src.push(ret);
-        const out = [];
-        for (const raw of src) {
-            let s = String(raw == null ? '' : raw).trim();
-            if (!s) continue;
-            if (/^(whisper_|system_info|operator\(\)|main:|js:|storeFS:|\[GSHT Whisper\])/i.test(s)) continue;
-            if (/^(whisper_print_timings|whisper_model_load|whisper_init_|whisper_backend_|whisper_full_|ggml_)/i.test(s)) continue;
-            s = s.replace(/^\[[0-9:.\s\-\>]+\]\s*/g, '').trim();
-            if (!s) continue;
-            if (out[out.length - 1] !== s) out.push(s);
-        }
-        return out.join('\n').trim();
-    }
-    function gshtGetWhisperRuntimeDir() {
-        const workerInput = document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js';
-        let p = workerInput.replace(/\\/g, '/');
-        if (p.includes('/')) p = p.slice(0, p.lastIndexOf('/') + 1);
-        else p = 'stt/whisper/';
-        return p;
-    }
-    async function gshtLoadWhisperMainThreadModule() {
-        if (window.__gshtWhisperModuleReady && window.Module && window.Module.init && window.Module.full_default) return window.Module;
-        if (gshtWhisperModulePromise) return gshtWhisperModulePromise;
-        gshtWhisperModulePromise = new Promise((resolve, reject) => {
-            try {
-                const runtimeDir = gshtGetWhisperRuntimeDir();
-                const runtimeJs = runtimeDir + 'libmain.js?v=' + encodeURIComponent(GSHT_WHISPER_RUNTIME_VERSION);
-                const runtimeWasm = runtimeDir + 'libmain.wasm?v=' + encodeURIComponent(GSHT_WHISPER_RUNTIME_VERSION);
-                window.Module = {
-                    print: gshtWhisperLog,
-                    printErr: gshtWhisperLog,
-                    setStatus: (text) => { try { setOfflineSttPartial(String(text || '')); } catch(e) {} },
-                    monitorRunDependencies: () => {},
-                    locateFile: (path) => String(path || '').endsWith('.wasm') ? runtimeWasm : runtimeDir + path,
-                    onRuntimeInitialized: () => {
-                        if (!window.Module || !window.Module.init || !window.Module.full_default || !window.Module.FS_createDataFile) {
-                            reject(new Error('libmain.js đã tải nhưng thiếu Module.init/full_default/FS_createDataFile. Hãy dùng đúng libmain.js/libmain.wasm đã test thành công trong demo.'));
-                            return;
-                        }
-                        window.__gshtWhisperModuleReady = true;
-                        resolve(window.Module);
-                    },
-                    onAbort: (what) => {
-                        try { setOfflineSttStatus('❌ Whisper native abort: ' + String(what || ''), 'danger'); } catch(e) {}
-                    }
-                };
-                const existing = document.querySelector('script[data-gsht-whisper-runtime="1"]');
-                if (existing) {
-                    setTimeout(() => {
-                        if (window.Module && window.Module.init && window.Module.full_default) resolve(window.Module);
-                    }, 50);
-                    return;
-                }
-                const s = document.createElement('script');
-                s.src = runtimeJs;
-                s.async = true;
-                s.dataset.gshtWhisperRuntime = '1';
-                s.onload = () => {
-                    setTimeout(() => {
-                        if (window.Module && window.Module.init && window.Module.full_default) {
-                            window.__gshtWhisperModuleReady = true;
-                            resolve(window.Module);
-                        }
-                    }, 200);
-                };
-                s.onerror = () => reject(new Error('Không tải được Whisper runtime: ' + runtimeJs));
-                document.head.appendChild(s);
-            } catch(e) { reject(e); }
-        });
-        return gshtWhisperModulePromise;
-    }
-    async function gshtResolveWhisperModelBuffer(pref) {
-        const idbModel = await resolveOfflineSttModelBufferForWorker(pref);
-        if (idbModel && idbModel.buffer) return { buffer: idbModel.buffer, key: idbModel.key || pref.modelPath || 'idb-model' };
-        const resolved = await resolveOfflineSttModelPath(pref);
-        const res = await fetch(resolved, { cache: 'no-store' });
-        if (!res.ok) throw new Error('Không tải được model Whisper: HTTP ' + res.status + ' - ' + resolved);
-        return { buffer: await res.arrayBuffer(), key: resolved };
-    }
-    async function prepareWhisperMainThreadRuntime() {
-        const pref = getOfflineSttPreference();
-        setOfflineSttStatus('⏳ Đang nạp Whisper main-thread theo demo gốc...', 'warning');
-        const M = await gshtLoadWhisperMainThreadModule();
-        const modelKey = pref.modelPath || pref.modelKey || 'whisper.bin';
-        if (gshtWhisperModelReady && gshtWhisperInstance && gshtWhisperModelKey === modelKey) {
-            setOfflineSttStatus('✅ Whisper main-thread đã sẵn sàng.', 'success');
-            return { kind: 'whisper-main', module: M };
-        }
-        const model = await gshtResolveWhisperModelBuffer(pref);
-        const u8 = new Uint8Array(model.buffer);
-        if (!u8.length) throw new Error('Model Whisper rỗng. Hãy chọn lại file .bin.');
-        setOfflineSttPartial('Đưa model vào WASM FS: ' + (u8.byteLength/1024/1024).toFixed(1) + ' MB');
-        try { M.FS_unlink('/whisper.bin'); } catch(e) {}
-        try { M.FS_unlink('whisper.bin'); } catch(e) {}
-        // Bám đúng demo gốc đã chạy thành công.
-        M.FS_createDataFile('/', 'whisper.bin', u8, true, true);
-        const inst = M.init('whisper.bin');
-        if (!inst) throw new Error('Module.init("whisper.bin") trả về 0/rỗng.');
-        gshtWhisperInstance = inst;
-        gshtWhisperModelKey = modelKey;
-        gshtWhisperModelReady = true;
-        setOfflineSttStatus('✅ Whisper main-thread đã nạp model. Instance=' + inst, 'success');
-        return { kind: 'whisper-main', module: M };
-    }
-    // Ghi đè hàm cũ để nút KIỂM TRA không dùng Worker nữa.
-    prepareWhisperOfflineWorker = prepareWhisperMainThreadRuntime;
-
-    async function gshtTranscribeWithWhisperMainThread(floatAudio, sampleRate, label='audio') {
-        await prepareWhisperMainThreadRuntime();
-        const src = floatAudio instanceof Float32Array ? floatAudio : new Float32Array(floatAudio || []);
-        let audio = src;
-        const fromRate = Number(sampleRate || 16000);
-        if (fromRate && Math.abs(fromRate - 16000) > 1 && src.length) {
+            // Fallback nếu thiếu OfflineAudioContext: tự nội suy về 16 kHz.
+            const ch = audioBuffer.getChannelData(0);
+            const fromRate = audioBuffer.sampleRate || ctx.sampleRate || 16000;
             const ratio = fromRate / 16000;
-            const out = new Float32Array(Math.max(1, Math.round(src.length / ratio)));
+            const out = new Float32Array(Math.max(1, Math.round(ch.length / ratio)));
             for (let i = 0; i < out.length; i++) {
                 const pos = i * ratio;
                 const i0 = Math.floor(pos);
-                const i1 = Math.min(i0 + 1, src.length - 1);
+                const i1 = Math.min(i0 + 1, ch.length - 1);
                 const f = pos - i0;
-                out[i] = src[i0] * (1 - f) + src[i1] * f;
+                out[i] = ch[i0] * (1 - f) + ch[i1] * f;
             }
-            audio = out;
-        }
-        const maxSamples = 16000 * 10;
-        if (audio.length > maxSamples) audio = audio.slice(0, maxSamples);
-        const clean = new Float32Array(audio.length);
-        for (let i = 0; i < audio.length; i++) {
-            let v = audio[i];
-            if (!Number.isFinite(v)) v = 0;
-            clean[i] = Math.max(-1, Math.min(1, v));
-        }
-        const M = window.Module;
-        gshtWhisperLogBuffer = [];
-        const oldPrint = M.print;
-        const oldErr = M.printErr;
-        M.print = gshtWhisperLog;
-        M.printErr = gshtWhisperLog;
-        let ret;
-        try {
-            setOfflineSttStatus('⏳ Whisper đang xử lý trên main-thread: ' + (clean.length/16000).toFixed(1) + ' giây. Giao diện có thể đứng trong vài giây...', 'warning');
-            setOfflineSttPartial('Đang xử lý ' + label + ' bằng Whisper...');
-            ret = M.full_default(gshtWhisperInstance, clean, 'vi', 1, false);
+            return { audio: out, sampleRate: 16000 };
         } finally {
-            M.print = oldPrint;
-            M.printErr = oldErr;
+            try { await ctx.close(); } catch(e) {}
         }
-        const text = gshtCleanWhisperTranscript(gshtWhisperLogBuffer, ret);
-        if (text) appendStandaloneTranscript(text);
-        setOfflineSttStatus('✅ Whisper xử lý xong đoạn ' + label + '.', 'success');
-        setOfflineSttPartial(text || 'Whisper xử lý xong nhưng không nhận được văn bản rõ ràng.');
-        return text;
     }
 
     async function startWhisperMicTranscribe() {
         await prepareWhisperMainThreadRuntime();
         offlineSttStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true, channelCount:1 } });
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) throw new Error('Trình duyệt không hỗ trợ AudioContext.');
+        try { offlineSttAudioContext = new AudioCtx({ sampleRate: 16000, channelCount: 1, echoCancellation: false, autoGainControl: true, noiseSuppression: true }); }
+        catch(e) { offlineSttAudioContext = new AudioCtx(); }
+        offlineSttSource = offlineSttAudioContext.createMediaStreamSource(offlineSttStream);
+        offlineSttProcessor = offlineSttAudioContext.createScriptProcessor(4096, 1, 1);
+        const zeroGain = offlineSttAudioContext.createGain();
+        zeroGain.gain.value = 0;
+        offlineSttProcessor._gshtZeroGain = zeroGain;
+
         offlineSttEngine = 'whisper';
-        setOfflineSttStatus('🎙 Whisper main-thread đang ghi từng đoạn 6 giây. Khi xử lý, giao diện có thể đứng trong vài giây.', 'success');
-        setOfflineSttPartial('Đang ghi đoạn âm thanh đầu tiên...');
-        const startOneSegment = () => {
-            if (!isStandaloneTranscribing || !offlineSttStream) return;
-            const chunks = [];
-            gshtWhisperMediaRecorder = new MediaRecorder(offlineSttStream);
-            gshtWhisperMediaRecorder.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
-            gshtWhisperMediaRecorder.onstop = async () => {
-                if (!chunks.length) return;
-                if (gshtWhisperProcessing) return;
-                gshtWhisperProcessing = true;
+        const ctxRate = offlineSttAudioContext.sampleRate || 16000;
+        const targetSeconds = 5;
+        const targetSamples = Math.max(8000, Math.round(ctxRate * targetSeconds));
+        let chunks = [];
+        let total = 0;
+        let lastProgress = 0;
+        setOfflineSttStatus('🎙 Whisper đang thu trực tiếp bằng WebAudio từng đoạn 5 giây. Khi xử lý, giao diện có thể đứng trong vài giây.', 'success');
+        setOfflineSttPartial('Đang thu đoạn âm thanh đầu tiên...');
+
+        offlineSttProcessor.onaudioprocess = (event) => {
+            if (!isStandaloneTranscribing || offlineSttEngine !== 'whisper') return;
+            if (gshtWhisperProcessing) return; // bỏ qua âm thanh mới trong lúc WASM đang xử lý để tránh gọi chồng
+            const input = event.inputBuffer.getChannelData(0);
+            const copy = new Float32Array(input.length);
+            copy.set(input);
+            chunks.push(copy);
+            total += copy.length;
+            const now = Date.now();
+            if (now - lastProgress > 500) {
+                lastProgress = now;
+                try { setOfflineSttPartial('Đang gom âm thanh cho Whisper: ' + Math.min(targetSeconds, total / ctxRate).toFixed(1) + '/' + targetSeconds + ' giây'); } catch(e) {}
+            }
+            if (total < targetSamples) return;
+
+            const segment = new Float32Array(Math.min(total, targetSamples));
+            let pos = 0;
+            for (const c of chunks) {
+                const n = Math.min(c.length, segment.length - pos);
+                if (n <= 0) break;
+                segment.set(c.subarray(0, n), pos);
+                pos += n;
+            }
+            chunks = [];
+            total = 0;
+            gshtWhisperProcessing = true;
+            setTimeout(async () => {
                 try {
-                    const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
-                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                    const ctx = new AudioCtx();
-                    const buf = await blob.arrayBuffer();
-                    const audioBuffer = await ctx.decodeAudioData(buf.slice(0));
-                    const channel = audioBuffer.getChannelData(0);
-                    const copy = new Float32Array(channel.length); copy.set(channel);
-                    await gshtTranscribeWithWhisperMainThread(copy, audioBuffer.sampleRate || 16000, 'micro');
-                    try { await ctx.close(); } catch(e) {}
+                    await gshtTranscribeWithWhisperMainThread(segment, ctxRate, 'micro 5s');
                 } catch(err) {
                     setOfflineSttStatus('❌ Whisper main-thread lỗi: ' + (err && err.message ? err.message : err), 'danger');
                 } finally {
                     gshtWhisperProcessing = false;
-                    if (isStandaloneTranscribing && offlineSttEngine === 'whisper') setTimeout(startOneSegment, 300);
+                    if (isStandaloneTranscribing && offlineSttEngine === 'whisper') {
+                        try { setOfflineSttPartial('Đang thu đoạn âm thanh tiếp theo...'); } catch(e) {}
+                    }
                 }
-            };
-            gshtWhisperMediaRecorder.start();
-            gshtWhisperMicTimer = setTimeout(() => {
-                try { if (gshtWhisperMediaRecorder && gshtWhisperMediaRecorder.state !== 'inactive') gshtWhisperMediaRecorder.stop(); } catch(e) {}
-            }, 6000);
+            }, 30);
         };
-        startOneSegment();
+        offlineSttSource.connect(offlineSttProcessor);
+        offlineSttProcessor.connect(zeroGain);
+        zeroGain.connect(offlineSttAudioContext.destination);
     }
 
     const gshtOriginalStopStandaloneTranscribe = stopStandaloneTranscribe;
@@ -5291,15 +5014,10 @@ ${timeText}` : viewerTitleText);
         try {
             const response = await fetch(currentMediaBlobUrl);
             const buf = await response.arrayBuffer();
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            const tmpCtx = new AudioCtx();
-            const audioBuffer = await tmpCtx.decodeAudioData(buf.slice(0));
-            const channel = audioBuffer.getChannelData(0);
-            const copy = new Float32Array(channel.length); copy.set(channel);
+            const decoded = await gshtDecodeAudioArrayBufferLikeWhisperDemo(buf);
             const before = document.getElementById('standalone-stt-result')?.value || '';
-            const text = await gshtTranscribeWithWhisperMainThread(copy, audioBuffer.sampleRate || 16000, 'file');
+            const text = await gshtTranscribeWithWhisperMainThread(decoded.audio, decoded.sampleRate || 16000, 'file');
             if (textArea) textArea.value = text || document.getElementById('standalone-stt-result')?.value.replace(before, '').trim() || 'Whisper xử lý xong nhưng không nhận được văn bản rõ ràng.';
-            try { await tmpCtx.close(); } catch(e) {}
         } catch(err) {
             if (textArea) textArea.value = '❌ Không bóc băng Whisper được: ' + (err && err.message ? err.message : err);
         } finally {
