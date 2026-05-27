@@ -7939,5 +7939,360 @@ window.addEventListener('load', () => {
 })();
 </script>
 
+
+
+<script>
+// --- GSHT V84: Ghi âm đầy đủ -> lưu âm thanh tạm -> chia nhỏ thích nghi -> ghép kết quả ---
+(function(){
+  'use strict';
+  const V84 = 'whisper-record-save-adaptive-v84-20260527';
+  let recording = false;
+  let recordCtx = null;
+  let recordStream = null;
+  let recordSource = null;
+  let recordProcessor = null;
+  let recordChunks = [];
+  let recordSamples = 0;
+  let recordTimer = null;
+  let processingCancelled = false;
+  let processingNow = false;
+  let lastAudio = null;
+
+  function $(id){ return document.getElementById(id); }
+  function status(msg, kind){ try { setOfflineSttStatus(msg, kind || 'info'); } catch(e) { console.log('[GSHT STT]', msg); } }
+  function partial(msg){ try { setOfflineSttPartial(msg || ''); } catch(e) {} }
+  function textEl(){ return $('standalone-stt-result'); }
+  function setText(msg){ const el = textEl(); if (el) el.value = msg || ''; }
+  function getText(){ return textEl()?.value || ''; }
+  function wait(ms){ return new Promise(r => setTimeout(r, ms)); }
+  function fmt(sec){
+    sec = Math.max(0, Number(sec) || 0);
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    return (h ? String(h).padStart(2,'0') + ':' : '') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  }
+  function sanitizeFilePart(s){ return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,80) || 'audio'; }
+  function getSegmentSeconds(){
+    const sel = $('gsht-whisper-v83-segment')?.value || $('offline-stt-whisper-segment-seconds')?.value || '8';
+    const raw = sel === 'custom' ? $('gsht-whisper-v83-custom-segment')?.value : sel;
+    return Math.max(3, Math.min(60, parseFloat(raw) || 8));
+  }
+  function getOverlapSeconds(){ return Math.max(0, Math.min(3, parseFloat($('gsht-whisper-v83-overlap')?.value || '0.3') || 0)); }
+  function getMaxProcessSeconds(){ return Math.max(0, Math.min(7200, parseFloat($('gsht-whisper-v83-max')?.value || '0') || 0)); }
+  function getMicProfile(){
+    const v = $('offline-stt-whisper-mic-profile')?.value || 'field';
+    if (v === 'raw') return { echoCancellation:false, noiseSuppression:false, autoGainControl:false };
+    return { echoCancellation:true, noiseSuppression:true, autoGainControl:true };
+  }
+  function mergeFloatChunks(chunks, total){
+    const out = new Float32Array(total || chunks.reduce((s,c)=>s+c.length,0));
+    let off = 0;
+    for (const c of chunks) { out.set(c, off); off += c.length; }
+    return out;
+  }
+  function floatTo16BitPCM(float32){
+    const out = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i++) {
+      let s = Number.isFinite(float32[i]) ? Math.max(-1, Math.min(1, float32[i])) : 0;
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return out;
+  }
+  function encodeWavMono(float32, sampleRate){
+    const pcm = floatTo16BitPCM(float32);
+    const buffer = new ArrayBuffer(44 + pcm.length * 2);
+    const view = new DataView(buffer);
+    function writeString(offset, str){ for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); }
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + pcm.length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, pcm.length * 2, true);
+    let offset = 44;
+    for (let i = 0; i < pcm.length; i++, offset += 2) view.setInt16(offset, pcm[i], true);
+    return new Blob([buffer], { type: 'audio/wav' });
+  }
+  function insertControls(){
+    if (!$('gsht-whisper-record-chunk-v83-panel')) {
+      // Nếu panel V83 chưa kịp sinh, giữ nguyên. V84 vẫn hoạt động nhưng không có controls nâng cao.
+    }
+    if ($('gsht-whisper-record-temp-audio-v84-panel')) return;
+    const anchor = $('gsht-whisper-record-chunk-v83-panel') || $('gsht-whisper-local-model-panel') || $('gsht-whisper-audio-chunk-panel') || $('offline-stt-status');
+    if (!anchor) return;
+    const box = document.createElement('div');
+    box.id = 'gsht-whisper-record-temp-audio-v84-panel';
+    box.className = 'border border-primary rounded p-2 mt-2 bg-black bg-opacity-25';
+    box.innerHTML = `
+      <div class="small text-primary fw-bold mb-2"><i class="fa-solid fa-floppy-disk me-1"></i> ÂM THANH GHI TẠM - WHISPER V84</div>
+      <audio id="gsht-whisper-v84-audio-preview" class="w-100 mb-2" controls style="display:none"></audio>
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-sm btn-outline-info flex-fill fw-bold" onclick="gshtDownloadLastWhisperAudioV84()"><i class="fa-solid fa-download me-1"></i>TẢI FILE GHI ÂM</button>
+        <button type="button" class="btn btn-sm btn-outline-success flex-fill fw-bold" onclick="gshtShareLastWhisperAudioV84()"><i class="fa-solid fa-share-nodes me-1"></i>CHIA SẺ FILE GHI ÂM</button>
+        <button type="button" class="btn btn-sm btn-outline-danger flex-fill fw-bold" onclick="gshtClearLastWhisperAudioV84()"><i class="fa-solid fa-trash me-1"></i>XÓA Ổ TẠM</button>
+      </div>
+      <div id="gsht-whisper-v84-audio-status" class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;">Sau khi dừng ghi âm, app sẽ lưu tạm bản ghi thành WAV trong bộ nhớ phiên làm việc. Người dùng có thể nghe lại, tải về hoặc chia sẻ trước khi xử lý/ghép kết quả.</div>`;
+    anchor.insertAdjacentElement('afterend', box);
+  }
+  function setLastAudio(audio, sampleRate, sourceName){
+    if (lastAudio?.url) { try { URL.revokeObjectURL(lastAudio.url); } catch(e) {} }
+    const name = 'WHISPER_GHI_AM_' + sanitizeFilePart(sourceName || new Date().toISOString().replace(/[:.]/g,'-')) + '.wav';
+    const blob = encodeWavMono(audio, Math.round(sampleRate || 16000));
+    const url = URL.createObjectURL(blob);
+    lastAudio = { audio, sampleRate: Math.round(sampleRate || 16000), blob, url, name, createdAt: Date.now(), seconds: audio.length/(sampleRate||16000) };
+    insertControls();
+    const player = $('gsht-whisper-v84-audio-preview');
+    if (player) { player.src = url; player.style.display = 'block'; try { player.load(); } catch(e) {} }
+    const st = $('gsht-whisper-v84-audio-status');
+    if (st) st.textContent = 'Đã lưu tạm: ' + name + ' · ' + lastAudio.seconds.toFixed(1) + ' giây · ' + (blob.size/1024).toFixed(1) + ' KB. Có thể nghe lại, tải về hoặc chia sẻ.';
+  }
+  window.gshtDownloadLastWhisperAudioV84 = function(){
+    if (!lastAudio?.blob) return alert('Chưa có file âm thanh ghi tạm. Hãy ghi âm trước.');
+    const a = document.createElement('a');
+    a.href = lastAudio.url;
+    a.download = lastAudio.name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 200);
+  };
+  window.gshtShareLastWhisperAudioV84 = async function(){
+    if (!lastAudio?.blob) return alert('Chưa có file âm thanh ghi tạm. Hãy ghi âm trước.');
+    const file = new File([lastAudio.blob], lastAudio.name, { type: 'audio/wav' });
+    if (navigator.canShare && navigator.canShare({ files:[file] }) && navigator.share) {
+      await navigator.share({ title:'File ghi âm hiện trường', text:'File ghi âm được tạo từ phần mềm giám sát hiện trường.', files:[file] });
+    } else {
+      window.gshtDownloadLastWhisperAudioV84();
+      alert('Thiết bị/trình duyệt chưa hỗ trợ chia sẻ file trực tiếp. App đã tải file về để anh chia sẻ bằng ứng dụng khác.');
+    }
+  };
+  window.gshtClearLastWhisperAudioV84 = function(){
+    if (lastAudio?.url) { try { URL.revokeObjectURL(lastAudio.url); } catch(e) {} }
+    lastAudio = null;
+    const player = $('gsht-whisper-v84-audio-preview');
+    if (player) { player.removeAttribute('src'); player.style.display='none'; try { player.load(); } catch(e) {} }
+    const st = $('gsht-whisper-v84-audio-status');
+    if (st) st.textContent = 'Đã xóa file âm thanh ghi tạm trong phiên làm việc.';
+  };
+
+  async function decodeFullAudioFile(file){
+    const arrayBuffer = await file.arrayBuffer();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('Trình duyệt không hỗ trợ AudioContext.');
+    const ctx = new AC();
+    let audioBuffer;
+    try { audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0)); }
+    finally { try { await ctx.close(); } catch(e) {} }
+    const channels = audioBuffer.numberOfChannels || 1;
+    const len = audioBuffer.length || 0;
+    const out = new Float32Array(len);
+    for (let c = 0; c < channels; c++) {
+      const ch = audioBuffer.getChannelData(c);
+      for (let i = 0; i < len; i++) out[i] += ch[i] / channels;
+    }
+    return { audio: out, sampleRate: audioBuffer.sampleRate || 44100, duration: audioBuffer.duration || len/(audioBuffer.sampleRate || 44100) };
+  }
+  async function transcribeCore(chunk, sampleRate, label, managedText){
+    const fn = window.gshtTranscribeWithWhisperMainThread || window.transcribeWorkerWhisper;
+    if (typeof fn !== 'function') throw new Error('Chưa tìm thấy hàm xử lý Whisper.');
+    const before = getText();
+    let ret = '';
+    try { ret = await fn(chunk, sampleRate, label); }
+    finally { if (typeof managedText === 'string') setText(managedText); }
+    ret = String(ret || '').trim();
+    if (!ret) {
+      const after = getText();
+      if (after && after !== before && after.startsWith(before)) ret = after.slice(before.length).trim();
+      if (typeof managedText === 'string') setText(managedText);
+    }
+    return ret;
+  }
+  function isTimeoutLike(err){ return /timeout|không phản hồi|worker V80 timeout/i.test(String(err && err.message ? err.message : err || '')); }
+  async function transcribeAdaptive(chunk, sampleRate, label, managedText, depth){
+    depth = depth || 0;
+    const dur = chunk.length / (sampleRate || 16000);
+    try {
+      return await transcribeCore(chunk, sampleRate, label, managedText);
+    } catch(err) {
+      if (isTimeoutLike(err) && dur > 4 && depth < 3) {
+        const mid = Math.floor(chunk.length / 2);
+        partial('Đoạn ' + label + ' bị timeout, tự chia nhỏ còn khoảng ' + (dur/2).toFixed(1) + ' giây/đoạn...');
+        const a = chunk.slice(0, mid);
+        const b = chunk.slice(mid);
+        const r1 = await transcribeAdaptive(a, sampleRate, label + '.1', managedText, depth + 1);
+        await wait(120);
+        const r2 = await transcribeAdaptive(b, sampleRate, label + '.2', managedText, depth + 1);
+        return [r1, r2].filter(Boolean).join(' ');
+      }
+      throw err;
+    }
+  }
+  async function processAudioByChunksV84(audio, sampleRate, sourceName){
+    if (processingNow) throw new Error('Đang có phiên Whisper khác xử lý. Hãy đợi hoặc bấm DỪNG XỬ LÝ.');
+    processingNow = true;
+    processingCancelled = false;
+    insertControls();
+    try {
+      sampleRate = sampleRate || 16000;
+      let fullAudio = audio instanceof Float32Array ? audio : new Float32Array(audio || []);
+      const realDuration = fullAudio.length / sampleRate;
+      const maxSec = getMaxProcessSeconds();
+      if (maxSec > 0 && realDuration > maxSec) fullAudio = fullAudio.subarray(0, Math.floor(maxSec * sampleRate));
+      const segSec = getSegmentSeconds();
+      const ovSec = Math.min(getOverlapSeconds(), Math.max(0, segSec - 1));
+      const segSamples = Math.max(1, Math.floor(segSec * sampleRate));
+      const stepSamples = Math.max(1, Math.floor((segSec - ovSec) * sampleRate));
+      const totalChunks = Math.max(1, Math.ceil(Math.max(1, fullAudio.length - segSamples) / stepSamples) + 1);
+      const header = '🎙️ Nguồn: ' + (sourceName || 'âm thanh') + '\n' +
+        'Thời lượng gốc: ' + realDuration.toFixed(1) + ' giây\n' +
+        'Sẽ xử lý: ' + (fullAudio.length / sampleRate).toFixed(1) + ' giây\n' +
+        'Chia đoạn ban đầu: ' + segSec + ' giây, chồng lặp: ' + ovSec + ' giây\n' +
+        'Tổng đoạn dự kiến: ' + totalChunks + '\n' +
+        'V84: nếu đoạn quá nặng/timeout, app tự chia nhỏ tiếp rồi ghép kết quả.\n\n';
+      const lines = [];
+      setText(header);
+      status('⏳ Whisper V84 đang xử lý tuần tự, có tự chia nhỏ khi timeout...', 'warning');
+      let index = 0;
+      for (let start = 0; start < fullAudio.length; start += stepSamples) {
+        if (processingCancelled) break;
+        const end = Math.min(fullAudio.length, start + segSamples);
+        if (end <= start) break;
+        index++;
+        const chunk = new Float32Array(end - start);
+        chunk.set(fullAudio.subarray(start, end));
+        const startSec = start / sampleRate;
+        const endSec = end / sampleRate;
+        const progress = header + 'Tiến độ: ' + index + '/' + totalChunks + '\n\n' + lines.join('\n');
+        setText(progress);
+        partial('Whisper V84 đang xử lý đoạn ' + index + '/' + totalChunks + ': ' + fmt(startSec) + ' - ' + fmt(endSec));
+        status('⏳ Whisper V84 đang xử lý đoạn ' + index + '/' + totalChunks + '...', 'warning');
+        let text = '';
+        try { text = await transcribeAdaptive(chunk, sampleRate, (sourceName || 'audio') + ' đoạn ' + index, progress, 0); }
+        catch(err) { text = '❌ ' + (err && err.message ? err.message : String(err)); }
+        lines.push('[' + fmt(startSec) + ' - ' + fmt(endSec) + '] ' + String(text || '').trim());
+        setText(header + 'Tiến độ: ' + index + '/' + totalChunks + '\n\n' + lines.join('\n'));
+        await wait(180);
+        if (end >= fullAudio.length) break;
+      }
+      if (processingCancelled) {
+        status('Đã dừng xử lý Whisper V84 theo yêu cầu.', 'secondary');
+        partial('Đã dừng xử lý. Kết quả đã nhận vẫn được giữ lại.');
+      } else {
+        status('✅ Whisper V84 đã xử lý xong và ghép kết quả.', 'success');
+        partial('Hoàn tất: ' + (sourceName || 'âm thanh'));
+      }
+      return lines.join('\n');
+    } finally {
+      processingNow = false;
+    }
+  }
+  async function handleFileV84(ev){
+    const input = ev && ev.target;
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    try {
+      insertControls();
+      setText('⏳ Đang đọc toàn bộ file âm thanh: ' + file.name + '\n');
+      status('⏳ Đang decode toàn bộ file, sau đó chia nhỏ thích nghi...', 'warning');
+      const decoded = await decodeFullAudioFile(file);
+      await processAudioByChunksV84(decoded.audio, decoded.sampleRate, 'file ' + file.name);
+    } catch(err) {
+      const msg = err && err.message ? err.message : String(err || 'Lỗi không xác định');
+      status('❌ Whisper V84 test file lỗi: ' + msg, 'danger');
+      setText('❌ Whisper V84 test file lỗi: ' + msg);
+    } finally { if (input) input.value = ''; }
+  }
+  async function startRecordV84(){
+    if (recording) return;
+    insertControls();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('Trình duyệt không hỗ trợ AudioContext.');
+    recordStream = await navigator.mediaDevices.getUserMedia({ audio: getMicProfile(), video:false });
+    recordCtx = new AC();
+    recordSource = recordCtx.createMediaStreamSource(recordStream);
+    recordProcessor = recordCtx.createScriptProcessor(4096, 1, 1);
+    recordChunks = [];
+    recordSamples = 0;
+    processingCancelled = false;
+    recording = true;
+    recordProcessor.onaudioprocess = function(e){
+      if (!recording) return;
+      const input = e.inputBuffer;
+      const mono = new Float32Array(input.length);
+      const n = input.numberOfChannels || 1;
+      for (let c = 0; c < n; c++) {
+        const ch = input.getChannelData(c);
+        for (let i = 0; i < mono.length; i++) mono[i] += ch[i] / n;
+      }
+      recordChunks.push(mono);
+      recordSamples += mono.length;
+    };
+    recordSource.connect(recordProcessor);
+    const gain = recordCtx.createGain(); gain.gain.value = 0;
+    recordProcessor.connect(gain); gain.connect(recordCtx.destination);
+    const btn = $('btn-standalone-stt');
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-stop me-1"></i> DỪNG GHI & BẮT ĐẦU NHẬN DẠNG';
+    setText('🎙️ Đang ghi âm vào ổ tạm...\nSau khi bấm DỪNG, app sẽ lưu WAV tạm, rồi chia nhỏ nhận dạng và ghép kết quả.');
+    status('🎙️ Whisper V84 đang ghi âm đầy đủ. Bấm lại để dừng, lưu file WAV tạm và xử lý.', 'success');
+    recordTimer = setInterval(() => {
+      const dur = recordSamples / (recordCtx?.sampleRate || 16000);
+      partial('Đang ghi âm Whisper V84: ' + dur.toFixed(1) + ' giây. File WAV tạm sẽ tạo khi dừng.');
+    }, 500);
+  }
+  async function stopRecordV84(){
+    if (!recording) return;
+    recording = false;
+    try { if (recordTimer) clearInterval(recordTimer); } catch(e) {}
+    recordTimer = null;
+    try { if (recordProcessor) recordProcessor.disconnect(); } catch(e) {}
+    try { if (recordSource) recordSource.disconnect(); } catch(e) {}
+    try { if (recordStream) recordStream.getTracks().forEach(t => t.stop()); } catch(e) {}
+    const sr = recordCtx?.sampleRate || 16000;
+    try { if (recordCtx) await recordCtx.close(); } catch(e) {}
+    recordCtx = recordStream = recordSource = recordProcessor = null;
+    const btn = $('btn-standalone-stt');
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-microphone-lines me-1"></i> BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI';
+    const audio = mergeFloatChunks(recordChunks, recordSamples);
+    recordChunks = [];
+    recordSamples = 0;
+    if (!audio.length) { status('Không có dữ liệu âm thanh để xử lý.', 'warning'); return; }
+    setLastAudio(audio, sr, new Date().toISOString().replace(/[:.]/g,'-'));
+    await processAudioByChunksV84(audio, sr, 'ghi âm trực tiếp');
+  }
+  async function toggleV84(){
+    const engine = ($('offline-stt-engine')?.value || '').toLowerCase();
+    if (engine !== 'whisper') {
+      if (typeof window.__gshtOldToggleStandaloneTranscribeV84 === 'function') return window.__gshtOldToggleStandaloneTranscribeV84.apply(this, arguments);
+      if (typeof window.__gshtOldToggleStandaloneTranscribeV83 === 'function') return window.__gshtOldToggleStandaloneTranscribeV83.apply(this, arguments);
+      return;
+    }
+    try {
+      if (recording) await stopRecordV84();
+      else await startRecordV84();
+    } catch(err) {
+      status('❌ Whisper V84 không khởi động/xử lý được: ' + (err && err.message ? err.message : err), 'danger');
+    }
+  }
+  window.gshtCancelWhisperV84Processing = function(){ processingCancelled = true; status('Đang yêu cầu dừng xử lý Whisper V84...', 'secondary'); };
+  const oldCancel = window.gshtCancelWhisperV83Processing;
+  window.gshtCancelWhisperV83Processing = function(){ try { if (typeof oldCancel === 'function') oldCancel(); } catch(e) {} window.gshtCancelWhisperV84Processing(); };
+  if (!window.__gshtOldToggleStandaloneTranscribeV84) window.__gshtOldToggleStandaloneTranscribeV84 = window.toggleStandaloneTranscribe;
+  window.toggleStandaloneTranscribe = toggleV84;
+  window.handleStandaloneWhisperAudioFile = handleFileV84;
+  window.startWhisperMicTranscribe = startRecordV84;
+  window.stopWhisperMicTranscribe = stopRecordV84;
+  window.addEventListener('load', insertControls);
+  setTimeout(insertControls, 900);
+  try { console.log('[GSHT] Whisper V84 adaptive file + temp audio loaded'); } catch(e) {}
+})();
+</script>
+
 </body>
 </html>
