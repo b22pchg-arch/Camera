@@ -20,6 +20,7 @@ const APP_SHELL = [
   'webfonts/fa-solid-900.woff2',  // <-- Khóa cứng file font icon hay dùng dưới hiện trường
   'webfonts/fa-regular-400.woff2'
 ];
+
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(GSHT_CACHE).then(cache => {
