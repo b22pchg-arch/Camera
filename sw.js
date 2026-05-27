@@ -1,6 +1,7 @@
-// GSHT PWA Service Worker - update-check + Cross-Origin Isolation for Whisper WASM
-// Bản này bổ sung COOP/COEP để Whisper.cpp WASM dùng pthreads/SharedArrayBuffer ổn định hơn.
-const GSHT_CACHE = 'gsht-pwa-v73-whisper-coi-fixed-20260527';
+// GSHT PWA Service Worker - SAFE UPDATE BUILD
+// Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
+// vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
+const GSHT_CACHE = 'gsht-pwa-v74-safe-update-20260527';
 const APP_SHELL = [
   './',
   './index.html',
@@ -15,7 +16,7 @@ const APP_SHELL = [
   './stt/vosk/vosk.js',
   './stt/whisper/whisper-worker.js',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
   'webfonts/fa-solid-900.woff2',  // <-- Khóa cứng file font icon hay dùng dưới hiện trường
   'webfonts/fa-regular-400.woff2'
 ];
