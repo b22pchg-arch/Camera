@@ -1,5 +1,5 @@
-// GSHT PWA Service Worker - cache app shell, không cache model STT lớn mặc định
-const GSHT_CACHE = 'gsht-pwa-v69-20260527';
+// GSHT PWA Service Worker - update-check fixed, cache app shell, không cache model STT lớn mặc định
+const GSHT_CACHE = 'gsht-pwa-v72-update-check-fixed-20260527';
 const APP_SHELL = [
   './',
   './index.html',
@@ -17,19 +17,24 @@ const APP_SHELL = [
   'webfonts/fa-regular-400.woff2'
 ];
 
+
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(GSHT_CACHE).then(cache => Promise.allSettled(
-      APP_SHELL.map(url => cache.add(url))
-    )).then(() => self.skipWaiting())
+    caches.open(GSHT_CACHE)
+      .then(cache => Promise.allSettled(
+        APP_SHELL.map(url => cache.add(new Request(url, { cache: 'reload' })))
+      ))
+      // Không gọi skipWaiting tự động để nút NÂNG CẤP trong app hoạt động đúng.
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(k => k.startsWith('gsht-pwa-') && k !== GSHT_CACHE).map(k => caches.delete(k))
-    )).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k.startsWith('gsht-pwa-') && k !== GSHT_CACHE).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
@@ -51,10 +56,10 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // HTML: network-first để nhận bản cập nhật nhanh, fallback cache/offline.
+  // HTML/navigation: network-first để nhận bản mới nhanh, fallback cache/offline.
   if (event.request.mode === 'navigate' || /index\.html$/i.test(url.pathname)) {
     event.respondWith(
-      fetch(event.request).then(res => {
+      fetch(event.request, { cache: 'no-store' }).then(res => {
         const copy = res.clone();
         caches.open(GSHT_CACHE).then(cache => cache.put('./index.html', copy));
         return res;
