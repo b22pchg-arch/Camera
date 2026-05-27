@@ -17,7 +17,6 @@ const APP_SHELL = [
   'webfonts/fa-regular-400.woff2'
 ];
 
-
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(GSHT_CACHE)
