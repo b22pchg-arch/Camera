@@ -851,6 +851,7 @@ function showUpdateNotification() {
                                     <select id="offline-stt-engine" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="saveOfflineSttPreference()">
                                         <option value="vosk" selected>Vosk tiếng Việt offline</option>
                                         <option value="whisper">Whisper offline local</option>
+                                        <option value="system">Công cụ sẵn có trên điện thoại</option>
                                     </select>
                                 </div>
                                 <div class="col-12 col-sm-8">
@@ -859,7 +860,7 @@ function showUpdateNotification() {
                                 </div>
                                 <div class="col-12 col-sm-8">
                                     <label class="form-label text-info fw-bold" for="offline-stt-worker-path">Whisper worker local</label>
-                                    <input id="offline-stt-worker-path" class="form-control form-control-sm bg-dark text-info border-secondary" value="whisper-worker.js" onchange="saveOfflineSttPreference()" placeholder="VD: whisper-worker.js">
+                                    <input id="offline-stt-worker-path" class="form-control form-control-sm bg-dark text-info border-secondary" value="stt/whisper/whisper-worker.js" onchange="saveOfflineSttPreference()" placeholder="VD: stt/whisper/whisper-worker.js">
                                 </div>
                                 <div class="col-12 col-sm-4">
                                     <button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="checkOfflineSttEngine()"><i class="fa-solid fa-circle-check me-1"></i>KIỂM TRA</button>
@@ -943,13 +944,14 @@ function showUpdateNotification() {
                             </div>
 
                             <div id="offline-stt-status" class="text-secondary mt-2">Chưa kiểm tra engine. Có thể dùng đường dẫn file local hoặc model đã lưu trong kho nội bộ bằng dạng gsht-idb://tên-model.</div>
+                            <div class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;"><b>Gợi ý:</b> Vosk chạy offline nhẹ nhưng độ chính xác vừa phải; Whisper cần worker/WASM/model riêng và máy mạnh hơn; <b>Công cụ sẵn có trên điện thoại</b> không cần model nhưng tùy trình duyệt/thiết bị, có thể cần dịch vụ nhận dạng của hệ điều hành.</div>
                             <div id="offline-stt-partial" class="offline-stt-partial mt-2">Kết quả tạm thời sẽ hiện ở đây...</div>
                         </div>
 
                         <button id="btn-standalone-stt" class="btn btn-warning text-dark w-100 fw-bold mb-2 py-2" onclick="toggleStandaloneTranscribe()">
                             <i class="fa-solid fa-microphone me-1"></i> <span id="stt-btn-text">BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI OFFLINE</span>
                         </button>
-                        <textarea id="standalone-stt-result" class="form-control bg-secondary text-white border-secondary small" rows="5" placeholder="Văn bản bóc băng offline từ Vosk/Whisper sẽ hiển thị ở đây theo thời gian thực..."></textarea>
+                        <textarea id="standalone-stt-result" class="form-control bg-secondary text-white border-secondary small" rows="5" placeholder="Văn bản bóc băng từ Vosk / Whisper / công cụ sẵn có của điện thoại sẽ hiển thị ở đây..."></textarea>
                         <div class="d-flex gap-2 mt-2 flex-wrap">
                             <button class="btn btn-sm btn-outline-light flex-fill" onclick="copyStandaloneSTT()"><i class="fa-solid fa-copy me-1"></i> Sao chép chữ</button>
                             <button class="btn btn-sm btn-outline-info flex-fill" onclick="sendStandaloneSTTToNote()"><i class="fa-solid fa-pen-to-square me-1"></i> Đưa vào ghi chú</button>
@@ -1367,13 +1369,14 @@ function showUpdateNotification() {
                 <ul class="text-secondary ps-3 mb-3">
                     <li><b>Ghi âm offline:</b> dùng khi chỉ cần lưu âm thanh hiện trường, không quay hình.</li>
                     <li><b>Phụ đề video:</b> nếu trình duyệt hỗ trợ nhận diện giọng nói, app có thể ghi phụ đề khi quay video.</li>
-                    <li><b>Bóc băng độc lập offline:</b> chọn <b>Vosk</b> hoặc <b>Whisper</b> trong khung Nhận dạng tiếng Việt offline. App sẽ dùng micro và xử lý trên thiết bị, không cần internet sau khi thư viện/model đã sẵn sàng.</li>
+                    <li><b>Bóc băng độc lập:</b> chọn <b>Vosk</b>, <b>Whisper</b> hoặc <b>Công cụ sẵn có trên điện thoại</b>. Vosk/Whisper dùng model local; công cụ điện thoại không cần model nhưng phụ thuộc trình duyệt/hệ điều hành và có thể không hoạt động trên mọi thiết bị.</li>
                     <li><b>Tải model lần đầu:</b> không cần đưa model lớn lên GitHub. Nhập link ngoài vào ô <b>Đường dẫn ngoài đã lưu</b> như Google Drive, OneDrive, GitHub Release hoặc server nội bộ; bấm <b>LƯU LINK</b> để dùng lại lần sau, nhập <b>Tên lưu nội bộ</b>, rồi bấm <b>TẢI MODEL</b>. App lưu model vào kho IndexedDB và tự đổi đường dẫn sang dạng <code>gsht-idb://ten-model</code> để chạy offline.</li>
                     <li><b>Chọn từ thư mục chia sẻ:</b> nhập link thư mục vào ô <b>Đường dẫn thư mục chia sẻ</b>, bấm <b>LƯU THƯ MỤC</b> rồi <b>QUÉT FILE</b>. App hỗ trợ tốt nhất với <code>stt-models.json</code>, GitHub public folder, hoặc Google Drive public folder có API key. Nếu Drive/OneDrive chặn tải trực tiếp, hãy bấm <b>MỞ THƯ MỤC</b>, tải file về máy rồi dùng <b>CHỌN FILE</b>.</li>
                     <li><b>Khi link ngoài bị chặn tải trực tiếp:</b> bấm <b>MỞ LINK</b> để tải file model về máy, sau đó quay lại app và dùng <b>CHỌN FILE</b> để lưu vào kho nội bộ. Cách này phù hợp với một số link Google Drive/OneDrive không cho trình duyệt tải bằng <code>fetch()</code>.</li>
                     <li><b>Chọn file model:</b> nếu đã tải model bằng máy tính hoặc điện thoại, bấm <b>CHỌN FILE</b> để lưu một lần vào kho nội bộ. Với Vosk Browser nên dùng model đã đóng gói dạng <code>model.tar.gz</code>; file ZIP chính thức thường cần đóng gói lại trước khi chạy.</li>
                     <li><b>Vosk:</b> phù hợp điện thoại hiện trường vì nhẹ hơn, cần thư viện <code>vosk.js</code>/<code>vosk.wasm</code> và model tiếng Việt. Model nhỏ tiếng Việt của Vosk là lựa chọn nên thử trước.</li>
-                    <li><b>Whisper:</b> độ chính xác có thể tốt hơn nhưng nặng hơn, cần worker local như <code>whisper-worker.js</code> và model tương ứng. Nên dùng model nhỏ/quantized khi chạy trên điện thoại.</li>
+                    <li><b>Whisper:</b> độ chính xác có thể tốt hơn nhưng nặng hơn, cần worker local như <code>stt/whisper/whisper-worker.js</code>, file WASM đi kèm và model <code>ggml</code>/<code>gguf</code> tương ứng. Nên dùng model nhỏ/quantized khi chạy trên điện thoại.</li>
+                    <li><b>Công cụ sẵn có trên điện thoại:</b> dùng Web Speech API nếu trình duyệt hỗ trợ. Đây là cách giữ lại chức năng bóc băng cũ, không cần tải model; tuy nhiên khả năng offline phụ thuộc máy và trình duyệt.</li>
                     <li>Nút <b>KIỂM TRA</b> dùng để thử nạp engine/model trước khi ra hiện trường. Nếu kiểm tra báo lỗi, hãy kiểm tra lại tên file, đường dẫn model và cache Service Worker.</li>
                     <li>Có thể bấm <b>Đưa vào ghi chú</b> để chuyển nội dung bóc băng sang ô Ghi chú của phiên chụp.</li>
                     <li>Sau khi dừng bóc băng độc lập, camera sẽ được mở lại nếu trước đó đang bật.</li>
@@ -4502,9 +4505,7 @@ ${timeText}` : viewerTitleText);
         const key = getOfflineSttModelKey();
         try {
             const record = await getOfflineSttModelRecord(key);
-            if (!record || !record.blob) return alert(`Chưa có model đã lưu với tên: ${key}
-
-Hãy bấm CHỌN FILE hoặc TẢI MODEL trước.`);
+            if (!record || !record.blob) return alert('Chưa có model đã lưu với tên: ' + key + '\n\nHãy bấm CHỌN FILE hoặc TẢI MODEL trước.');
             const modelInput = document.getElementById('offline-stt-model-path');
             if (modelInput) modelInput.value = OFFLINE_STT_IDB_PREFIX + key;
             const engineInput = document.getElementById('offline-stt-engine');
@@ -4516,8 +4517,7 @@ Hãy bấm CHỌN FILE hoặc TẢI MODEL trước.`);
             await checkOfflineSttEngine();
         } catch(err) {
             setOfflineSttModelStoreStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
-            alert(`Không dùng được model đã lưu:
-${err && err.message ? err.message : err}`);
+            alert('Không dùng được model đã lưu:\n' + (err && err.message ? err.message : err));
         }
     }
     async function deleteStoredOfflineSttModel() {
@@ -4538,7 +4538,7 @@ ${err && err.message ? err.message : err}`);
             return {
                 engine: saved.engine || document.getElementById('offline-stt-engine')?.value || 'vosk',
                 modelPath: saved.modelPath || document.getElementById('offline-stt-model-path')?.value || 'models/vosk-model-small-vn/model.tar.gz',
-                workerPath: saved.workerPath || document.getElementById('offline-stt-worker-path')?.value || 'whisper-worker.js',
+                workerPath: saved.workerPath || document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js',
                 modelUrl: saved.modelUrl || saved.externalUrl || getSavedOfflineSttExternalUrl() || document.getElementById('offline-stt-model-url')?.value || '',
                 externalUrl: saved.externalUrl || saved.modelUrl || getSavedOfflineSttExternalUrl() || '',
                 folderUrl: saved.folderUrl || getSavedOfflineSttFolderUrl() || document.getElementById('offline-stt-folder-url')?.value || '',
@@ -4546,7 +4546,7 @@ ${err && err.message ? err.message : err}`);
                 modelKey: saved.modelKey || document.getElementById('offline-stt-model-key')?.value || 'vosk-vn-small'
             };
         } catch(e) {
-            return { engine:'vosk', modelPath:'models/vosk-model-small-vn/model.tar.gz', workerPath:'whisper-worker.js', modelUrl:getSavedOfflineSttExternalUrl(), externalUrl:getSavedOfflineSttExternalUrl(), folderUrl:getSavedOfflineSttFolderUrl(), driveApiKey:getSavedOfflineSttDriveApiKey(), modelKey:'vosk-vn-small' };
+            return { engine:'vosk', modelPath:'models/vosk-model-small-vn/model.tar.gz', workerPath:'stt/whisper/whisper-worker.js', modelUrl:getSavedOfflineSttExternalUrl(), externalUrl:getSavedOfflineSttExternalUrl(), folderUrl:getSavedOfflineSttFolderUrl(), driveApiKey:getSavedOfflineSttDriveApiKey(), modelKey:'vosk-vn-small' };
         }
     }
     function initOfflineSttPreferenceUI() {
@@ -4570,7 +4570,7 @@ ${err && err.message ? err.message : err}`);
         const pref = {
             engine: document.getElementById('offline-stt-engine')?.value || 'vosk',
             modelPath: document.getElementById('offline-stt-model-path')?.value || 'models/vosk-model-small-vn/model.tar.gz',
-            workerPath: document.getElementById('offline-stt-worker-path')?.value || 'whisper-worker.js',
+            workerPath: document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js',
             modelUrl: normalizeExternalSttModelUrl(document.getElementById('offline-stt-model-url')?.value || ''),
             externalUrl: normalizeExternalSttModelUrl(document.getElementById('offline-stt-model-url')?.value || ''),
             folderUrl: normalizeExternalSttFolderUrl(document.getElementById('offline-stt-folder-url')?.value || ''),
@@ -4644,33 +4644,57 @@ ${err && err.message ? err.message : err}`);
         setOfflineSttStatus('✅ Vosk đã sẵn sàng offline.', 'success');
         return offlineSttRuntime;
     }
+    function getSystemSpeechRecognitionClass() {
+        return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    }
+    async function checkSystemPhoneSpeechRecognizer() {
+        const SpeechRecognition = getSystemSpeechRecognitionClass();
+        if (!SpeechRecognition) {
+            throw new Error('Thiết bị/trình duyệt này chưa hỗ trợ Web Speech Recognition. Thường Android Chrome hỗ trợ tốt hơn; iOS/Safari có thể hạn chế.');
+        }
+        setOfflineSttStatus('✅ Công cụ nhận dạng giọng nói sẵn có của điện thoại/trình duyệt đã được phát hiện. Không cần model Vosk/Whisper, nhưng có thể phụ thuộc engine của hệ điều hành/trình duyệt.', 'success');
+        return SpeechRecognition;
+    }
     async function prepareWhisperOfflineWorker() {
         const pref = getOfflineSttPreference();
         if (offlineSttWorker) return offlineSttWorker;
         setOfflineSttStatus('⏳ Đang khởi tạo Whisper worker offline...', 'warning');
         return await new Promise((resolve, reject) => {
             try {
-                const worker = new Worker(pref.workerPath);
-                const timer = setTimeout(() => reject(new Error('Whisper worker không phản hồi. Kiểm tra file ' + pref.workerPath)), 20000);
+                const workerPath = pref.workerPath || 'stt/whisper/whisper-worker.js';
+                const worker = new Worker(workerPath);
+                const timer = setTimeout(() => reject(new Error('Whisper worker không phản hồi. Kiểm tra file ' + workerPath + ' và các file WASM đi kèm.')), 30000);
                 worker.onmessage = (ev) => {
                     const data = ev.data || {};
-                    if (data.type === 'ready') {
+                    if (data.type === 'ready' || data.type === 'inited') {
                         clearTimeout(timer);
                         offlineSttWorker = worker;
                         setOfflineSttStatus('✅ Whisper worker đã sẵn sàng offline.', 'success');
                         resolve(worker);
+                    } else if (data.type === 'progress') {
+                        setOfflineSttPartial(data.message || ('Whisper đang xử lý ' + (data.progress || 0) + '%'));
                     } else if (data.type === 'partial') {
                         setOfflineSttPartial(data.text || '');
-                    } else if (data.type === 'result') {
-                        appendStandaloneTranscript(data.text || '');
+                    } else if (data.type === 'result' || data.type === 'final') {
+                        appendStandaloneTranscript(data.text || data.result || '');
                         setOfflineSttPartial('');
                     } else if (data.type === 'error') {
                         setOfflineSttStatus('❌ Whisper: ' + (data.message || 'lỗi không xác định'), 'danger');
+                    } else if (data.type === 'log') {
+                        setOfflineSttPartial(data.message || '');
                     }
                 };
                 worker.onerror = (err) => reject(new Error(err.message || 'Không tải được whisper worker'));
                 resolveOfflineSttModelPath(pref).then((resolvedModelPath) => {
-                    worker.postMessage({ type:'init', modelPath: resolvedModelPath, originalModelPath: pref.modelPath, language:'vi', task:'transcribe' });
+                    worker.postMessage({
+                        type:'init',
+                        modelPath: resolvedModelPath,
+                        originalModelPath: pref.modelPath,
+                        wasmPath: (pref.wasmPath || 'stt/whisper/whisper.wasm'),
+                        language:'vi',
+                        task:'transcribe',
+                        translate:false
+                    });
                 }).catch((err) => reject(err));
             } catch(e) { reject(e); }
         });
@@ -4682,13 +4706,16 @@ ${err && err.message ? err.message : err}`);
             if (pref.engine === 'vosk') {
                 await prepareVoskOfflineRecognizer(16000);
                 alert('✅ Vosk tiếng Việt offline đã sẵn sàng.');
-            } else {
+            } else if (pref.engine === 'whisper') {
                 await prepareWhisperOfflineWorker();
                 alert('✅ Whisper offline worker đã sẵn sàng.');
+            } else {
+                await checkSystemPhoneSpeechRecognizer();
+                alert('✅ Công cụ nhận dạng sẵn có của điện thoại/trình duyệt đã sẵn sàng.');
             }
         } catch(err) {
             setOfflineSttStatus('❌ ' + (err && err.message ? err.message : err), 'danger');
-            alert('Không khởi tạo được engine offline:\n' + (err && err.message ? err.message : err));
+            alert('Không khởi tạo được engine nhận dạng:\n' + (err && err.message ? err.message : err));
         }
     }
     function appendStandaloneTranscript(text) {
@@ -4755,11 +4782,47 @@ ${err && err.message ? err.message : err}`);
             copy.set(input);
             try { worker.postMessage({ type:'audio', sampleRate: offlineSttAudioContext.sampleRate || 16000, audio: copy }, [copy.buffer]); } catch(e) {}
         };
-        worker.postMessage({ type:'start', sampleRate: offlineSttAudioContext.sampleRate || 16000 });
+        worker.postMessage({ type:'start', sampleRate: offlineSttAudioContext.sampleRate || 16000, language:'vi', task:'transcribe' });
         offlineSttSource.connect(offlineSttProcessor);
         offlineSttProcessor.connect(offlineSttAudioContext.destination);
         offlineSttEngine = 'whisper';
-        setOfflineSttStatus('🎙 Whisper worker đang nghe offline từ micro...', 'success');
+        setOfflineSttStatus('🎙 Whisper worker đang nghe offline từ micro. Nếu worker dùng chế độ xử lý theo đoạn, kết quả có thể trả về chậm hơn Vosk.', 'success');
+    }
+    async function startSystemPhoneTranscribe() {
+        const SpeechRecognition = await checkSystemPhoneSpeechRecognizer();
+        const rec = new SpeechRecognition();
+        rec.lang = 'vi-VN';
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.maxAlternatives = 1;
+        const textArea = document.getElementById('standalone-stt-result');
+        let baseText = textArea && textArea.value.trim() ? textArea.value.trim() + '\n' : '';
+        let finalText = '';
+        rec.onstart = () => {
+            offlineSttEngine = 'system';
+            setOfflineSttStatus('🎙 Đang nghe bằng công cụ nhận dạng sẵn có của điện thoại/trình duyệt...', 'success');
+            setOfflineSttPartial('Đang nghe...');
+        };
+        rec.onresult = (event) => {
+            let interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const txt = event.results[i][0]?.transcript || '';
+                if (event.results[i].isFinal) finalText += (finalText ? ' ' : '') + txt.trim() + '.';
+                else interim += txt;
+            }
+            updateStandaloneTranscript(baseText, finalText, interim);
+        };
+        rec.onerror = (event) => {
+            const msg = event?.error || 'lỗi không xác định';
+            setOfflineSttStatus('⚠️ Công cụ sẵn có báo lỗi: ' + msg, msg === 'no-speech' ? 'warning' : 'danger');
+        };
+        rec.onend = () => {
+            if (isStandaloneTranscribing && offlineSttEngine === 'system') {
+                try { setTimeout(() => { if (isStandaloneTranscribing && standaloneRecognition === rec) rec.start(); }, 300); } catch(e) {}
+            }
+        };
+        standaloneRecognition = rec;
+        rec.start();
     }
     function toggleStandaloneTranscribe() { if (isStandaloneTranscribing) stopStandaloneTranscribe(); else startStandaloneTranscribe(); }
     async function startStandaloneTranscribe() {
@@ -4770,11 +4833,12 @@ ${err && err.message ? err.message : err}`);
         const btn = document.getElementById('btn-standalone-stt');
         if (btn) { btn.classList.replace('btn-warning', 'btn-danger'); btn.classList.add('storage-alarm'); }
         const txt = document.getElementById('stt-btn-text');
-        if (txt) txt.innerText = pref.engine === 'vosk' ? 'ĐANG NGHE OFFLINE BẰNG VOSK...' : 'ĐANG NGHE OFFLINE BẰNG WHISPER...';
+        if (txt) txt.innerText = pref.engine === 'vosk' ? 'ĐANG NGHE OFFLINE BẰNG VOSK...' : (pref.engine === 'whisper' ? 'ĐANG NGHE OFFLINE BẰNG WHISPER...' : 'ĐANG NGHE BẰNG CÔNG CỤ ĐIỆN THOẠI...');
         setOfflineSttPartial('Đang khởi tạo micro...');
         try {
             if (pref.engine === 'vosk') await startVoskMicTranscribe();
-            else await startWhisperMicTranscribe();
+            else if (pref.engine === 'whisper') await startWhisperMicTranscribe();
+            else await startSystemPhoneTranscribe();
         } catch(err) {
             isStandaloneTranscribing = false;
             stopStandaloneTranscribe(false);
@@ -4800,7 +4864,7 @@ ${err && err.message ? err.message : err}`);
         const btn = document.getElementById('btn-standalone-stt');
         if (btn) { btn.classList.remove('storage-alarm'); btn.classList.replace('btn-danger', 'btn-warning'); }
         const txt = document.getElementById('stt-btn-text');
-        if (txt) txt.innerText = 'BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI OFFLINE';
+        if (txt) txt.innerText = 'BẮT ĐẦU NHẬN DIỆN GIỌNG NÓI';
         setOfflineSttPartial('Đã dừng nhận dạng.');
         if (restartCamera && isCameraOn) { try { initCamera(); } catch(e) {} }
     }
@@ -4836,7 +4900,9 @@ ${err && err.message ? err.message : err}`);
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             const tmpCtx = new AudioCtx();
             const audioBuffer = await tmpCtx.decodeAudioData(buf.slice(0));
-            if (pref.engine === 'vosk') {
+            if (pref.engine === 'system') {
+                throw new Error('Công cụ nhận dạng sẵn có của điện thoại/trình duyệt chỉ hỗ trợ nghe trực tiếp từ micro, không bóc băng từ file âm thanh đã ghi. Hãy chọn Vosk hoặc Whisper để xử lý file.');
+            } else if (pref.engine === 'vosk') {
                 const runtime = await prepareVoskOfflineRecognizer(audioBuffer.sampleRate || 16000);
                 const recognizer = new runtime.model.KaldiRecognizer(audioBuffer.sampleRate || 16000);
                 try { recognizer.setWords(true); } catch(e) {}
