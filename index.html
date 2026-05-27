@@ -874,6 +874,7 @@ function showUpdateNotification() {
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-url">Đường dẫn ngoài đã lưu</label>
                                         <input id="offline-stt-model-url" class="form-control form-control-sm bg-dark text-info border-secondary" value="https://drive.google.com/drive/folders/15-vcmtKgLUZzdhUh0TSnU8Z7xaO5QpBM?usp=sharing" onchange="saveOfflineSttExternalUrl(false); saveOfflineSttPreference()" placeholder="VD: Google Drive/OneDrive/Release/server nội bộ - link tải trực tiếp model.tar.gz hoặc .bin">
                                     </div>
+ 
                                     <div class="col-12 col-sm-5">
                                         <label class="form-label text-secondary fw-bold" for="offline-stt-model-key">Tên lưu nội bộ</label>
                                         <input id="offline-stt-model-key" class="form-control form-control-sm bg-dark text-warning border-secondary" value="vosk-vn-small" onchange="saveOfflineSttPreference()" placeholder="VD: vosk-vn-small">
@@ -7113,7 +7114,7 @@ window.addEventListener('load', () => {
             <button type="button" class="btn btn-sm btn-outline-warning flex-fill fw-bold" onclick="gshtSetWhisperModelQuick('base')">Base - rõ hơn</button>
             <button type="button" class="btn btn-sm btn-outline-success flex-fill fw-bold" onclick="gshtSetWhisperModelQuick('small')">Small - tốt hơn, chậm</button>
           </div>
-          <div class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;">Chất lượng kém thường do dùng model Tiny hoặc âm thanh TTS/ồn. Nên thử Base Q5_1 trước; Small tốt hơn nhưng nặng hơn nhiều trên điện thoại.</div>
+          <div class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;">Chất lượng phụ thuộc model .bin đã lưu nội bộ: Tiny nhanh nhưng kém; Base thường rõ hơn; Small tốt hơn nhưng nặng. Các nút dưới đây sẽ dùng model đã lưu trong IndexedDB, không tải trực tiếp từ GitHub.</div>
         </div>
       </div>`;
     status.insertAdjacentElement('beforebegin', box);
@@ -7324,6 +7325,162 @@ window.addEventListener('load', () => {
   window.addEventListener('load', insertWhisperQualityPanel);
   setTimeout(insertWhisperQualityPanel, 500);
   try { console.log('[GSHT] Whisper V80 worker runner loaded'); } catch(e) {}
+})();
+</script>
+
+
+
+<script>
+// --- GSHT V81: Whisper dùng model .bin đã lưu nội bộ, không phụ thuộc GitHub file lớn ---
+(function(){
+  'use strict';
+  const V81 = 'whisper-local-model-v81-20260527';
+  const IDB_PREFIX = 'gsht-idb://';
+  const MODEL_KEYS = {
+    tiny:  { key:'whisper-tiny-q5_1',  label:'Tiny Q5_1 - nhanh',        file:'ggml-tiny-q5_1.bin' },
+    base:  { key:'whisper-base-q5_1',  label:'Base Q5_1 - rõ hơn',       file:'ggml-base-q5_1.bin' },
+    small: { key:'whisper-small-q5_1', label:'Small Q5_1 - tốt hơn',     file:'ggml-small-q5_1.bin' }
+  };
+  function $(id){ return document.getElementById(id); }
+  function setStatus(msg, kind){ try { setOfflineSttStatus(msg, kind || 'info'); } catch(e) { console.log('[GSHT STT]', msg); } }
+  function setStoreStatus(msg, kind){ try { setOfflineSttModelStoreStatus(msg, kind || 'info'); } catch(e) { setStatus(msg, kind); } }
+  function normKey(k){ try { return normalizeOfflineSttModelKey(k); } catch(e) { return String(k || '').replace(/^gsht-idb:\/\//, '').replace(/[^a-zA-Z0-9._-]/g, '_'); } }
+  function setWhisperPrefByKey(key){
+    key = normKey(key);
+    const engine = $('offline-stt-engine');
+    const pathEl = $('offline-stt-model-path');
+    const keyEl = $('offline-stt-model-key');
+    if (engine) engine.value = 'whisper';
+    if (pathEl) pathEl.value = IDB_PREFIX + key;
+    if (keyEl) keyEl.value = key;
+    try { saveOfflineSttPreference(); } catch(e) {}
+    return key;
+  }
+  async function getRecordSafe(key){
+    if (typeof getOfflineSttModelRecord !== 'function') return null;
+    try { return await getOfflineSttModelRecord(key); } catch(e) { return null; }
+  }
+  async function getAllStoredSttModels(){
+    if (typeof openOfflineSttDb !== 'function') return [];
+    const db = await openOfflineSttDb();
+    return await new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction('models', 'readonly');
+        const store = tx.objectStore('models');
+        const req = store.getAll ? store.getAll() : null;
+        if (req) {
+          req.onsuccess = () => { try { db.close(); } catch(e) {} resolve(req.result || []); };
+          req.onerror = () => { try { db.close(); } catch(e) {} reject(req.error || new Error('Không đọc được danh sách model.')); };
+        } else {
+          const items = [];
+          store.openCursor().onsuccess = ev => { const cur = ev.target.result; if (cur) { items.push(cur.value); cur.continue(); } };
+          tx.oncomplete = () => { try { db.close(); } catch(e) {} resolve(items); };
+          tx.onerror = () => { try { db.close(); } catch(e) {} reject(tx.error || new Error('Không đọc được danh sách model.')); };
+        }
+      } catch(err) { try { db.close(); } catch(e) {} reject(err); }
+    });
+  }
+  function bytesMB(n){ return ((Number(n || 0) / 1024 / 1024) || 0).toFixed(1) + ' MB'; }
+  function recordSize(r){ return r?.size || r?.blob?.size || r?.data?.byteLength || r?.data?.size || 0; }
+  async function refreshStoredWhisperModelList(showMsg){
+    const sel = $('offline-stt-whisper-local-model-select');
+    const note = $('offline-stt-whisper-local-model-status');
+    if (!sel) return;
+    try {
+      const all = await getAllStoredSttModels();
+      const whisper = all.filter(r => String(r.engine || '').toLowerCase() === 'whisper' || /whisper|ggml|q5_1|q5_0/i.test(String(r.key || '') + ' ' + String(r.sourceName || r.name || '')));
+      sel.innerHTML = '';
+      if (!whisper.length) {
+        sel.innerHTML = '<option value="">Chưa có model Whisper .bin nào đã lưu nội bộ</option>';
+        if (note) note.textContent = 'Hãy chọn file .bin từ máy một lần bằng nút CHỌN FILE, sau đó bấm QUÉT MODEL ĐÃ LƯU.';
+        if (showMsg) setStoreStatus('⚠️ Chưa có model Whisper .bin trong kho nội bộ. Hãy bấm CHỌN FILE và chọn ggml-tiny/base/small-q5_1.bin.', 'warning');
+        return;
+      }
+      whisper.sort((a,b) => String(a.key).localeCompare(String(b.key)));
+      sel.innerHTML = whisper.map(r => `<option value="${String(r.key || '').replace(/"/g,'&quot;')}">${r.key || 'whisper-model'} · ${bytesMB(recordSize(r))}</option>`).join('');
+      const currentKey = normKey($('offline-stt-model-key')?.value || '').toLowerCase();
+      const match = whisper.find(r => String(r.key || '').toLowerCase() === currentKey);
+      if (match) sel.value = match.key;
+      if (note) note.textContent = `Đã tìm thấy ${whisper.length} model Whisper đã lưu nội bộ. Các nút Tiny/Base/Small sẽ chọn theo tên lưu, không cần file .bin trên GitHub.`;
+      if (showMsg) setStoreStatus(`✅ Tìm thấy ${whisper.length} model Whisper đã lưu nội bộ.`, 'success');
+    } catch(err) {
+      const msg = err && err.message ? err.message : String(err);
+      if (note) note.textContent = 'Không quét được kho model: ' + msg;
+      if (showMsg) setStoreStatus('❌ Không quét được kho model: ' + msg, 'danger');
+    }
+  }
+  function installLocalModelPanel(){
+    if ($('gsht-whisper-local-model-panel')) return;
+    const quality = $('gsht-whisper-quality-panel');
+    const anchor = quality || $('offline-stt-status');
+    if (!anchor) return;
+    const box = document.createElement('div');
+    box.id = 'gsht-whisper-local-model-panel';
+    box.className = 'border border-info rounded p-2 mt-2 bg-black bg-opacity-25';
+    box.innerHTML = `
+      <div class="small text-info fw-bold mb-2"><i class="fa-solid fa-database me-1"></i> MODEL WHISPER ĐÃ LƯU NỘI BỘ</div>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-sm-7">
+          <label class="form-label text-secondary fw-bold" for="offline-stt-whisper-local-model-select">Chọn model .bin đã lưu trên thiết bị</label>
+          <select id="offline-stt-whisper-local-model-select" class="form-select form-select-sm bg-dark text-info border-secondary">
+            <option value="">Bấm QUÉT MODEL ĐÃ LƯU</option>
+          </select>
+        </div>
+        <div class="col-6 col-sm-2">
+          <button type="button" class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="gshtRefreshStoredWhisperModels(true)"><i class="fa-solid fa-rotate me-1"></i>QUÉT</button>
+        </div>
+        <div class="col-6 col-sm-3">
+          <button type="button" class="btn btn-sm btn-success w-100 fw-bold" onclick="gshtUseSelectedStoredWhisperModel()"><i class="fa-solid fa-check me-1"></i>DÙNG MODEL</button>
+        </div>
+      </div>
+      <div id="offline-stt-whisper-local-model-status" class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;">
+        Do GitHub không phù hợp để chứa model .bin lớn, hãy chọn file .bin từ máy một lần. App sẽ dùng model đã lưu trong IndexedDB bằng dạng gsht-idb://...
+      </div>`;
+    anchor.insertAdjacentElement('beforebegin', box);
+    const sel = $('offline-stt-whisper-local-model-select');
+    if (sel) sel.onchange = function(){ if (this.value) window.gshtUseSelectedStoredWhisperModel(false); };
+    refreshStoredWhisperModelList(false);
+  }
+  window.gshtRefreshStoredWhisperModels = refreshStoredWhisperModelList;
+  window.gshtUseSelectedStoredWhisperModel = async function(showAlert=true){
+    const sel = $('offline-stt-whisper-local-model-select');
+    const key = sel?.value || $('offline-stt-model-key')?.value || '';
+    if (!key) return alert('Chưa chọn model Whisper đã lưu. Hãy bấm QUÉT hoặc CHỌN FILE .bin trước.');
+    const record = await getRecordSafe(key);
+    if (!record) return alert('Không tìm thấy model đã lưu với tên: ' + key + '\nHãy chọn lại file .bin từ máy hoặc bấm QUÉT MODEL ĐÃ LƯU.');
+    setWhisperPrefByKey(key);
+    if (sel) sel.value = key;
+    const msg = `✅ Đã chọn model Whisper nội bộ: ${key} (${bytesMB(recordSize(record))}).`;
+    setStoreStatus(msg, 'success');
+    setStatus(msg, 'success');
+    if (showAlert) alert(msg + '\n\nBây giờ bấm KIỂM TRA hoặc BẮT ĐẦU NHẬN DIỆN.');
+  };
+  window.gshtSetWhisperModelQuick = async function(kind){
+    const spec = MODEL_KEYS[kind] || MODEL_KEYS.tiny;
+    const key = setWhisperPrefByKey(spec.key);
+    const record = await getRecordSafe(key);
+    if (record) {
+      const msg = `✅ Đã chọn ${spec.label} từ kho nội bộ: ${key} (${bytesMB(recordSize(record))}).`;
+      setStoreStatus(msg, 'success');
+      setStatus(msg, 'success');
+      const sel = $('offline-stt-whisper-local-model-select'); if (sel) sel.value = key;
+      return;
+    }
+    const warn = `⚠️ Chưa có ${spec.label} trong kho nội bộ.\n\nDo không đưa model .bin lớn lên GitHub, hãy bấm CHỌN FILE và chọn file ${spec.file} trên điện thoại/máy tính. Sau khi lưu xong, bấm lại nút này hoặc bấm DÙNG ĐÃ LƯU.`;
+    setStoreStatus(warn.replace(/\n/g, ' '), 'warning');
+    setStatus('Đã đặt khóa model cần dùng: ' + key + '. Chưa có file .bin đã lưu, hãy CHỌN FILE để lưu model.', 'warning');
+    alert(warn);
+  };
+  const oldImport = window.importOfflineSttModelFile;
+  if (typeof oldImport === 'function') {
+    window.importOfflineSttModelFile = async function(event){
+      await oldImport.apply(this, arguments);
+      try { await refreshStoredWhisperModelList(false); } catch(e) {}
+    };
+  }
+  window.addEventListener('load', installLocalModelPanel);
+  setTimeout(installLocalModelPanel, 800);
+  try { console.log('[GSHT] Whisper V81 local model selector loaded'); } catch(e) {}
 })();
 </script>
 
