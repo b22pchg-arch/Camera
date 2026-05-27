@@ -1,5 +1,5 @@
 // GSHT PWA Service Worker - update-check fixed, cache app shell, không cache model STT lớn mặc định
-const GSHT_CACHE = 'gsht-pwa-v72-update-check-fixed-202605271428';
+const GSHT_CACHE = 'gsht-pwa-v72-update-check-fixed-20260527';
 const APP_SHELL = [
   './',
   './index.html',
@@ -16,6 +16,16 @@ const APP_SHELL = [
   'webfonts/fa-solid-900.woff2',  // <-- Khóa cứng file font icon hay dùng dưới hiện trường
   'webfonts/fa-regular-400.woff2'
 ];
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(GSHT_CACHE)
+      .then(cache => Promise.allSettled(
+        APP_SHELL.map(url => cache.add(new Request(url, { cache: 'reload' })))
+      ))
+      // Không gọi skipWaiting tự động để nút NÂNG CẤP trong app hoạt động đúng.
+  );
+});
+
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(GSHT_CACHE)
