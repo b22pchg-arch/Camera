@@ -1,8 +1,8 @@
-// GSHT PWA cache update V91 - camera display optimization, no crop preview
+// GSHT PWA cache update V95 - full-mode main capture buttons
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v104';
+const GSHT_CACHE = 'gsht-pwa-v94-full-mode-main-capture';
 const APP_SHELL = [
   './',
   './index.html',
@@ -22,7 +22,6 @@ const APP_SHELL = [
   'webfonts/fa-solid-900.woff2',  // <-- Khóa cứng file font icon hay dùng dưới hiện trường
   'webfonts/fa-regular-400.woff2'
 ];
-
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(GSHT_CACHE).then(cache => {
