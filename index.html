@@ -577,6 +577,14 @@ function showUpdateNotification() {
     <script src="qrcode.min.js"></script>
 	<script src="jsQR.min.js"></script>
     <script src="fflate.min.js"></script>
+
+<style>
+/* GSHT V85: thu gọn tùy chọn Vosk/Whisper, ưu tiên ghi âm + công cụ sẵn có */
+#gsht-stt-preferred-workflow .btn { font-size: 11px; }
+.gsht-stt-advanced-block { transition: opacity .2s ease; }
+#media-player-container audio { min-height: 42px; }
+</style>
+
 </head>
 <body>
 
@@ -845,13 +853,32 @@ function showUpdateNotification() {
 
                         <div class="offline-stt-panel">
                             <div class="small text-warning fw-bold mb-2"><i class="fa-solid fa-brain me-1"></i> NHẬN DẠNG TIẾNG VIỆT OFFLINE</div>
+                            <div class="border border-success rounded p-2 mb-2 bg-black bg-opacity-25" id="gsht-stt-preferred-workflow">
+                                <div class="small text-success fw-bold mb-1"><i class="fa-solid fa-star me-1"></i> CHẾ ĐỘ ƯU TIÊN TRÊN DI ĐỘNG</div>
+                                <div class="small text-secondary mb-2" style="font-size:10.5px;line-height:1.35;">
+                                    Mặc định nên dùng <b>công cụ sẵn có của điện thoại/trình duyệt</b> để bóc băng nhanh. Khi cần lưu chứng cứ âm thanh, dùng <b>GHI ÂM LƯU TẠM</b>, sau đó nghe lại, tải về hoặc chia sẻ.
+                                </div>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button class="btn btn-sm btn-success fw-bold flex-fill" type="button" onclick="gshtSelectSystemSpeechMode()"><i class="fa-solid fa-mobile-screen me-1"></i>DÙNG CÔNG CỤ ĐIỆN THOẠI</button>
+                                    <button class="btn btn-sm btn-outline-info fw-bold flex-fill" type="button" onclick="toggleAudioRecording()"><i class="fa-solid fa-microphone-lines me-1"></i>GHI ÂM LƯU TẠM</button>
+                                    <button class="btn btn-sm btn-outline-warning fw-bold flex-fill" type="button" onclick="gshtOpenLatestTempAudio()"><i class="fa-solid fa-folder-open me-1"></i>MỞ ÂM THANH TẠM</button>
+                                </div>
+                                <div id="gsht-temp-audio-status" class="small text-secondary mt-2" style="font-size:10.5px;line-height:1.35;">Chưa có file ghi âm tạm trong phiên hiện tại.</div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center border border-secondary rounded p-2 mb-2 bg-black bg-opacity-25">
+                                <div>
+                                    <div class="small text-info fw-bold"><i class="fa-solid fa-sliders me-1"></i> TÙY CHỌN NÂNG CAO VOSK / WHISPER</div>
+                                    <div class="small text-secondary" style="font-size:10.5px;line-height:1.35;">Dành cho người dùng muốn thử model offline. Mặc định có thể thu gọn để ưu tiên chế độ ổn định.</div>
+                                </div>
+                                <button id="btn-toggle-stt-advanced" class="btn btn-sm btn-outline-info fw-bold" type="button" onclick="gshtToggleSttAdvanced()">HIỆN</button>
+                            </div>
                             <div class="row g-2 align-items-end">
                                 <div class="col-12 col-sm-4">
                                     <label class="form-label text-info fw-bold" for="offline-stt-engine">Bộ nhận dạng</label>
-                                    <select id="offline-stt-engine" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="saveOfflineSttPreference()">
-                                        <option value="vosk" selected>Vosk tiếng Việt offline</option>
+                                    <select id="offline-stt-engine" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="saveOfflineSttPreference(); gshtUpdateSttModeUi()">
+                                        <option value="system" selected>Công cụ sẵn có trên điện thoại / trình duyệt</option>
+                                        <option value="vosk">Vosk tiếng Việt offline</option>
                                         <option value="whisper">Whisper offline local</option>
-                                        <option value="system">Công cụ sẵn có trên điện thoại</option>
                                     </select>
                                 </div>
                                 <div class="col-12 col-sm-8">
@@ -944,7 +971,7 @@ function showUpdateNotification() {
                             </div>
 
                             <div id="offline-stt-status" class="text-secondary mt-2">Chưa kiểm tra engine. Có thể dùng đường dẫn file local hoặc model đã lưu trong kho nội bộ bằng dạng gsht-idb://tên-model.</div>
-                            <div class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;"><b>Gợi ý:</b> Vosk chạy offline nhẹ nhưng độ chính xác vừa phải; Whisper cần worker/WASM/model riêng và máy mạnh hơn; <b>Công cụ sẵn có trên điện thoại</b> không cần model nhưng tùy trình duyệt/thiết bị, có thể cần dịch vụ nhận dạng của hệ điều hành.</div>
+                            <div class="small text-secondary mt-1" style="font-size:10.5px; line-height:1.35;"><b>Gợi ý:</b> Mặc định dùng <b>Công cụ sẵn có trên điện thoại</b> vì nhẹ và ít làm treo giao diện. Vosk/Whisper vẫn được giữ trong nhóm nâng cao; Vosk nhẹ nhưng độ chính xác vừa phải, Whisper nặng hơn và phù hợp thử nghiệm hoặc máy mạnh.</div>
                             <div id="offline-stt-partial" class="offline-stt-partial mt-2">Kết quả tạm thời sẽ hiện ở đây...</div>
                         </div>
 
@@ -1380,7 +1407,8 @@ function showUpdateNotification() {
                 <ul class="text-secondary ps-3 mb-3">
                     <li><b>Ghi âm offline:</b> dùng khi chỉ cần lưu âm thanh hiện trường, không quay hình.</li>
                     <li><b>Phụ đề video:</b> nếu trình duyệt hỗ trợ nhận diện giọng nói, app có thể ghi phụ đề khi quay video.</li>
-                    <li><b>Bóc băng độc lập:</b> chọn <b>Vosk</b>, <b>Whisper</b> hoặc <b>Công cụ sẵn có trên điện thoại</b>. Vosk/Whisper dùng model local; công cụ điện thoại không cần model nhưng phụ thuộc trình duyệt/hệ điều hành và có thể không hoạt động trên mọi thiết bị.</li>
+                    <li><b>Bóc băng độc lập:</b> mặc định dùng <b>Công cụ sẵn có trên điện thoại/trình duyệt</b> vì nhẹ và ít treo giao diện. Nên dùng thêm nút <b>Ghi âm lưu tạm</b> để lưu file âm thanh, nghe lại, tải về hoặc chia sẻ sang phần mềm bóc băng khác khi cần.</li>
+                    <li><b>Vosk / Whisper:</b> vẫn được giữ trong nhóm <b>Tùy chọn nâng cao</b>. Chỉ mở khi cần thử model offline local; trên điện thoại, Whisper có thể chậm hoặc làm đứng giao diện tùy cấu hình máy.</li>
                     <li><b>Tải model lần đầu:</b> không cần đưa model lớn lên GitHub. Nhập link ngoài vào ô <b>Đường dẫn ngoài đã lưu</b> như Google Drive, OneDrive, GitHub Release hoặc server nội bộ; bấm <b>LƯU LINK</b> để dùng lại lần sau, nhập <b>Tên lưu nội bộ</b>, rồi bấm <b>TẢI MODEL</b>. App lưu model vào kho IndexedDB và tự đổi đường dẫn sang dạng <code>gsht-idb://ten-model</code> để chạy offline.</li>
                     <li><b>Chọn từ thư mục chia sẻ:</b> nhập link thư mục vào ô <b>Đường dẫn thư mục chia sẻ</b>, bấm <b>LƯU THƯ MỤC</b> rồi <b>QUÉT FILE</b>. App hỗ trợ tốt nhất với <code>stt-models.json</code>, GitHub public folder, hoặc Google Drive public folder có API key. Nếu Drive/OneDrive chặn tải trực tiếp, hãy bấm <b>MỞ THƯ MỤC</b>, tải file về máy rồi dùng <b>CHỌN FILE</b>.</li>
                     <li><b>Khi link ngoài bị chặn tải trực tiếp:</b> bấm <b>MỞ LINK</b> để tải file model về máy, sau đó quay lại app và dùng <b>CHỌN FILE</b> để lưu vào kho nội bộ. Cách này phù hợp với một số link Google Drive/OneDrive không cho trình duyệt tải bằng <code>fetch()</code>.</li>
@@ -1449,7 +1477,10 @@ function showUpdateNotification() {
       </div>
       <div class="modal-footer border-secondary p-2 d-flex justify-content-between">
         <button type="button" class="btn btn-sm btn-secondary" onclick="discardMedia()"><i class="fa-solid fa-trash me-1"></i> Xóa/Hủy</button>
-        <button type="button" class="btn btn-sm btn-success fw-bold" onclick="downloadMedia()"><i class="fa-solid fa-download me-1"></i> TẢI XUỐNG MÁY</button>
+        <div class="d-flex gap-1">
+          <button type="button" class="btn btn-sm btn-outline-info fw-bold" onclick="shareCurrentMedia()"><i class="fa-solid fa-share-nodes me-1"></i> CHIA SẺ</button>
+          <button type="button" class="btn btn-sm btn-success fw-bold" onclick="downloadMedia()"><i class="fa-solid fa-download me-1"></i> TẢI XUỐNG MÁY</button>
+        </div>
       </div>
     </div>
   </div>
@@ -4055,9 +4086,15 @@ ${timeText}` : viewerTitleText);
         let audioStream = null; try { audioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(e) { return alert("Không bật được Micro!"); }
         let mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'; try { audioRecorder = new MediaRecorder(audioStream, { mimeType: mimeType }); } catch(e) { return; }
         audioChunks = []; audioRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-        audioRecorder.onstop = () => { 
-            if (audioChunks.length === 0 || audioRecordingTime < 1) return; currentMediaFilename = `AUDIO_${Date.now()}.${mimeType.includes('mp4')?'m4a':'webm'}`; 
-            currentMediaBlobUrl = URL.createObjectURL(new Blob(audioChunks, { type: mimeType })); currentMediaType = 'audio'; showMediaPreview(); audioStream.getTracks().forEach(t => t.stop());
+        audioRecorder.onstop = async () => { 
+            if (audioChunks.length === 0 || audioRecordingTime < 1) { try { audioStream.getTracks().forEach(t => t.stop()); } catch(e) {} return; }
+            const ext = mimeType.includes('mp4') ? 'm4a' : (mimeType.includes('ogg') ? 'ogg' : 'webm');
+            currentMediaFilename = `AUDIO_TAM_${new Date().toISOString().replace(/[:.]/g,'-')}.${ext}`; 
+            const audioBlob = new Blob(audioChunks, { type: mimeType });
+            currentMediaBlobUrl = URL.createObjectURL(audioBlob); currentMediaType = 'audio';
+            try { await gshtSaveTempAudioBlob(audioBlob, currentMediaFilename, mimeType, audioRecordingTime); } catch(e) { console.warn('save temp audio failed', e); }
+            showMediaPreview();
+            try { audioStream.getTracks().forEach(t => t.stop()); } catch(e) {}
         };
         isAudioRecording = true; audioRecordingTime = 0; const btn = document.getElementById("btn-record-audio"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm";
         audioRecorder.start(); audioInterval = setInterval(() => { audioRecordingTime++; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG GHI (${audioRecordingTime}s)`; }, 1000);
@@ -4605,7 +4642,7 @@ ${timeText}` : viewerTitleText);
         try {
             const saved = JSON.parse(localStorage.getItem('gsht_offline_stt_pref_v67') || '{}');
             return {
-                engine: saved.engine || document.getElementById('offline-stt-engine')?.value || 'vosk',
+                engine: saved.engine || document.getElementById('offline-stt-engine')?.value || 'system',
                 modelPath: saved.modelPath || document.getElementById('offline-stt-model-path')?.value || 'models/vosk-model-small-vn/model.tar.gz',
                 workerPath: saved.workerPath || document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js',
                 modelUrl: saved.modelUrl || saved.externalUrl || getSavedOfflineSttExternalUrl() || document.getElementById('offline-stt-model-url')?.value || '',
@@ -4615,7 +4652,7 @@ ${timeText}` : viewerTitleText);
                 modelKey: saved.modelKey || document.getElementById('offline-stt-model-key')?.value || 'vosk-vn-small'
             };
         } catch(e) {
-            return { engine:'vosk', modelPath:'models/vosk-model-small-vn/model.tar.gz', workerPath:'stt/whisper/whisper-worker.js', modelUrl:getSavedOfflineSttExternalUrl(), externalUrl:getSavedOfflineSttExternalUrl(), folderUrl:getSavedOfflineSttFolderUrl(), driveApiKey:getSavedOfflineSttDriveApiKey(), modelKey:'vosk-vn-small' };
+            return { engine:'system', modelPath:'models/vosk-model-small-vn/model.tar.gz', workerPath:'stt/whisper/whisper-worker.js', modelUrl:getSavedOfflineSttExternalUrl(), externalUrl:getSavedOfflineSttExternalUrl(), folderUrl:getSavedOfflineSttFolderUrl(), driveApiKey:getSavedOfflineSttDriveApiKey(), modelKey:'vosk-vn-small' };
         }
     }
     function initOfflineSttPreferenceUI() {
@@ -4637,7 +4674,7 @@ ${timeText}` : viewerTitleText);
     }
     function saveOfflineSttPreference() {
         const pref = {
-            engine: document.getElementById('offline-stt-engine')?.value || 'vosk',
+            engine: document.getElementById('offline-stt-engine')?.value || 'system',
             modelPath: document.getElementById('offline-stt-model-path')?.value || 'models/vosk-model-small-vn/model.tar.gz',
             workerPath: document.getElementById('offline-stt-worker-path')?.value || 'stt/whisper/whisper-worker.js',
             modelUrl: normalizeExternalSttModelUrl(document.getElementById('offline-stt-model-url')?.value || ''),
@@ -8292,6 +8329,184 @@ window.addEventListener('load', () => {
   setTimeout(insertControls, 900);
   try { console.log('[GSHT] Whisper V84 adaptive file + temp audio loaded'); } catch(e) {}
 })();
+
+
+    // --- GSHT V85: Ưu tiên ghi âm lưu tạm + công cụ bóc băng sẵn có trên điện thoại ---
+    const GSHT_TEMP_AUDIO_DB = 'gsht_temp_audio_v85';
+    const GSHT_TEMP_AUDIO_STORE = 'audio';
+    let gshtLatestTempAudioMeta = null;
+    let gshtSttAdvancedVisible = false;
+
+    function gshtOpenTempAudioDb() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(GSHT_TEMP_AUDIO_DB, 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(GSHT_TEMP_AUDIO_STORE)) db.createObjectStore(GSHT_TEMP_AUDIO_STORE, { keyPath: 'id' });
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error || new Error('Không mở được kho âm thanh tạm.'));
+        });
+    }
+    async function gshtSaveTempAudioBlob(blob, filename, mimeType, durationSeconds) {
+        const db = await gshtOpenTempAudioDb();
+        const id = 'audio-' + Date.now();
+        const meta = { id, filename, mimeType: mimeType || blob.type || 'audio/webm', size: blob.size, durationSeconds: Number(durationSeconds || 0), savedAt: Date.now() };
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(GSHT_TEMP_AUDIO_STORE, 'readwrite');
+            tx.objectStore(GSHT_TEMP_AUDIO_STORE).put({ ...meta, blob });
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error || new Error('Không lưu được âm thanh tạm.'));
+        });
+        try { db.close(); } catch(e) {}
+        gshtLatestTempAudioMeta = meta;
+        try { localStorage.setItem('gsht_latest_temp_audio_v85', JSON.stringify(meta)); } catch(e) {}
+        gshtUpdateTempAudioStatus(meta);
+        return meta;
+    }
+    async function gshtGetTempAudioRecord(id) {
+        const db = await gshtOpenTempAudioDb();
+        const rec = await new Promise((resolve, reject) => {
+            const tx = db.transaction(GSHT_TEMP_AUDIO_STORE, 'readonly');
+            const req = tx.objectStore(GSHT_TEMP_AUDIO_STORE).get(id);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error || new Error('Không đọc được âm thanh tạm.'));
+        });
+        try { db.close(); } catch(e) {}
+        return rec;
+    }
+    function gshtFormatBytes(bytes) {
+        const n = Number(bytes || 0);
+        if (n < 1024) return n + ' B';
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+        return (n / 1024 / 1024).toFixed(1) + ' MB';
+    }
+    function gshtUpdateTempAudioStatus(meta) {
+        const el = document.getElementById('gsht-temp-audio-status');
+        if (!el) return;
+        if (!meta) {
+            el.textContent = 'Chưa có file ghi âm tạm trong phiên hiện tại.';
+            return;
+        }
+        const sec = meta.durationSeconds ? `, ${Math.round(meta.durationSeconds)} giây` : '';
+        el.innerHTML = `Đã lưu tạm: <b class="text-info">${meta.filename}</b> (${gshtFormatBytes(meta.size)}${sec}). Có thể mở lại, tải về hoặc chia sẻ.`;
+    }
+    async function gshtOpenLatestTempAudio() {
+        let meta = gshtLatestTempAudioMeta;
+        if (!meta) {
+            try { meta = JSON.parse(localStorage.getItem('gsht_latest_temp_audio_v85') || 'null'); } catch(e) { meta = null; }
+        }
+        if (!meta || !meta.id) return alert('Chưa có file ghi âm tạm. Hãy bấm GHI ÂM LƯU TẠM trước.');
+        const rec = await gshtGetTempAudioRecord(meta.id);
+        if (!rec || !rec.blob) return alert('Không tìm thấy file âm thanh tạm. Có thể dữ liệu trình duyệt đã bị xóa.');
+        currentMediaFilename = rec.filename || meta.filename || 'audio_tam.webm';
+        currentMediaType = 'audio';
+        if (currentMediaBlobUrl) { try { URL.revokeObjectURL(currentMediaBlobUrl); } catch(e) {} }
+        currentMediaBlobUrl = URL.createObjectURL(rec.blob);
+        showMediaPreview();
+    }
+    function gshtSelectSystemSpeechMode() {
+        const engine = document.getElementById('offline-stt-engine');
+        if (engine) engine.value = 'system';
+        saveOfflineSttPreference();
+        gshtUpdateSttModeUi();
+        setOfflineSttStatus('✅ Đã chọn chế độ mặc định: công cụ nhận dạng sẵn có trên điện thoại/trình duyệt.', 'success');
+        setOfflineSttPartial('Bấm BẮT ĐẦU NHẬN DIỆN để dùng công cụ sẵn có. Bấm GHI ÂM LƯU TẠM nếu muốn lưu/chia sẻ file âm thanh.');
+    }
+    function gshtToggleSttAdvanced(force) {
+        if (typeof force === 'boolean') gshtSttAdvancedVisible = force;
+        else gshtSttAdvancedVisible = !gshtSttAdvancedVisible;
+        gshtUpdateSttModeUi();
+    }
+    function gshtMarkAdvancedSttBlocks() {
+        const ids = ['offline-stt-model-path','offline-stt-worker-path','offline-stt-model-url','offline-stt-model-key','offline-stt-folder-url','offline-stt-drive-api-key','offline-stt-folder-file-select','offline-stt-model-progress','offline-stt-model-store-status'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            const box = el?.closest('.col-12') || el?.parentElement;
+            if (box) box.classList.add('gsht-stt-advanced-block');
+        });
+        document.querySelectorAll('[onclick*="downloadDefaultVoskVietnameseZip"],[onclick*="storeOfflineSttModelFromUrl"],[onclick*="handleOfflineSttModelFile"],[onclick*="useSavedOfflineSttModel"],[onclick*="deleteSavedOfflineSttModel"],[onclick*="scanOfflineSttSharedFolder"],[onclick*="openOfflineSttSharedFolder"],[onclick*="useSelectedOfflineSttFolderFile"],[onclick*="saveOfflineSttFolderSettings"],[onclick*="saveOfflineSttExternalUrl"],[onclick*="loadSavedOfflineSttExternalUrl"],[onclick*="openExternalSttModelUrl"]')
+            .forEach(btn => { (btn.closest('.col-6') || btn.closest('.col-12') || btn.parentElement)?.classList.add('gsht-stt-advanced-block'); });
+    }
+    function gshtUpdateSttModeUi() {
+        const engine = document.getElementById('offline-stt-engine')?.value || 'system';
+        document.querySelectorAll('.gsht-stt-advanced-block').forEach(el => {
+            el.style.display = (gshtSttAdvancedVisible || engine !== 'system') ? '' : 'none';
+        });
+        const btn = document.getElementById('btn-toggle-stt-advanced');
+        if (btn) btn.textContent = (gshtSttAdvancedVisible || engine !== 'system') ? 'ẨN' : 'HIỆN';
+        const model = document.getElementById('offline-stt-model-path');
+        const worker = document.getElementById('offline-stt-worker-path');
+        if (model) model.disabled = (engine === 'system');
+        if (worker) worker.disabled = (engine !== 'whisper');
+    }
+
+    // Media preview/download/share fallback nếu bản gốc thiếu hoặc bị cache mất hàm.
+    function showMediaPreview() {
+        const modalEl = document.getElementById('mediaPreviewModal');
+        const container = document.getElementById('media-player-container');
+        const title = document.getElementById('mediaPreviewTitle');
+        if (!container || !currentMediaBlobUrl) return;
+        container.innerHTML = '';
+        const player = document.createElement(currentMediaType === 'video' ? 'video' : 'audio');
+        player.id = 'preview-player';
+        player.src = currentMediaBlobUrl;
+        player.controls = true;
+        player.style.maxWidth = '100%';
+        player.style.width = '100%';
+        if (currentMediaType === 'video') player.style.maxHeight = '70vh';
+        container.appendChild(player);
+        if (title) title.innerHTML = `<i class="fa-solid fa-circle-play me-2"></i>${currentMediaType === 'audio' ? 'ÂM THANH TẠM' : 'TRÌNH PHÁT VIDEO'}`;
+        const transcribeBox = document.getElementById('transcribe-container');
+        if (transcribeBox) transcribeBox.classList.toggle('d-none', currentMediaType !== 'audio');
+        try {
+            if (window.bootstrap && bootstrap.Modal) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            else { modalEl.style.display = 'block'; modalEl.classList.add('show'); modalEl.removeAttribute('aria-hidden'); }
+        } catch(e) { modalEl.style.display = 'block'; modalEl.classList.add('show'); }
+    }
+    function discardMedia() {
+        if (currentMediaBlobUrl) { try { URL.revokeObjectURL(currentMediaBlobUrl); } catch(e) {} }
+        currentMediaBlobUrl = null; currentMediaFilename = null; currentMediaType = null;
+        try { bootstrap.Modal.getInstance(document.getElementById('mediaPreviewModal'))?.hide(); } catch(e) {}
+    }
+    async function downloadMedia() {
+        if (!currentMediaBlobUrl) return alert('Chưa có media để tải.');
+        const a = document.createElement('a');
+        a.href = currentMediaBlobUrl;
+        a.download = currentMediaFilename || (currentMediaType === 'audio' ? 'audio_tam.webm' : 'video_tam.webm');
+        document.body.appendChild(a); a.click(); a.remove();
+    }
+    async function shareCurrentMedia() {
+        if (!currentMediaBlobUrl) return alert('Chưa có media để chia sẻ.');
+        try {
+            const blob = await (await fetch(currentMediaBlobUrl)).blob();
+            const file = new File([blob], currentMediaFilename || 'audio_tam.webm', { type: blob.type || 'application/octet-stream' });
+            if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+                await navigator.share({ files: [file], title: currentMediaFilename || 'Âm thanh tạm' });
+            } else {
+                await downloadMedia();
+                alert('Thiết bị/trình duyệt không hỗ trợ chia sẻ file trực tiếp. App đã tải file xuống máy để anh chia sẻ thủ công.');
+            }
+        } catch(err) { alert('Không chia sẻ được: ' + (err && err.message ? err.message : err)); }
+    }
+
+    // Khởi tạo giao diện V85 sau khi các hàm cũ đã sẵn sàng.
+    window.addEventListener('DOMContentLoaded', () => {
+        try {
+            gshtMarkAdvancedSttBlocks();
+            const migrated = localStorage.getItem('gsht_stt_default_system_v85_done');
+            if (!migrated) {
+                const saved = JSON.parse(localStorage.getItem('gsht_offline_stt_pref_v67') || '{}');
+                saved.engine = 'system';
+                localStorage.setItem('gsht_offline_stt_pref_v67', JSON.stringify(saved));
+                localStorage.setItem('gsht_stt_default_system_v85_done', '1');
+            }
+            initOfflineSttPreferenceUI();
+            gshtUpdateSttModeUi();
+            try { const meta = JSON.parse(localStorage.getItem('gsht_latest_temp_audio_v85') || 'null'); gshtUpdateTempAudioStatus(meta); } catch(e) {}
+        } catch(e) { console.warn('GSHT V85 init failed', e); }
+    });
+
 </script>
 
 </body>
