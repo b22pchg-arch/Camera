@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v94-camerafullfarme';
+const GSHT_CACHE = 'gsht-pwa-v95-camerafullfarmemoi';
 const APP_SHELL = [
   './',
   './index.html',
@@ -22,6 +22,7 @@ const APP_SHELL = [
   'webfonts/fa-solid-900.woff2',  // <-- Khóa cứng file font icon hay dùng dưới hiện trường
   'webfonts/fa-regular-400.woff2'
 ];
+
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(GSHT_CACHE).then(cache => {
