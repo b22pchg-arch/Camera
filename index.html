@@ -8697,5 +8697,174 @@ window.addEventListener('load', () => {
 })();
 </script>
 
+
+
+<style id="gsht-v87-hide-whisper-advanced-style">
+/* GSHT V87: gom và ẩn triệt để các khối Whisper/Vosk còn sót */
+#gsht-stt-advanced-body .gsht-stt-advanced-auto-managed {
+    margin-top: 8px !important;
+}
+#gsht-stt-advanced-body.d-none .gsht-stt-advanced-auto-managed {
+    display: none !important;
+}
+.gsht-stt-advanced-orphan-hidden {
+    display: none !important;
+}
+#gsht-stt-advanced-body .small.text-warning.fw-bold,
+#gsht-stt-advanced-body .small.text-info.fw-bold,
+#gsht-stt-advanced-body .small.text-success.fw-bold,
+#gsht-stt-advanced-body .small.text-primary.fw-bold {
+    letter-spacing: .1px;
+}
+</style>
+
+<script id="gsht-v87-hide-whisper-advanced">
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V87-HIDE-ADVANCED-STT';
+    const ADVANCED_IDS = [
+        'gsht-whisper-quality-panel',
+        'gsht-whisper-local-model-panel',
+        'gsht-whisper-audio-chunk-panel',
+        'gsht-whisper-record-chunk-v83-panel',
+        'gsht-whisper-record-temp-audio-v84-panel'
+    ];
+    const ADVANCED_TEXTS = [
+        'TÙY CHỌN WHISPER - CHẤT LƯỢNG / ĐỘ MƯỢT',
+        'MODEL WHISPER ĐÃ LƯU NỘI BỘ',
+        'WHISPER V83 - GHI ĐẦY ĐỦ RỒI CHIA NHỎ XỬ LÝ',
+        'ÂM THANH GHI TẠM - WHISPER V84'
+    ];
+    function byId(id){ return document.getElementById(id); }
+    function qs(sel, root=document){ return root.querySelector(sel); }
+    function isInsideAdvanced(el){ return !!(el && el.closest && el.closest('#gsht-stt-advanced-body')); }
+    function findMainPanel(){ return qs('.offline-stt-panel'); }
+    function getAdvancedHeader(){
+        const btn = byId('btn-toggle-stt-advanced');
+        return btn ? btn.closest('.d-flex') : null;
+    }
+    function ensureAdvancedBody(){
+        const panel = findMainPanel();
+        const header = getAdvancedHeader();
+        if (!panel || !header) return null;
+        let body = byId('gsht-stt-advanced-body');
+        if (!body) {
+            body = document.createElement('div');
+            body.id = 'gsht-stt-advanced-body';
+            body.className = 'd-none';
+            body.innerHTML = '<div class="gsht-stt-advanced-note"><i class="fa-solid fa-circle-info me-1"></i><b>Vosk / Whisper là chế độ nâng cao.</b> Mặc định nên dùng công cụ sẵn có của điện thoại và ghi âm lưu tạm. Chỉ mở phần này khi cần cấu hình model offline, kiểm tra runtime hoặc thử nhận dạng bằng file âm thanh.</div>';
+            header.insertAdjacentElement('afterend', body);
+        }
+        return body;
+    }
+    function closestPanelFromText(text){
+        const panel = findMainPanel();
+        if (!panel) return null;
+        const nodes = panel.querySelectorAll('div,section,article');
+        for (const node of nodes) {
+            if (!node.textContent || !node.textContent.includes(text)) continue;
+            const candidate = node.closest('#gsht-whisper-quality-panel,#gsht-whisper-local-model-panel,#gsht-whisper-audio-chunk-panel,#gsht-whisper-record-chunk-v83-panel,#gsht-whisper-record-temp-audio-v84-panel,.border.rounded,.card,.row');
+            if (candidate && candidate.id !== 'gsht-stt-advanced-body' && !candidate.contains(byId('btn-toggle-stt-advanced'))) return candidate;
+            return node;
+        }
+        return null;
+    }
+    function moveAdvancedBlocks(){
+        const body = ensureAdvancedBody();
+        if (!body) return false;
+        const moved = [];
+        // Các khối sinh động từ các bản V80/V81/V82/V83/V84.
+        ADVANCED_IDS.forEach(id => {
+            const el = byId(id);
+            if (el && el !== body) moved.push(el);
+        });
+        // Dự phòng nếu id thay đổi nhưng tiêu đề vẫn còn.
+        ADVANCED_TEXTS.forEach(t => {
+            const el = closestPanelFromText(t);
+            if (el && el !== body && !moved.includes(el)) moved.push(el);
+        });
+        // Các khối cấu hình nâng cao cũ của Vosk/Whisper.
+        const engineRow = byId('offline-stt-engine')?.closest('.row');
+        const modelBox = byId('offline-stt-model-url')?.closest('.border.border-secondary') || byId('offline-stt-model-url')?.closest('.border');
+        const fileTestBox = byId('standalone-whisper-audio-file')?.closest('.border');
+        [engineRow, modelBox, fileTestBox].filter(Boolean).forEach(el => { if (!moved.includes(el)) moved.push(el); });
+        moved.forEach(el => {
+            if (!el || el === body || el.contains(byId('btn-toggle-stt-advanced'))) return;
+            el.classList.add('gsht-stt-advanced-auto-managed','gsht-stt-advanced-block');
+            el.classList.remove('gsht-stt-advanced-orphan-hidden');
+            if (!isInsideAdvanced(el)) body.appendChild(el);
+        });
+        return moved.length > 0;
+    }
+    function setAdvancedVisible(visible){
+        const body = ensureAdvancedBody();
+        if (!body) return;
+        moveAdvancedBlocks();
+        body.classList.toggle('d-none', !visible);
+        body.style.display = visible ? '' : 'none';
+        const btn = byId('btn-toggle-stt-advanced');
+        if (btn) {
+            btn.innerHTML = visible ? '<i class="fa-solid fa-eye-slash me-1"></i>ẨN' : '<i class="fa-solid fa-eye me-1"></i>HIỆN';
+            btn.classList.toggle('btn-outline-warning', visible);
+            btn.classList.toggle('btn-outline-info', !visible);
+        }
+        try { localStorage.setItem('gsht_stt_advanced_visible_v87', visible ? '1' : '0'); } catch(e) {}
+    }
+    function shouldShowAdvanced(){
+        const engine = byId('offline-stt-engine')?.value || 'system';
+        let saved = false;
+        try { saved = localStorage.getItem('gsht_stt_advanced_visible_v87') === '1'; } catch(e) {}
+        return saved || engine !== 'system';
+    }
+    function apply(){
+        // Một lần nâng cấp V87: xóa trạng thái cũ V86 để mặc định ẩn lại đúng yêu cầu.
+        try {
+            if (localStorage.getItem('gsht_v87_reset_advanced_done') !== '1') {
+                localStorage.removeItem('gsht_stt_advanced_visible_v86');
+                localStorage.setItem('gsht_stt_advanced_visible_v87', '0');
+                localStorage.setItem('gsht_v87_reset_advanced_done', '1');
+            }
+        } catch(e) {}
+        moveAdvancedBlocks();
+        setAdvancedVisible(shouldShowAdvanced());
+    }
+    const oldToggle = window.gshtToggleSttAdvanced;
+    window.gshtToggleSttAdvanced = function(force){
+        moveAdvancedBlocks();
+        const body = ensureAdvancedBody();
+        let next;
+        if (typeof force === 'boolean') next = force;
+        else next = !(body && body.style.display !== 'none' && !body.classList.contains('d-none'));
+        setAdvancedVisible(next);
+        if (typeof oldToggle === 'function') {
+            try { oldToggle(next); } catch(e) {}
+            setAdvancedVisible(next);
+        }
+    };
+    const oldUpdate = window.gshtUpdateSttModeUi;
+    window.gshtUpdateSttModeUi = function(){
+        if (typeof oldUpdate === 'function') { try { oldUpdate.apply(this, arguments); } catch(e) {} }
+        apply();
+    };
+    let scheduled = false;
+    function schedule(){
+        if (scheduled) return;
+        scheduled = true;
+        setTimeout(() => { scheduled = false; apply(); }, 80);
+    }
+    window.addEventListener('DOMContentLoaded', schedule);
+    window.addEventListener('load', () => { apply(); setTimeout(apply, 600); setTimeout(apply, 1500); });
+    setTimeout(apply, 300);
+    setTimeout(apply, 1000);
+    setTimeout(apply, 2500);
+    try {
+        const panel = findMainPanel() || document.body;
+        const obs = new MutationObserver(schedule);
+        obs.observe(panel, { childList:true, subtree:true });
+    } catch(e) {}
+    try { console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
+})();
+</script>
+
 </body>
 </html>
