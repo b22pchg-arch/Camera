@@ -9968,5 +9968,354 @@ window.addEventListener('load', () => {
 })();
 </script>
 
+
+
+<style id="gsht-v92-camera-full-sensor-style">
+#gsht-camera-full-sensor-panel .form-label { font-size: 10.5px; }
+#gsht-camera-full-sensor-panel .small { line-height: 1.35; }
+#gsht-camera-full-sensor-status { font-size: 10.5px; }
+</style>
+<script id="gsht-v92-camera-full-sensor-capture">
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V92-FULL-SENSOR-CAPTURE';
+    const CAPTURE_MODE_KEY = 'gsht_camera_capture_mode_v92';
+    const ASPECT_MODE_KEY = 'gsht_camera_aspect_mode_v92';
+    const byId = id => document.getElementById(id);
+
+    function getCaptureMode(){ try { return localStorage.getItem(CAPTURE_MODE_KEY) || 'auto-still'; } catch(e){ return 'auto-still'; } }
+    function setCaptureMode(v){ try { localStorage.setItem(CAPTURE_MODE_KEY, v || 'auto-still'); } catch(e){} }
+    function getAspectMode(){ try { return localStorage.getItem(ASPECT_MODE_KEY) || 'sensor-4-3'; } catch(e){ return 'sensor-4-3'; } }
+    function setAspectMode(v){ try { localStorage.setItem(ASPECT_MODE_KEY, v || 'sensor-4-3'); } catch(e){} }
+    function labelCaptureMode(v){
+        return ({
+            'auto-still': 'Ưu tiên ảnh tĩnh full-frame nếu hỗ trợ',
+            'preview': 'Chụp từ preview video hiện tại',
+            'still-only': 'Chỉ thử ảnh tĩnh full-frame'
+        })[v || 'auto-still'] || 'Ưu tiên ảnh tĩnh full-frame nếu hỗ trợ';
+    }
+    function labelAspectMode(v){
+        return ({
+            'sensor-4-3': 'Ưu tiên tỉ lệ cảm biến 4:3 - giảm crop',
+            'quality': 'Theo chất lượng đã chọn/dò được',
+            'wide-16-9': 'Ưu tiên 16:9 - dễ giống video nhưng có thể crop sensor'
+        })[v || 'sensor-4-3'] || 'Ưu tiên tỉ lệ cảm biến 4:3 - giảm crop';
+    }
+    function setFullSensorStatus(html, cls='text-secondary'){
+        const el = byId('gsht-camera-full-sensor-status');
+        if (el) { el.className = 'small ' + cls; el.innerHTML = html; }
+    }
+    function getQualityForAspect(){
+        let q = {};
+        try { q = typeof getPhotoQualitySetting === 'function' ? getPhotoQualitySetting() : {}; } catch(e) {}
+        return Object.assign({ width: 1600, height: 1200, maxLongEdge: 1600, fps: 25 }, q || {});
+    }
+    function buildPreferred43Size(){
+        const q = getQualityForAspect();
+        const longEdge = Math.max(Number(q.maxLongEdge || 0), Number(q.width || 0), Number(q.height || 0), 1600);
+        let w = Math.round(longEdge);
+        let h = Math.round(w * 3 / 4);
+        if (w > 4096) { w = 4096; h = 3072; }
+        if (w < 1280) { w = 1280; h = 960; }
+        return { width: w, height: h, fps: Math.round(q.fps || 25) };
+    }
+    function ensureFullSensorPanel(){
+        if (byId('gsht-camera-full-sensor-panel')) return;
+        const anchor = byId('gsht-camera-display-panel') || byId('gsht-camera-probe-panel');
+        if (!anchor) return;
+        const html = `
+            <div id="gsht-camera-full-sensor-panel" class="col-12">
+                <div class="border border-success rounded p-2 bg-black bg-opacity-25">
+                    <div class="small text-success fw-bold mb-2"><i class="fa-solid fa-maximize me-1"></i>ẢNH FULL-FRAME / GIẢM CROP SENSOR</div>
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-5">
+                            <label class="form-label text-info fw-bold mb-1" for="gsht-camera-capture-mode"><i class="fa-solid fa-camera-retro me-1"></i>Cách lấy ảnh khi chụp</label>
+                            <select id="gsht-camera-capture-mode" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="gshtSetCameraCaptureMode(this.value)">
+                                <option value="auto-still">Ưu tiên ảnh tĩnh full-frame nếu hỗ trợ</option>
+                                <option value="preview">Chụp từ preview video hiện tại</option>
+                                <option value="still-only">Chỉ thử ảnh tĩnh full-frame</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <label class="form-label text-info fw-bold mb-1" for="gsht-camera-aspect-mode"><i class="fa-solid fa-expand me-1"></i>Tỉ lệ luồng camera</label>
+                            <select id="gsht-camera-aspect-mode" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="gshtSetCameraAspectMode(this.value, true)">
+                                <option value="sensor-4-3">Ưu tiên tỉ lệ cảm biến 4:3 - giảm crop</option>
+                                <option value="quality">Theo chất lượng đã chọn/dò được</option>
+                                <option value="wide-16-9">Ưu tiên 16:9 - có thể crop sensor</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-2 d-grid">
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="gshtApplyCameraAspectMode()"><i class="fa-solid fa-rotate me-1"></i>ÁP DỤNG</button>
+                        </div>
+                        <div class="col-12"><div id="gsht-camera-full-sensor-status" class="small text-secondary">Chế độ này ưu tiên lấy ảnh tĩnh full-frame bằng ImageCapture nếu trình duyệt/camera hỗ trợ. Nếu không hỗ trợ, app tự quay về chụp từ preview.</div></div>
+                    </div>
+                </div>
+            </div>`;
+        const statusCol = byId('gsht-camera-display-status')?.closest('.col-12') || anchor;
+        if (statusCol && statusCol.insertAdjacentHTML) statusCol.insertAdjacentHTML('afterend', html);
+        const capSel = byId('gsht-camera-capture-mode'); if (capSel) capSel.value = getCaptureMode();
+        const aspSel = byId('gsht-camera-aspect-mode'); if (aspSel) aspSel.value = getAspectMode();
+    }
+    window.gshtSetCameraCaptureMode = function(mode){
+        setCaptureMode(mode || 'auto-still');
+        setFullSensorStatus(`Cách lấy ảnh: <b>${labelCaptureMode(getCaptureMode())}</b>.`, 'text-success');
+    };
+    window.gshtSetCameraAspectMode = async function(mode, restart){
+        setAspectMode(mode || 'sensor-4-3');
+        setFullSensorStatus(`Tỉ lệ camera: <b>${labelAspectMode(getAspectMode())}</b>. ${restart ? 'Đang mở lại camera...' : ''}`, 'text-success');
+        if (restart && typeof initCamera === 'function' && typeof isCameraOn !== 'undefined' && isCameraOn) await initCamera();
+    };
+    window.gshtApplyCameraAspectMode = async function(){
+        const capSel = byId('gsht-camera-capture-mode'); if (capSel) setCaptureMode(capSel.value || 'auto-still');
+        const aspSel = byId('gsht-camera-aspect-mode'); if (aspSel) setAspectMode(aspSel.value || 'sensor-4-3');
+        setFullSensorStatus('Đã áp dụng. Đang mở lại camera để xin luồng phù hợp hơn...', 'text-info');
+        if (typeof initCamera === 'function' && typeof isCameraOn !== 'undefined' && isCameraOn) await initCamera();
+    };
+
+    function wrapCameraConstraints(){
+        if (typeof getCameraConstraints !== 'function' || window.__gshtV92ConstraintsWrapped) return;
+        const oldGet = getCameraConstraints;
+        getCameraConstraints = function(){
+            const c = oldGet.apply(this, arguments) || { video: true };
+            const v = typeof c.video === 'object' ? Object.assign({}, c.video) : {};
+            const mode = getAspectMode();
+            const q = getQualityForAspect();
+            if (mode === 'sensor-4-3') {
+                const pref = buildPreferred43Size();
+                v.width = { ideal: pref.width };
+                v.height = { ideal: pref.height };
+                v.aspectRatio = { ideal: 4 / 3 };
+                v.frameRate = { ideal: Math.min(30, pref.fps || 25) };
+                // resizeMode:none đề nghị trình duyệt không tự crop/scale nếu thiết bị hỗ trợ.
+                v.resizeMode = { ideal: 'none' };
+            } else if (mode === 'wide-16-9') {
+                v.aspectRatio = { ideal: 16 / 9 };
+                v.width = { ideal: q.width || 1920 };
+                v.height = { ideal: q.height || 1080 };
+                v.frameRate = { ideal: q.fps || 25 };
+            } else {
+                // Giữ theo chất lượng dò/chọn nhưng vẫn xin trình duyệt hạn chế crop nếu hiểu resizeMode.
+                v.resizeMode = { ideal: 'none' };
+            }
+            return Object.assign({}, c, { video: v });
+        };
+        window.__gshtV92ConstraintsWrapped = true;
+    }
+
+    async function getBestStillSource(video){
+        const mode = getCaptureMode();
+        const track = localStream?.getVideoTracks?.()[0] || null;
+        const settings = track?.getSettings?.() || {};
+        if (mode !== 'preview' && track && 'ImageCapture' in window) {
+            try {
+                const ic = new ImageCapture(track);
+                const blob = await ic.takePhoto();
+                const bmp = await createImageBitmap(blob);
+                return { source: bmp, width: bmp.width, height: bmp.height, kind: 'ImageCapture', close: () => { try { bmp.close?.(); } catch(e){} }, settings };
+            } catch(e) {
+                console.warn(VERSION, 'ImageCapture.takePhoto không dùng được, fallback preview', e);
+                if (mode === 'still-only') throw new Error('Camera/trình duyệt không hỗ trợ ảnh tĩnh full-frame qua ImageCapture: ' + (e.message || e));
+            }
+        }
+        return { source: video, width: video.videoWidth, height: video.videoHeight, kind: 'PreviewVideo', close: () => {}, settings };
+    }
+
+    async function redrawCaptureFromSource(type, srcInfo) {
+        if (currentStoragePercent > 95) return alert(`Bộ nhớ thiết bị đầy!`);
+        const now = new Date();
+        const gpsMeta = getCurrentGpsMeta();
+        const address = await getAddressForGps(gpsMeta);
+        const info = getCaptureContext(type, now, gpsMeta, address);
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const out = getCaptureOutputDimensions(srcInfo.width, srcInfo.height);
+        const scale = Math.max(0.75, out.width / 1000);
+        const enabledExtras = ['selfie','map','compass'].filter(key => getExtraInsertPref(key));
+        const orderedExtras = shouldMirrorFooterLayout(type) ? ['compass','map','selfie'].filter(key => enabledExtras.includes(key)) : enabledExtras;
+        const imgBoxSize = enabledExtras.length ? Math.min(240 * scale, out.width * 0.16) : 0;
+        const pad = 20 * scale;
+        const lineH = Math.max(25 * scale, 22);
+        const mirrorLayout = shouldMirrorFooterLayout(type);
+        const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + (Math.max(0, enabledExtras.length - 1) * pad)) : 0;
+        const textX = mirrorLayout ? (pad + extrasTotalW + (enabledExtras.length ? pad : 0)) : pad;
+        const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 3);
+        const footerInfoLines = [
+            { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: '#ffffff' },
+            { text: `Địa chỉ: ${info.address}`, max: 3, color: '#ffffff' },
+            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 2, color: '#ffffff' },
+            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 2, color: '#ffffff' },
+            { text: `Ghi chú: ${info.note}`, max: 3, color: '#ffc107' }
+        ];
+        const measureCtx = document.createElement('canvas').getContext('2d');
+        measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        const headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale, mirrorLayout);
+        const textBlockH = footerInfoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max), 0);
+        const footerH = Math.ceil(Math.max((enabledExtras.length ? imgBoxSize + 48 * scale : 0), 18 * scale + headerH + 12 * scale + textBlockH + 22 * scale));
+
+        canvas.width = out.width;
+        canvas.height = out.height + footerH;
+        ctx.save();
+        if (currentFacingMode === 'user') { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(srcInfo.source, 0, 0, srcInfo.width, srcInfo.height, 0, 0, out.width, out.height);
+        ctx.restore();
+
+        const fY = out.height;
+        ctx.fillStyle = '#090909';
+        ctx.fillRect(0, fY, canvas.width, footerH);
+        ctx.strokeStyle = type === 'TRƯỚC' ? '#0d6efd' : (type === 'QUÁ TRÌNH' ? '#ffc107' : '#20c997');
+        ctx.lineWidth = Math.max(2, 3 * scale);
+        ctx.strokeRect(0, fY, canvas.width, footerH);
+
+        const drawExtraSync = (sourceDataUrl, canvasSourceId, labelText, xPos) => new Promise(resolve => {
+            if (!imgBoxSize) return resolve();
+            let sourceToDraw = sourceDataUrl;
+            if (!sourceToDraw && canvasSourceId) {
+                let c = document.getElementById(canvasSourceId);
+                if (c && !c.classList.contains('d-none')) {
+                    try { sourceToDraw = c.toDataURL('image/jpeg', getJpegQuality()); } catch(e) {}
+                }
+            }
+            if (!sourceToDraw) { resolve(); return; }
+            let img = new Image();
+            img.onload = () => {
+                const yPos = fY + 22 * scale;
+                ctx.fillStyle = '#000';
+                ctx.fillRect(xPos, yPos, imgBoxSize, imgBoxSize);
+                drawImageContain(ctx, img, xPos, yPos, imgBoxSize, imgBoxSize);
+                let labelH = Math.max(20 * scale, imgBoxSize * 0.17);
+                ctx.fillStyle = 'rgba(0,0,0,0.75)';
+                ctx.fillRect(xPos, yPos + imgBoxSize - labelH, imgBoxSize, labelH);
+                ctx.fillStyle = '#0dcaf0';
+                ctx.font = `bold ${Math.max(10, labelH * 0.55)}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(labelText, xPos + imgBoxSize/2, yPos + imgBoxSize - labelH/2, imgBoxSize - 4);
+                resolve();
+            };
+            img.onerror = resolve;
+            img.src = sourceToDraw;
+        });
+
+        let extraX = mirrorLayout ? pad : (canvas.width - pad - (orderedExtras.length * imgBoxSize + Math.max(0, orderedExtras.length - 1) * pad));
+        const drawTasks = [];
+        orderedExtras.forEach(key => {
+            if (key === 'compass') drawTasks.push(drawExtraSync(globalExtras.compass, 'canvas-compass', 'LA BÀN', extraX));
+            if (key === 'map') drawTasks.push(drawExtraSync(globalExtras.map, 'canvas-map', 'BẢN ĐỒ', extraX));
+            if (key === 'selfie') drawTasks.push(drawExtraSync(globalExtras.selfie, null, 'NGƯỜI CHỤP', extraX));
+            extraX += imgBoxSize + pad;
+        });
+        await Promise.all(drawTasks);
+
+        let y = fY + 18 * scale;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        y += drawFooterHeaderBlock(ctx, info, textX, y, maxTextW, scale, mirrorLayout);
+        y += 12 * scale;
+        ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        footerInfoLines.forEach(row => {
+            ctx.fillStyle = row.color;
+            y += drawWrappedTextBlock(ctx, row.text, textX, y, maxTextW, lineH, row.max, 'left');
+        });
+
+        const photoObj = applyGpsMeta({
+            id: 'img_' + Date.now(),
+            type: type,
+            dataUrl: canvas.toDataURL('image/jpeg', getJpegQuality()),
+            timestampMs: now.getTime(),
+            timestampStr: now.toLocaleString('vi-VN'),
+            addressText: info.address,
+            fieldName: info.prefix,
+            teamText: info.team,
+            noteText: info.note,
+            captureSource: srcInfo.kind,
+            sourceWidth: srcInfo.width,
+            sourceHeight: srcInfo.height
+        }, gpsMeta);
+        photoObj.name = buildStandardPhotoName(photoObj, type);
+
+        if (type === 'TRƯỚC') {
+            repoBefore.unshift(photoObj);
+            captureBuffer.TRƯỚC = photoObj;
+            document.getElementById('preview-before').innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')">${mapButtonHtml(photoObj)}`;
+        } else if (type === 'SAU') {
+            repoAfter.unshift(photoObj);
+            captureBuffer.SAU = photoObj;
+            document.getElementById('preview-after').innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')">${mapButtonHtml(photoObj)}`;
+            captureBuffer.QUÁ_TRÌNH = [];
+            document.getElementById('preview-process').innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
+        } else if (type === 'QUÁ TRÌNH') {
+            repoProcess.unshift(photoObj);
+            captureBuffer.QUÁ_TRÌNH.push(photoObj);
+            document.getElementById('preview-process').innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>${mapButtonHtml(photoObj)}`;
+        }
+        saveToDB(photoObj);
+        if (captureBuffer.TRƯỚC && captureBuffer.SAU) {
+            document.getElementById('btn-stitch-fast-ts')?.removeAttribute('disabled');
+            document.getElementById('btn-stitch-ts-only')?.removeAttribute('disabled');
+            document.getElementById('btn-stitch-full')?.removeAttribute('disabled');
+        }
+        updateUIState();
+        setFullSensorStatus(`✅ Đã chụp bằng <b>${srcInfo.kind === 'ImageCapture' ? 'ảnh tĩnh full-frame' : 'preview video'}</b>: nguồn <b>${srcInfo.width}×${srcInfo.height}</b>, ảnh xuất <b>${out.width}×${out.height}</b>.`, 'text-success');
+    }
+
+    function overrideCapturePhoto(){
+        if (typeof window.capturePhoto !== 'function' && typeof capturePhoto !== 'function') return;
+        const newCapture = async function(type){
+            const video = byId('video-preview');
+            if (!localStream || !video || !video.videoWidth) return alert('Camera chưa sẵn sàng!');
+            let srcInfo = null;
+            try {
+                setFullSensorStatus('Đang lấy khung ảnh tốt nhất từ camera...', 'text-info');
+                srcInfo = await getBestStillSource(video);
+                await redrawCaptureFromSource(type, srcInfo);
+            } catch(e) {
+                console.warn(VERSION, e);
+                alert('Không chụp được theo chế độ full-frame: ' + (e.message || e));
+            } finally {
+                try { srcInfo?.close?.(); } catch(e) {}
+            }
+        };
+        window.capturePhoto = newCapture;
+        try { capturePhoto = newCapture; } catch(e) {}
+        window.__gshtV92CaptureOverride = true;
+    }
+
+    function appendHelp(){
+        try {
+            const help = Array.from(document.querySelectorAll('#help-tab-pane, #help, .tab-pane')).find(el => /TAB MÁY ẢNH|QUAY VIDEO HIỆN TRƯỜNG/i.test(el.textContent || ''));
+            if (help && !byId('gsht-v92-help-note')) {
+                const p = document.createElement('div');
+                p.id = 'gsht-v92-help-note';
+                p.className = 'alert alert-success small mt-2';
+                p.innerHTML = '<b>Giảm crop so với camera gốc:</b> Camera gốc của điện thoại thường chụp bằng luồng ảnh tĩnh/full sensor, còn PWA thường lấy luồng preview video nên có thể hẹp hơn. Bản này ưu tiên <b>ImageCapture.takePhoto()</b> nếu trình duyệt hỗ trợ và xin luồng <b>4:3</b> để giảm crop sensor. Nếu thiết bị không hỗ trợ, app tự fallback về chụp preview.';
+                help.appendChild(p);
+            }
+        } catch(e) {}
+    }
+    function updatePanelFromState(){
+        const capSel = byId('gsht-camera-capture-mode'); if (capSel) capSel.value = getCaptureMode();
+        const aspSel = byId('gsht-camera-aspect-mode'); if (aspSel) aspSel.value = getAspectMode();
+        const video = byId('video-preview');
+        const track = localStream?.getVideoTracks?.()[0];
+        const s = track?.getSettings?.() || {};
+        const actual = video?.videoWidth && video?.videoHeight ? `${video.videoWidth}×${video.videoHeight}` : `${s.width || '?'}×${s.height || '?'}`;
+        setFullSensorStatus(`Ảnh: <b>${labelCaptureMode(getCaptureMode())}</b>. Luồng: <b>${labelAspectMode(getAspectMode())}</b>. Preview thực tế: <b>${actual}</b>.`, 'text-secondary');
+    }
+    function init(){
+        ensureFullSensorPanel();
+        wrapCameraConstraints();
+        overrideCapturePhoto();
+        appendHelp();
+        updatePanelFromState();
+        setTimeout(updatePanelFromState, 1200);
+        setTimeout(updatePanelFromState, 2600);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 1000));
+    else setTimeout(init, 1000);
+    window.addEventListener('load', () => setTimeout(init, 1600));
+})();
+</script>
+
 </body>
 </html>
