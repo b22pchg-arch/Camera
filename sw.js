@@ -1,8 +1,8 @@
-// GSHT PWA cache update V86
+// GSHT PWA cache update V88 - video full frame/footer sync
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v87';
+const GSHT_CACHE = 'gsht-pwa-v88-video-fullframe-footer';
 const APP_SHELL = [
   './',
   './index.html',
@@ -105,3 +105,5 @@ self.addEventListener('fetch', event => {
 // GSHT V85 record temp audio + adaptive Whisper chunks
 
 // GSHT V87 cache bump: stt advanced hidden fix
+
+// GSHT V88: video full-frame quality sync + photo-style video footer
