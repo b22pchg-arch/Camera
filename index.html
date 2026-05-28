@@ -9782,5 +9782,191 @@ window.addEventListener('load', () => {
 })();
 </script>
 
+
+
+<style id="gsht-v91-camera-display-style">
+#camera-wrapper.gsht-camera-preview-optimized { max-width: min(100%, 960px) !important; }
+#camera-container.gsht-preview-fit, #camera-container.gsht-preview-native, #camera-container.gsht-preview-compact { background:#000; }
+#camera-container.gsht-preview-wide { aspect-ratio: 16 / 9 !important; background:#000; }
+#camera-container.gsht-preview-cover { aspect-ratio: 16 / 9 !important; background:#000; }
+#video-preview.gsht-fit-contain { width:100% !important; height:100% !important; object-fit: contain !important; object-position:center center !important; background:#000; image-rendering:auto; }
+#video-preview.gsht-fit-cover { width:100% !important; height:100% !important; object-fit: cover !important; object-position:center center !important; background:#000; image-rendering:auto; }
+#gsht-camera-display-panel .form-label { font-size: 10.5px; }
+#gsht-camera-display-panel .small { line-height: 1.3; }
+</style>
+<script id="gsht-v91-camera-display-optimization">
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V91-CAMERA-DISPLAY-OPTIMIZATION';
+    const DISPLAY_KEY = 'gsht_camera_preview_display_mode_v91';
+    const byId = id => document.getElementById(id);
+    function getDisplayMode(){ try { return localStorage.getItem(DISPLAY_KEY) || 'fit'; } catch(e){ return 'fit'; } }
+    function setDisplayMode(mode){ try { localStorage.setItem(DISPLAY_KEY, mode || 'fit'); } catch(e){} }
+    function getModeLabel(mode){
+        return ({
+            fit: 'Tối ưu đủ khung - không cắt',
+            compact: 'Đủ khung - giới hạn chiều cao màn hình',
+            wide: 'Khung 16:9 - không cắt, có thể có viền',
+            cover: 'Lấp đầy khung - chỉ cắt phần xem trước'
+        })[mode || 'fit'] || 'Tối ưu đủ khung - không cắt';
+    }
+    function ensureDisplayPanel(){
+        const probePanel = byId('gsht-camera-probe-panel');
+        if (!probePanel || byId('gsht-camera-display-panel')) return;
+        const statusCol = byId('gsht-camera-probe-status')?.closest('.col-12');
+        const html = `
+            <div id="gsht-camera-display-panel" class="col-12">
+                <div class="border border-info rounded p-2 bg-black bg-opacity-25">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-5">
+                            <label class="form-label text-info fw-bold mb-1" for="gsht-camera-display-mode"><i class="fa-solid fa-crop-simple me-1"></i>Hiển thị khung camera</label>
+                            <select id="gsht-camera-display-mode" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="gshtSetCameraDisplayMode(this.value)">
+                                <option value="fit">Tối ưu đủ khung - không cắt</option>
+                                <option value="compact">Đủ khung - giới hạn chiều cao màn hình</option>
+                                <option value="wide">Khung 16:9 - không cắt, có thể có viền</option>
+                                <option value="cover">Lấp đầy khung - chỉ cắt phần xem trước</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-7">
+                            <div id="gsht-camera-display-status" class="small text-secondary">
+                                Mặc định dùng <b>tối ưu đủ khung</b>: ảnh/video xuất ra lấy đủ dữ liệu từ camera, không cắt mép.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        if (statusCol) statusCol.insertAdjacentHTML('beforebegin', html);
+        else probePanel.querySelector('.row')?.insertAdjacentHTML('beforeend', html);
+        const sel = byId('gsht-camera-display-mode');
+        if (sel) sel.value = getDisplayMode();
+    }
+    function getActualVideoInfo(){
+        const video = byId('video-preview');
+        const track = localStream?.getVideoTracks?.()[0] || null;
+        const settings = track?.getSettings?.() || {};
+        const vw = Number(video?.videoWidth || settings.width || 0);
+        const vh = Number(video?.videoHeight || settings.height || 0);
+        return { video, track, settings, vw, vh };
+    }
+    function applyPreviewGeometry(){
+        const { video, settings, vw, vh } = getActualVideoInfo();
+        const container = byId('camera-container');
+        const wrapper = byId('camera-wrapper');
+        const status = byId('gsht-camera-display-status');
+        const note = byId('camera-frame-note');
+        if (!video || !container) return;
+        const mode = getDisplayMode();
+        const ratio = (vw && vh) ? `${vw} / ${vh}` : '16 / 9';
+        wrapper?.classList.add('gsht-camera-preview-optimized');
+        container.classList.remove('gsht-preview-fit','gsht-preview-native','gsht-preview-compact','gsht-preview-wide','gsht-preview-cover');
+        video.classList.remove('gsht-fit-contain','gsht-fit-cover');
+        container.style.maxHeight = '';
+        container.style.aspectRatio = ratio;
+        video.classList.add('gsht-fit-contain');
+        if (mode === 'compact') {
+            container.classList.add('gsht-preview-compact');
+            container.style.maxHeight = '62svh';
+            container.style.aspectRatio = ratio;
+        } else if (mode === 'wide') {
+            container.classList.add('gsht-preview-wide');
+            container.style.aspectRatio = '16 / 9';
+        } else if (mode === 'cover') {
+            container.classList.add('gsht-preview-cover');
+            container.style.aspectRatio = '16 / 9';
+            video.classList.remove('gsht-fit-contain');
+            video.classList.add('gsht-fit-cover');
+        } else {
+            container.classList.add('gsht-preview-fit');
+            container.style.aspectRatio = ratio;
+        }
+        const actual = (vw && vh) ? `${vw}×${vh}` : `${settings.width || '?'}×${settings.height || '?'}`;
+        const warning = mode === 'cover' ? '<span class="text-warning">Chế độ này chỉ cắt phần xem trước để lấp đầy khung; ảnh/video lưu vẫn lấy đủ khung camera.</span>' : '<span class="text-success">Không cắt khung hình; ưu tiên giữ đủ nội dung hiện trường.</span>';
+        if (status) status.innerHTML = `Đang dùng: <b>${getModeLabel(mode)}</b>. Luồng thực tế: <b>${actual}</b>. ${warning}`;
+        if (note && !note.dataset.gshtV91Touched) {
+            // Không ghi đè note chính; updateCameraFrameRatio sẽ nối thông tin ở wrapper bên dưới.
+        }
+    }
+    window.gshtSetCameraDisplayMode = function(mode){
+        setDisplayMode(mode || 'fit');
+        applyPreviewGeometry();
+        try { updateCameraFrameRatio(); } catch(e) {}
+    };
+    window.gshtApplyCameraPreviewOptimization = applyPreviewGeometry;
+    function wrapUpdateFrame(){
+        if (typeof updateCameraFrameRatio !== 'function' || window.__gshtV91FrameWrapped) return;
+        const old = updateCameraFrameRatio;
+        updateCameraFrameRatio = function(){
+            const ret = old.apply(this, arguments);
+            try {
+                ensureDisplayPanel();
+                applyPreviewGeometry();
+                const note = byId('camera-frame-note');
+                const { vw, vh, settings } = getActualVideoInfo();
+                const mode = getDisplayMode();
+                if (note && vw && vh) {
+                    const out = typeof getCaptureOutputDimensions === 'function' ? getCaptureOutputDimensions(vw, vh) : { width: vw, height: vh };
+                    const suffixId = 'gsht-v91-frame-note';
+                    let suffix = byId(suffixId);
+                    if (!suffix) {
+                        suffix = document.createElement('div');
+                        suffix.id = suffixId;
+                        suffix.className = 'text-success mt-1';
+                        note.appendChild(suffix);
+                    }
+                    suffix.innerHTML = `Hiển thị: <b>${getModeLabel(mode)}</b>; luồng thực tế: <b>${vw}×${vh}</b>; ảnh/video lưu theo khung đủ: <b>${out.width}×${out.height}</b>.`;
+                }
+            } catch(e) { console.warn(VERSION, e); }
+            return ret;
+        };
+        window.__gshtV91FrameWrapped = true;
+    }
+    function wrapCaptureAndRecording(){
+        if (typeof capturePhoto === 'function' && !window.__gshtV91CaptureWrapped) {
+            const oldCapture = capturePhoto;
+            capturePhoto = async function(){
+                try { applyPreviewGeometry(); } catch(e) {}
+                return oldCapture.apply(this, arguments);
+            };
+            window.__gshtV91CaptureWrapped = true;
+        }
+        if (typeof toggleRecording === 'function' && !window.__gshtV91RecordWrapped) {
+            const oldRecord = toggleRecording;
+            toggleRecording = async function(){
+                try { applyPreviewGeometry(); } catch(e) {}
+                return oldRecord.apply(this, arguments);
+            };
+            window.__gshtV91RecordWrapped = true;
+        }
+    }
+    function addHelpNote(){
+        try {
+            const help = Array.from(document.querySelectorAll('#help-tab-pane, #help, .tab-pane')).find(el => /TAB MÁY ẢNH|QUAY VIDEO HIỆN TRƯỜNG/i.test(el.textContent || ''));
+            if (help && !byId('gsht-v91-help-note')) {
+                const p = document.createElement('div');
+                p.id = 'gsht-v91-help-note';
+                p.className = 'alert alert-success small mt-2';
+                p.innerHTML = '<b>Hiển thị camera tối ưu:</b> Mặc định app dùng chế độ <b>Tối ưu đủ khung - không cắt</b>. Chế độ này đọc tỉ lệ thật của luồng camera, hiển thị đủ khung và ảnh/video lưu ra cũng lấy đủ dữ liệu từ camera. Nếu cần xem đầy màn hình có thể chọn <b>Lấp đầy khung</b>, nhưng chế độ này chỉ cắt phần xem trước; ảnh/video lưu vẫn giữ đủ khung.';
+                help.appendChild(p);
+            }
+        } catch(e) {}
+    }
+    function init(){
+        ensureDisplayPanel();
+        wrapUpdateFrame();
+        wrapCaptureAndRecording();
+        addHelpNote();
+        const sel = byId('gsht-camera-display-mode');
+        if (sel) sel.value = getDisplayMode();
+        applyPreviewGeometry();
+        setTimeout(applyPreviewGeometry, 800);
+        setTimeout(applyPreviewGeometry, 2000);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 800));
+    else setTimeout(init, 800);
+    window.addEventListener('load', () => setTimeout(init, 1500));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(applyPreviewGeometry, 400); });
+})();
+</script>
+
 </body>
 </html>
