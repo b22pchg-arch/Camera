@@ -4148,12 +4148,13 @@ ${timeText}` : viewerTitleText);
     }
 
     function getVideoFooterInfoLines(info) {
+        if (typeof gshtFooterRowsFromInfo === 'function') return gshtFooterRowsFromInfo(info);
         return [
-            { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: '#ffffff' },
-            { text: `Địa chỉ: ${info.address}`, max: 3, color: '#ffffff' },
-            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 2, color: '#ffffff' },
-            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 2, color: '#ffffff' },
-            { text: `Ghi chú: ${info.note}`, max: 3, color: '#ffc107' }
+            { text: `Tọa độ: ${info.gpsLine}`, max: 4, color: '#ffffff' },
+            { text: `Địa chỉ: ${info.address}`, max: 6, color: '#ffffff' },
+            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 4, color: '#ffffff' },
+            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 4, color: '#ffffff' },
+            { text: `Ghi chú: ${info.note}`, max: 6, color: '#ffc107' }
         ];
     }
 
@@ -4174,8 +4175,8 @@ ${timeText}` : viewerTitleText);
         const headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale, false);
         const textBlockH = lines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max), 0);
         const footerH = Math.ceil(Math.max(
-            enabledExtras.length ? imgBoxSize + 48 * scale : 0,
-            18 * scale + headerH + 12 * scale + textBlockH + 22 * scale
+            enabledExtras.length ? imgBoxSize + 56 * scale : 0,
+            18 * scale + headerH + 12 * scale + textBlockH + 36 * scale
         ));
         return { enabledExtras, orderedExtras, pad, lineH, imgBoxSize, extrasTotalW, textX, maxTextW, lines, headerH, footerH, scale };
     }
@@ -10233,18 +10234,12 @@ window.addEventListener('load', () => {
         const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + (Math.max(0, enabledExtras.length - 1) * pad)) : 0;
         const textX = mirrorLayout ? (pad + extrasTotalW + (enabledExtras.length ? pad : 0)) : pad;
         const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 3);
-        const footerInfoLines = [
-            { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: '#ffffff' },
-            { text: `Địa chỉ: ${info.address}`, max: 3, color: '#ffffff' },
-            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 2, color: '#ffffff' },
-            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 2, color: '#ffffff' },
-            { text: `Ghi chú: ${info.note}`, max: 3, color: '#ffc107' }
-        ];
+        const footerInfoLines = gshtFooterRowsFromInfo(info);
         const measureCtx = document.createElement('canvas').getContext('2d');
         measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
         const headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale, mirrorLayout);
         const textBlockH = footerInfoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max), 0);
-        const footerH = Math.ceil(Math.max((enabledExtras.length ? imgBoxSize + 48 * scale : 0), 18 * scale + headerH + 12 * scale + textBlockH + 22 * scale));
+        const footerH = Math.ceil(Math.max((enabledExtras.length ? imgBoxSize + 56 * scale : 0), 18 * scale + headerH + 12 * scale + textBlockH + 34 * scale));
 
         canvas.width = out.width;
         canvas.height = out.height + footerH;
@@ -10779,7 +10774,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 // GSHT V96: nhập ảnh/video từ camera gốc hoặc thư viện máy, đọc EXIF thời gian/GPS nếu có, xử lý chân ảnh/video như ảnh chụp trong app.
 (function(){
     'use strict';
-    const VERSION = 'GSHT-V95-NATIVE-IMPORT';
+    const VERSION = 'GSHT-V99-NATIVE-IMPORT-TIME-FOOTER';
     const $ = (id) => document.getElementById(id);
     function status(html, cls='text-secondary') {
         const el = $('gsht-native-import-status');
@@ -10793,6 +10788,20 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         if (!m) return null;
         const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
         return Number.isFinite(d.getTime()) ? d : null;
+    }
+    function parseExifDateWithOffset(dateStr, offsetStr){
+        if (!dateStr || typeof dateStr !== 'string') return null;
+        const m = dateStr.trim().match(/^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+        if (!m) return null;
+        const off = String(offsetStr || '').trim().match(/^([+-])(\d{2}):(\d{2})$/);
+        if (off) {
+            const utcMs = Date.UTC(Number(m[1]), Number(m[2])-1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+            const sign = off[1] === '-' ? -1 : 1;
+            const offsetMin = sign * (Number(off[2]) * 60 + Number(off[3]));
+            const d = new Date(utcMs - offsetMin * 60000);
+            return Number.isFinite(d.getTime()) ? d : null;
+        }
+        return parseExifDate(dateStr);
     }
     function readAscii(view, start, len){
         let s = '';
@@ -10861,6 +10870,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         const exifIFD = ifd0[0x8769] ? readIFD(tiff + Number(ifd0[0x8769].value)) : {};
         const gpsIFD = ifd0[0x8825] ? readIFD(tiff + Number(ifd0[0x8825].value)) : {};
         const dateStr = (exifIFD[0x9003]?.value || exifIFD[0x9004]?.value || ifd0[0x0132]?.value || '').trim();
+        const offsetStr = (exifIFD[0x9011]?.value || exifIFD[0x9012]?.value || exifIFD[0x9010]?.value || '').trim();
         const orientation = Number(ifd0[0x0112]?.value || 1);
         let lat = null, lng = null;
         try {
@@ -10876,8 +10886,10 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             }
         } catch(e) {}
         return {
-            date: parseExifDate(dateStr),
+            date: parseExifDateWithOffset(dateStr, offsetStr),
             dateRaw: dateStr || '',
+            dateOffsetRaw: offsetStr || '',
+            dateSource: dateStr ? (offsetStr ? 'EXIF DateTimeOriginal + OffsetTime' : 'EXIF DateTimeOriginal') : '',
             lat: Number.isFinite(lat) ? lat : null,
             lng: Number.isFinite(lng) ? lng : null,
             orientation: Number.isFinite(orientation) ? orientation : 1
@@ -10896,6 +10908,36 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         }
         return typeof getCurrentGpsMeta === 'function' ? getCurrentGpsMeta() : null;
     }
+    function gshtValidDate(d){
+        return d instanceof Date && Number.isFinite(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100;
+    }
+    function gshtResolveExternalMediaDate(file, meta){
+        if (gshtValidDate(meta?.date)) return meta.date;
+        if (gshtValidDate(meta?.creationTime)) return meta.creationTime;
+        if (Number.isFinite(Number(file?.lastModified)) && Number(file.lastModified) > 0) {
+            const d = new Date(Number(file.lastModified));
+            if (gshtValidDate(d)) return d;
+        }
+        return new Date();
+    }
+    function gshtDateSourceLabel(file, meta){
+        if (gshtValidDate(meta?.date)) return meta?.dateSource || 'EXIF';
+        if (gshtValidDate(meta?.creationTime)) return meta?.dateSource || 'metadata video';
+        if (Number.isFinite(Number(file?.lastModified)) && Number(file.lastModified) > 0) return 'thời gian file';
+        return 'thời gian nhập';
+    }
+    function gshtMeasureRows(ctx, rows, maxWidth, lineH){
+        return (rows || []).reduce((sum, row) => sum + measureWrappedTextHeight(ctx, row.text, maxWidth, lineH, row.max || 99), 0);
+    }
+    function gshtFooterRowsFromInfo(info){
+        return [
+            { text: `Tọa độ: ${info.gpsLine}`, max: 4, color: '#ffffff' },
+            { text: `Địa chỉ: ${info.address}`, max: 6, color: '#ffffff' },
+            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 4, color: '#ffffff' },
+            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 4, color: '#ffffff' },
+            { text: `Ghi chú: ${info.note}`, max: 6, color: '#ffc107' }
+        ];
+    }
     async function makeBitmapFromFile(file){
         try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); }
         catch(e) { return await createImageBitmap(file); }
@@ -10907,7 +10949,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     }
     async function drawImportedPhoto(type, file, bmp, exif){
         if (typeof currentStoragePercent !== 'undefined' && currentStoragePercent > 95) throw new Error('Bộ nhớ thiết bị đầy.');
-        const now = exif?.date || (file?.lastModified ? new Date(file.lastModified) : new Date());
+        const now = gshtResolveExternalMediaDate(file, exif);
         const gpsMeta = gpsFromExifOrCurrent(exif);
         const address = typeof getAddressForGps === 'function' ? await getAddressForGps(gpsMeta) : '';
         const info = getCaptureContext(type, now, gpsMeta, address);
@@ -10924,18 +10966,12 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + (Math.max(0, enabledExtras.length - 1) * pad)) : 0;
         const textX = mirrorLayout ? (pad + extrasTotalW + (enabledExtras.length ? pad : 0)) : pad;
         const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 3);
-        const footerInfoLines = [
-            { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: '#ffffff' },
-            { text: `Địa chỉ: ${info.address}`, max: 3, color: '#ffffff' },
-            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 2, color: '#ffffff' },
-            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 2, color: '#ffffff' },
-            { text: `Ghi chú: ${info.note}`, max: 3, color: '#ffc107' }
-        ];
+        const footerInfoLines = gshtFooterRowsFromInfo(info);
         const measureCtx = document.createElement('canvas').getContext('2d');
         measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
         const headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale, mirrorLayout);
         const textBlockH = footerInfoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max), 0);
-        const footerH = Math.ceil(Math.max((enabledExtras.length ? imgBoxSize + 48 * scale : 0), 18 * scale + headerH + 12 * scale + textBlockH + 22 * scale));
+        const footerH = Math.ceil(Math.max((enabledExtras.length ? imgBoxSize + 56 * scale : 0), 18 * scale + headerH + 12 * scale + textBlockH + 34 * scale));
         canvas.width = out.width;
         canvas.height = out.height + footerH;
         ctx.drawImage(bmp, 0, 0, bmp.width, bmp.height, 0, 0, out.width, out.height);
@@ -10997,6 +11033,8 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             sourceWidth: bmp.width,
             sourceHeight: bmp.height,
             exifDateRaw: exif?.dateRaw || '',
+            exifDateOffsetRaw: exif?.dateOffsetRaw || '',
+            timeSourceText: gshtDateSourceLabel(file, exif),
             exifGpsUsed: !!(Number.isFinite(Number(exif?.lat)) && Number.isFinite(Number(exif?.lng)))
         }, gpsMeta);
         photoObj.name = typeof buildStandardPhotoName === 'function' ? buildStandardPhotoName(photoObj, type) : `${type}_${photoObj.timestampMs}.jpg`;
@@ -11056,6 +11094,51 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     };
     function videoLoaded(video){ return new Promise((resolve,reject)=>{ video.onloadedmetadata=resolve; video.onerror=()=>reject(new Error('Không đọc được video.')); }); }
     function videoEnded(video){ return new Promise(resolve=>{ video.onended=resolve; }); }
+    function gshtReadTextBytes(view, start, len){
+        let s='';
+        for (let i=0; i<len && start+i<view.byteLength; i++) {
+            const c = view.getUint8(start+i);
+            if (c >= 32 && c <= 126) s += String.fromCharCode(c);
+            else s += '\0';
+        }
+        return s;
+    }
+    function gshtFindMp4Atom(view, atom, from=0, to=view.byteLength){
+        let pos = from;
+        while (pos + 8 <= to) {
+            let size = view.getUint32(pos, false);
+            const type = gshtReadTextBytes(view, pos+4, 4).replace(/\0/g,'');
+            let header = 8;
+            if (size === 1 && pos + 16 <= to) { size = Number(view.getBigUint64(pos+8, false)); header = 16; }
+            if (!size || size < header) break;
+            if (type === atom) return { start: pos, header, size, dataStart: pos + header, end: Math.min(to, pos + size) };
+            pos += size;
+        }
+        return null;
+    }
+    function gshtParseMp4CreationDate(buffer){
+        try {
+            const view = new DataView(buffer);
+            const moov = gshtFindMp4Atom(view, 'moov', 0, view.byteLength) || { dataStart:0, end:view.byteLength };
+            const mvhd = gshtFindMp4Atom(view, 'mvhd', moov.dataStart, moov.end);
+            if (!mvhd || mvhd.dataStart + 12 > view.byteLength) return null;
+            const version = view.getUint8(mvhd.dataStart);
+            let seconds = null;
+            if (version === 1 && mvhd.dataStart + 16 <= view.byteLength) seconds = Number(view.getBigUint64(mvhd.dataStart + 4, false));
+            else seconds = view.getUint32(mvhd.dataStart + 4, false);
+            const unixMs = (seconds - 2082844800) * 1000;
+            const d = new Date(unixMs);
+            return gshtValidDate(d) ? d : null;
+        } catch(e) { return null; }
+    }
+    async function gshtResolveImportedVideoDate(file){
+        try {
+            const head = await file.slice(0, Math.min(file.size, 8_000_000)).arrayBuffer();
+            const d = gshtParseMp4CreationDate(head);
+            if (gshtValidDate(d)) return { creationTime: d, dateSource: 'metadata video MP4/MOV' };
+        } catch(e) {}
+        return { creationTime: gshtResolveExternalMediaDate(file, null), dateSource: gshtDateSourceLabel(file, null) };
+    }
     function getImportedVideoLabel(){ return $('gsht-import-video-label')?.value || 'VIDEO'; }
     function drawImportedVideoFrame(ctx, sourceVideo, outW, outH, footerH, layout, fixedInfo, startMs){
         ctx.clearRect(0,0,outW,outH+footerH);
@@ -11130,7 +11213,8 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             const ctx = canvas.getContext('2d');
             const scale = Math.max(0.75, out.width / 1000);
             const label = getImportedVideoLabel();
-            const ts = file.lastModified ? new Date(file.lastModified) : new Date();
+            const videoDateMeta = await gshtResolveImportedVideoDate(file);
+            const ts = gshtResolveExternalMediaDate(file, videoDateMeta);
             const gpsMeta = typeof getCurrentGpsMeta === 'function' ? getCurrentGpsMeta() : null;
             const address = typeof getAddressForGps === 'function' ? await getAddressForGps(gpsMeta) : '';
             const fixedInfo = getCaptureContext(label, ts, gpsMeta, address);
@@ -11636,6 +11720,30 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     }
     window.addEventListener('load', () => { setTimeout(schedule, 1200); setTimeout(appendHelpV98, 2400); });
     console.log(VERSION + ' loaded');
+})();
+</script>
+
+
+
+<script>
+// GSHT V99: sửa thời gian ảnh/video nhập ngoài và chống mất nội dung chân trang.
+(function(){
+    'use strict';
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V99: chuẩn hóa thời gian EXIF/video và chân trang tự đủ cao'; } catch(e) {}
+    function addHelpV99(){
+        try {
+            const help = document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
+            if (help && !document.getElementById('gsht-v99-help-note')) {
+                const div = document.createElement('div');
+                div.id = 'gsht-v99-help-note';
+                div.className = 'alert alert-info small mt-2';
+                div.innerHTML = '<b>V99:</b> Ảnh/video nhập ngoài ưu tiên thời gian EXIF hoặc metadata video; nếu không có mới dùng thời gian file. Chân trang ảnh/video được tăng số dòng và tự tính chiều cao lớn hơn để tránh mất nội dung.';
+                help.appendChild(div);
+            }
+        } catch(e) {}
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(addHelpV99, 1800));
+    else setTimeout(addHelpV99, 1800);
 })();
 </script>
 
