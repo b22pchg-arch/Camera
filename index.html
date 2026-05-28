@@ -729,6 +729,86 @@ function showUpdateNotification() {
                 </div>
             </div>
 
+
+            <div id="native-camera-import-panel" class="card bg-dark border-warning p-2 mb-3 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                    <div class="small fw-bold text-warning text-uppercase">
+                        <i class="fa-solid fa-images me-1"></i> CAMERA GỐC / NHẬP ẢNH NGOÀI / NHẬP VIDEO
+                    </div>
+                    <span class="badge bg-black border border-warning text-warning" style="font-size:10px;">V95</span>
+                </div>
+                <div class="small text-secondary mb-2" style="font-size:10.5px; line-height:1.35;">
+                    Dùng camera gốc khi cần ảnh đẹp/full khung hơn PWA, hoặc chọn ảnh/video đã chụp sẵn trong máy. Ảnh nhập sẽ đọc thời gian/GPS EXIF nếu có, sau đó chèn chân ảnh và phân vào đúng kho được chọn.
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-12 col-md-6">
+                        <div class="border border-secondary rounded p-2 h-100">
+                            <div class="small fw-bold text-info mb-2"><i class="fa-solid fa-camera-retro me-1"></i>CHỤP BẰNG CAMERA GỐC CỦA MÁY</div>
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <label class="btn btn-sm btn-outline-primary w-100 fw-bold mb-0" style="font-size:10.5px;">
+                                        TRƯỚC<input type="file" hidden accept="image/*" capture="environment" onchange="gshtHandleNativeCameraPhoto(event, 'TRƯỚC')">
+                                    </label>
+                                </div>
+                                <div class="col-4">
+                                    <label class="btn btn-sm btn-outline-warning w-100 fw-bold mb-0" style="font-size:10.5px;">
+                                        Q.TRÌNH<input type="file" hidden accept="image/*" capture="environment" onchange="gshtHandleNativeCameraPhoto(event, 'QUÁ TRÌNH')">
+                                    </label>
+                                </div>
+                                <div class="col-4">
+                                    <label class="btn btn-sm btn-outline-success w-100 fw-bold mb-0" style="font-size:10.5px;">
+                                        SAU<input type="file" hidden accept="image/*" capture="environment" onchange="gshtHandleNativeCameraPhoto(event, 'SAU')">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="border border-secondary rounded p-2 h-100">
+                            <div class="small fw-bold text-success mb-2"><i class="fa-solid fa-folder-open me-1"></i>CHỌN ẢNH ĐÃ CHỤP SẴN VÀO KHO</div>
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <label class="btn btn-sm btn-primary w-100 fw-bold mb-0" style="font-size:10.5px;">
+                                        ẢNH TRƯỚC<input type="file" hidden multiple accept="image/*" onchange="gshtHandleExternalPhotos(event, 'TRƯỚC')">
+                                    </label>
+                                </div>
+                                <div class="col-4">
+                                    <label class="btn btn-sm btn-warning text-dark w-100 fw-bold mb-0" style="font-size:10.5px;">
+                                        ẢNH QT<input type="file" hidden multiple accept="image/*" onchange="gshtHandleExternalPhotos(event, 'QUÁ TRÌNH')">
+                                    </label>
+                                </div>
+                                <div class="col-4">
+                                    <label class="btn btn-sm btn-success w-100 fw-bold mb-0" style="font-size:10.5px;">
+                                        ẢNH SAU<input type="file" hidden multiple accept="image/*" onchange="gshtHandleExternalPhotos(event, 'SAU')">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border border-secondary rounded p-2 bg-black bg-opacity-25">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-md-7">
+                            <label class="btn btn-sm btn-outline-danger w-100 fw-bold mb-0">
+                                <i class="fa-solid fa-file-video me-1"></i> CHỌN VIDEO TRONG MÁY ĐỂ TẠO VIDEO CÓ CHÂN THÔNG TIN
+                                <input type="file" hidden accept="video/*" onchange="gshtHandleExternalVideo(event)">
+                            </label>
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <select id="gsht-import-video-label" class="form-select form-select-sm bg-secondary text-white border-secondary">
+                                <option value="VIDEO" selected>Nhãn video: VIDEO</option>
+                                <option value="TRƯỚC">Nhãn video: TRƯỚC</option>
+                                <option value="QUÁ TRÌNH">Nhãn video: QUÁ TRÌNH</option>
+                                <option value="SAU">Nhãn video: SAU</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="gsht-native-import-status" class="small text-secondary mt-2" style="font-size:10.5px; line-height:1.35;">
+                        Chưa nhập ảnh/video ngoài. Lưu ý: PWA không thể tự truy cập toàn bộ thư viện ảnh; người dùng cần chọn file thủ công.
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-2 mb-3">
                 <div class="col-4 preview-before-column">
                     <div id="preview-before" class="preview-box"><span class="text-muted small text-center">TRƯỚC</span></div>
@@ -10678,6 +10758,410 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     else setTimeout(init, 1600);
     window.addEventListener('load', () => setTimeout(init, 2200));
     setInterval(() => { try { init(); } catch(e){} }, 3000);
+})();
+</script>
+
+
+<script>
+// GSHT V95: nhập ảnh/video từ camera gốc hoặc thư viện máy, đọc EXIF thời gian/GPS nếu có, xử lý chân ảnh/video như ảnh chụp trong app.
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V95-NATIVE-IMPORT';
+    const $ = (id) => document.getElementById(id);
+    function status(html, cls='text-secondary') {
+        const el = $('gsht-native-import-status');
+        if (el) { el.className = 'small mt-2 ' + cls; el.innerHTML = html; }
+        console.log(VERSION, html.replace(/<[^>]+>/g, ' '));
+    }
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function parseExifDate(str){
+        if (!str || typeof str !== 'string') return null;
+        const m = str.trim().match(/^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+        if (!m) return null;
+        const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+        return Number.isFinite(d.getTime()) ? d : null;
+    }
+    function readAscii(view, start, len){
+        let s = '';
+        for (let i=0; i<len; i++) {
+            const c = view.getUint8(start+i);
+            if (c === 0) break;
+            s += String.fromCharCode(c);
+        }
+        return s;
+    }
+    function parseExifFromArrayBuffer(buffer){
+        const view = new DataView(buffer);
+        const len = view.byteLength;
+        if (len < 12 || view.getUint16(0, false) !== 0xFFD8) return {};
+        let offset = 2;
+        let tiff = -1;
+        while (offset + 4 < len) {
+            if (view.getUint8(offset) !== 0xFF) break;
+            const marker = view.getUint8(offset + 1);
+            const size = view.getUint16(offset + 2, false);
+            if (marker === 0xE1 && offset + 4 + size <= len) {
+                const sig = readAscii(view, offset + 4, 6);
+                if (sig === 'Exif\0\0') { tiff = offset + 10; break; }
+            }
+            offset += 2 + size;
+        }
+        if (tiff < 0 || tiff + 8 >= len) return {};
+        const endian = readAscii(view, tiff, 2);
+        const little = endian === 'II';
+        if (!(little || endian === 'MM')) return {};
+        const u16 = (o) => view.getUint16(o, little);
+        const u32 = (o) => view.getUint32(o, little);
+        const typeSize = {1:1,2:1,3:2,4:4,5:8,7:1,9:4,10:8};
+        function valOffset(entry, type, count){
+            const bytes = (typeSize[type] || 1) * count;
+            return bytes <= 4 ? entry + 8 : tiff + u32(entry + 8);
+        }
+        function readValue(entry){
+            const type = u16(entry + 2);
+            const count = u32(entry + 4);
+            const pos = valOffset(entry, type, count);
+            if (pos < 0 || pos >= len) return null;
+            if (type === 2) return readAscii(view, pos, count);
+            if (type === 3) return count === 1 ? u16(pos) : Array.from({length:count}, (_,i)=>u16(pos+i*2));
+            if (type === 4) return count === 1 ? u32(pos) : Array.from({length:count}, (_,i)=>u32(pos+i*4));
+            if (type === 5) {
+                const readRat = (p) => { const den = u32(p+4); return den ? u32(p)/den : 0; };
+                return count === 1 ? readRat(pos) : Array.from({length:count}, (_,i)=>readRat(pos+i*8));
+            }
+            return null;
+        }
+        function readIFD(abs){
+            const out = {};
+            if (!abs || abs + 2 >= len) return out;
+            const entries = u16(abs);
+            for (let i=0; i<entries; i++) {
+                const e = abs + 2 + i*12;
+                if (e + 12 > len) break;
+                const tag = u16(e);
+                out[tag] = { entry:e, value: readValue(e) };
+            }
+            return out;
+        }
+        const firstIFD = tiff + u32(tiff + 4);
+        const ifd0 = readIFD(firstIFD);
+        const exifIFD = ifd0[0x8769] ? readIFD(tiff + Number(ifd0[0x8769].value)) : {};
+        const gpsIFD = ifd0[0x8825] ? readIFD(tiff + Number(ifd0[0x8825].value)) : {};
+        const dateStr = (exifIFD[0x9003]?.value || exifIFD[0x9004]?.value || ifd0[0x0132]?.value || '').trim();
+        const orientation = Number(ifd0[0x0112]?.value || 1);
+        let lat = null, lng = null;
+        try {
+            const latRef = String(gpsIFD[1]?.value || '').trim();
+            const latArr = gpsIFD[2]?.value;
+            const lngRef = String(gpsIFD[3]?.value || '').trim();
+            const lngArr = gpsIFD[4]?.value;
+            if (Array.isArray(latArr) && latArr.length >= 3 && Array.isArray(lngArr) && lngArr.length >= 3) {
+                lat = Number(latArr[0]) + Number(latArr[1])/60 + Number(latArr[2])/3600;
+                lng = Number(lngArr[0]) + Number(lngArr[1])/60 + Number(lngArr[2])/3600;
+                if (/S/i.test(latRef)) lat = -lat;
+                if (/W/i.test(lngRef)) lng = -lng;
+            }
+        } catch(e) {}
+        return {
+            date: parseExifDate(dateStr),
+            dateRaw: dateStr || '',
+            lat: Number.isFinite(lat) ? lat : null,
+            lng: Number.isFinite(lng) ? lng : null,
+            orientation: Number.isFinite(orientation) ? orientation : 1
+        };
+    }
+    async function readExifFromFile(file){
+        try {
+            const buf = await file.slice(0, Math.min(file.size, 2_000_000)).arrayBuffer();
+            return parseExifFromArrayBuffer(buf);
+        } catch(e) { return {}; }
+    }
+    function gpsFromExifOrCurrent(exif){
+        if (Number.isFinite(Number(exif?.lat)) && Number.isFinite(Number(exif?.lng))) {
+            const lat = Number(exif.lat), lng = Number(exif.lng);
+            return { lat, lng, gpsText: `${lat.toFixed(6)}, ${lng.toFixed(6)}`, mapUrl: typeof buildMapUrl === 'function' ? buildMapUrl(lat,lng) : `https://www.google.com/maps?q=${lat},${lng}` };
+        }
+        return typeof getCurrentGpsMeta === 'function' ? getCurrentGpsMeta() : null;
+    }
+    async function makeBitmapFromFile(file){
+        try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+        catch(e) { return await createImageBitmap(file); }
+    }
+    function getImportedOutDimensions(w,h){
+        if (typeof getCaptureOutputDimensions === 'function') return getCaptureOutputDimensions(w,h);
+        const max = 2400, r = Math.min(1, max/Math.max(w,h));
+        return { width: Math.round(w*r), height: Math.round(h*r) };
+    }
+    async function drawImportedPhoto(type, file, bmp, exif){
+        if (typeof currentStoragePercent !== 'undefined' && currentStoragePercent > 95) throw new Error('Bộ nhớ thiết bị đầy.');
+        const now = exif?.date || (file?.lastModified ? new Date(file.lastModified) : new Date());
+        const gpsMeta = gpsFromExifOrCurrent(exif);
+        const address = typeof getAddressForGps === 'function' ? await getAddressForGps(gpsMeta) : '';
+        const info = getCaptureContext(type, now, gpsMeta, address);
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const out = getImportedOutDimensions(bmp.width, bmp.height);
+        const scale = Math.max(0.75, out.width / 1000);
+        const enabledExtras = ['selfie','map','compass'].filter(key => { try { return getExtraInsertPref(key); } catch(e) { return true; } });
+        const mirrorLayout = typeof shouldMirrorFooterLayout === 'function' ? shouldMirrorFooterLayout(type) : type === 'SAU';
+        const orderedExtras = mirrorLayout ? ['compass','map','selfie'].filter(key => enabledExtras.includes(key)) : enabledExtras;
+        const imgBoxSize = enabledExtras.length ? Math.min(240 * scale, out.width * 0.16) : 0;
+        const pad = 20 * scale;
+        const lineH = Math.max(25 * scale, 22);
+        const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + (Math.max(0, enabledExtras.length - 1) * pad)) : 0;
+        const textX = mirrorLayout ? (pad + extrasTotalW + (enabledExtras.length ? pad : 0)) : pad;
+        const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 3);
+        const footerInfoLines = [
+            { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: '#ffffff' },
+            { text: `Địa chỉ: ${info.address}`, max: 3, color: '#ffffff' },
+            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 2, color: '#ffffff' },
+            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 2, color: '#ffffff' },
+            { text: `Ghi chú: ${info.note}`, max: 3, color: '#ffc107' }
+        ];
+        const measureCtx = document.createElement('canvas').getContext('2d');
+        measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        const headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale, mirrorLayout);
+        const textBlockH = footerInfoLines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max), 0);
+        const footerH = Math.ceil(Math.max((enabledExtras.length ? imgBoxSize + 48 * scale : 0), 18 * scale + headerH + 12 * scale + textBlockH + 22 * scale));
+        canvas.width = out.width;
+        canvas.height = out.height + footerH;
+        ctx.drawImage(bmp, 0, 0, bmp.width, bmp.height, 0, 0, out.width, out.height);
+        const fY = out.height;
+        ctx.fillStyle = '#090909';
+        ctx.fillRect(0, fY, canvas.width, footerH);
+        ctx.strokeStyle = type === 'TRƯỚC' ? '#0d6efd' : (type === 'QUÁ TRÌNH' ? '#ffc107' : '#20c997');
+        ctx.lineWidth = Math.max(2, 3 * scale);
+        ctx.strokeRect(0, fY, canvas.width, footerH);
+        const drawExtraSync = (sourceDataUrl, canvasSourceId, labelText, xPos) => new Promise(resolve => {
+            if (!imgBoxSize) return resolve();
+            let sourceToDraw = sourceDataUrl;
+            if (!sourceToDraw && canvasSourceId) {
+                const c = $(canvasSourceId);
+                if (c && !c.classList.contains('d-none')) { try { sourceToDraw = c.toDataURL('image/jpeg', typeof getJpegQuality === 'function' ? getJpegQuality() : 0.92); } catch(e) {} }
+            }
+            if (!sourceToDraw) return resolve();
+            const img = new Image();
+            img.onload = () => {
+                const yPos = fY + 22 * scale;
+                ctx.fillStyle = '#000'; ctx.fillRect(xPos, yPos, imgBoxSize, imgBoxSize);
+                if (typeof drawImageContain === 'function') drawImageContain(ctx, img, xPos, yPos, imgBoxSize, imgBoxSize);
+                else ctx.drawImage(img, xPos, yPos, imgBoxSize, imgBoxSize);
+                const labelH = Math.max(20 * scale, imgBoxSize * 0.17);
+                ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(xPos, yPos + imgBoxSize - labelH, imgBoxSize, labelH);
+                ctx.fillStyle = '#0dcaf0'; ctx.font = `bold ${Math.max(10, labelH * 0.55)}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(labelText, xPos + imgBoxSize/2, yPos + imgBoxSize - labelH/2, imgBoxSize - 4);
+                resolve();
+            };
+            img.onerror = resolve; img.src = sourceToDraw;
+        });
+        let extraX = mirrorLayout ? pad : (canvas.width - pad - (orderedExtras.length * imgBoxSize + Math.max(0, orderedExtras.length - 1) * pad));
+        const drawTasks = [];
+        orderedExtras.forEach(key => {
+            if (key === 'compass') drawTasks.push(drawExtraSync(globalExtras?.compass, 'canvas-compass', 'LA BÀN', extraX));
+            if (key === 'map') drawTasks.push(drawExtraSync(globalExtras?.map, 'canvas-map', 'BẢN ĐỒ', extraX));
+            if (key === 'selfie') drawTasks.push(drawExtraSync(globalExtras?.selfie, null, 'NGƯỜI CHỤP', extraX));
+            extraX += imgBoxSize + pad;
+        });
+        await Promise.all(drawTasks);
+        let y = fY + 18 * scale;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        y += drawFooterHeaderBlock(ctx, info, textX, y, maxTextW, scale, mirrorLayout);
+        y += 12 * scale;
+        ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        footerInfoLines.forEach(row => { ctx.fillStyle = row.color; y += drawWrappedTextBlock(ctx, row.text, textX, y, maxTextW, lineH, row.max, 'left'); });
+        const photoObj = applyGpsMeta({
+            id: 'img_ext_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+            type,
+            dataUrl: canvas.toDataURL('image/jpeg', typeof getJpegQuality === 'function' ? getJpegQuality() : 0.92),
+            timestampMs: now.getTime(),
+            timestampStr: now.toLocaleString('vi-VN'),
+            addressText: info.address,
+            fieldName: info.prefix,
+            teamText: info.team,
+            noteText: info.note,
+            captureSource: 'ExternalImage',
+            sourceFileName: file?.name || '',
+            sourceWidth: bmp.width,
+            sourceHeight: bmp.height,
+            exifDateRaw: exif?.dateRaw || '',
+            exifGpsUsed: !!(Number.isFinite(Number(exif?.lat)) && Number.isFinite(Number(exif?.lng)))
+        }, gpsMeta);
+        photoObj.name = typeof buildStandardPhotoName === 'function' ? buildStandardPhotoName(photoObj, type) : `${type}_${photoObj.timestampMs}.jpg`;
+        addProcessedPhotoToRepo(photoObj, type);
+        return photoObj;
+    }
+    function addProcessedPhotoToRepo(photoObj, type){
+        if (type === 'TRƯỚC') {
+            repoBefore.unshift(photoObj);
+            captureBuffer.TRƯỚC = photoObj;
+            const el = $('preview-before'); if (el) el.innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')">${typeof mapButtonHtml==='function'?mapButtonHtml(photoObj):''}`;
+        } else if (type === 'SAU') {
+            repoAfter.unshift(photoObj);
+            captureBuffer.SAU = photoObj;
+            const el = $('preview-after'); if (el) el.innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')">${typeof mapButtonHtml==='function'?mapButtonHtml(photoObj):''}`;
+            captureBuffer.QUÁ_TRÌNH = [];
+            const pe = $('preview-process'); if (pe) pe.innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
+        } else {
+            repoProcess.unshift(photoObj);
+            captureBuffer.QUÁ_TRÌNH.push(photoObj);
+            const el = $('preview-process'); if (el) el.innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>${typeof mapButtonHtml==='function'?mapButtonHtml(photoObj):''}`;
+        }
+        if (typeof saveToDB === 'function') saveToDB(photoObj);
+        if (captureBuffer.TRƯỚC && captureBuffer.SAU) {
+            $('btn-stitch-fast-ts')?.removeAttribute('disabled'); $('btn-stitch-ts-only')?.removeAttribute('disabled'); $('btn-stitch-full')?.removeAttribute('disabled');
+        }
+        if (typeof updateUIState === 'function') updateUIState();
+    }
+    async function processExternalImageFile(type, file){
+        const exif = await readExifFromFile(file);
+        const bmp = await makeBitmapFromFile(file);
+        try { return await drawImportedPhoto(type, file, bmp, exif); }
+        finally { try { bmp.close?.(); } catch(e) {} }
+    }
+    window.gshtHandleNativeCameraPhoto = async function(ev, type){
+        const file = ev?.target?.files?.[0];
+        if (!file) return;
+        try {
+            status(`Đang xử lý ảnh camera gốc vào kho <b>${type}</b>...`, 'text-info');
+            const obj = await processExternalImageFile(type, file);
+            status(`✅ Đã nhập ảnh camera gốc vào kho <b>${type}</b>. Thời gian dùng: <b>${new Date(obj.timestampMs).toLocaleString('vi-VN')}</b>${obj.exifGpsUsed ? ', GPS lấy từ EXIF.' : ', GPS lấy từ app/không có EXIF.'}`, 'text-success');
+        } catch(e) { console.error(VERSION, e); status('❌ Không xử lý được ảnh camera gốc: ' + (e.message || e), 'text-danger'); }
+        finally { if (ev?.target) ev.target.value = ''; }
+    };
+    window.gshtHandleExternalPhotos = async function(ev, type){
+        const files = Array.from(ev?.target?.files || []);
+        if (!files.length) return;
+        let ok = 0, fail = 0;
+        status(`Đang xử lý <b>${files.length}</b> ảnh vào kho <b>${type}</b>...`, 'text-info');
+        for (const file of files) {
+            try { await processExternalImageFile(type, file); ok++; status(`Đang xử lý ảnh ngoài: ${ok}/${files.length} ảnh thành công...`, 'text-info'); }
+            catch(e) { fail++; console.warn(VERSION, 'Ảnh lỗi', file.name, e); }
+            await new Promise(r=>setTimeout(r, 30));
+        }
+        status(`✅ Hoàn tất nhập ảnh ngoài vào kho <b>${type}</b>: thành công <b>${ok}</b>, lỗi <b>${fail}</b>.`, fail ? 'text-warning' : 'text-success');
+        if (ev?.target) ev.target.value = '';
+    };
+    function videoLoaded(video){ return new Promise((resolve,reject)=>{ video.onloadedmetadata=resolve; video.onerror=()=>reject(new Error('Không đọc được video.')); }); }
+    function videoEnded(video){ return new Promise(resolve=>{ video.onended=resolve; }); }
+    function getImportedVideoLabel(){ return $('gsht-import-video-label')?.value || 'VIDEO'; }
+    function drawImportedVideoFrame(ctx, sourceVideo, outW, outH, footerH, layout, fixedInfo, startMs){
+        ctx.clearRect(0,0,outW,outH+footerH);
+        ctx.drawImage(sourceVideo, 0,0,sourceVideo.videoWidth,sourceVideo.videoHeight, 0,0,outW,outH);
+        const fY = outH;
+        ctx.fillStyle = '#090909'; ctx.fillRect(0, fY, outW, footerH);
+        ctx.strokeStyle = '#dc3545'; ctx.lineWidth = Math.max(2, 3 * layout.scale); ctx.strokeRect(0, fY, outW, footerH);
+        const now = new Date(startMs + Math.max(0, sourceVideo.currentTime||0)*1000);
+        const info = Object.assign({}, fixedInfo, {
+            timeOnly: now.toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false}),
+            dateOnly: now.toLocaleDateString('vi-VN'),
+            weekdayOnly: typeof getVietnamWeekday === 'function' ? getVietnamWeekday(now) : ''
+        });
+        let y = fY + 18 * layout.scale;
+        y += drawFooterHeaderBlock(ctx, info, layout.textX, y, layout.maxTextW, layout.scale, false);
+        y += 12 * layout.scale;
+        ctx.font = `bold ${Math.max(16, 21 * layout.scale)}px Arial`;
+        layout.lines.forEach(row => { ctx.fillStyle = row.color; y += drawWrappedTextBlock(ctx, row.text, layout.textX, y, layout.maxTextW, layout.lineH, row.max, 'left'); });
+        let extraX = outW - layout.pad - (layout.orderedExtras.length * layout.imgBoxSize + Math.max(0, layout.orderedExtras.length - 1) * layout.pad);
+        layout.orderedExtras.forEach(key => {
+            const img = layout.cachedExtras[key];
+            const label = key === 'compass' ? 'LA BÀN' : (key === 'map' ? 'BẢN ĐỒ' : 'NGƯỜI CHỤP');
+            if (typeof drawVideoExtraBox === 'function') drawVideoExtraBox(ctx, img, label, extraX, fY, layout);
+            extraX += layout.imgBoxSize + layout.pad;
+        });
+    }
+    async function makeVideoExtraImages(layout){
+        layout.cachedExtras = { compass:null, map:null, selfie:null };
+        const loadImg = (src) => new Promise(resolve => { if (!src) return resolve(null); const img = new Image(); img.onload=()=>resolve(img); img.onerror=()=>resolve(null); img.src=src; });
+        const getSource = (globalSource, canvasId) => {
+            if (globalSource) return globalSource;
+            const c = $(canvasId);
+            if (c && !c.classList.contains('d-none')) { try { return c.toDataURL('image/jpeg', typeof getJpegQuality==='function'?getJpegQuality():0.92); } catch(e){} }
+            return null;
+        };
+        if (layout.enabledExtras.includes('compass')) layout.cachedExtras.compass = await loadImg(getSource(globalExtras?.compass, 'canvas-compass'));
+        if (layout.enabledExtras.includes('map')) layout.cachedExtras.map = await loadImg(getSource(globalExtras?.map, 'canvas-map'));
+        if (layout.enabledExtras.includes('selfie')) layout.cachedExtras.selfie = await loadImg(globalExtras?.selfie);
+    }
+    window.gshtHandleExternalVideo = async function(ev){
+        const file = ev?.target?.files?.[0];
+        if (!file) return;
+        try {
+            status(`Đang tạo video có chân thông tin từ file <b>${file.name}</b>...`, 'text-info');
+            const srcUrl = URL.createObjectURL(file);
+            const v = document.createElement('video');
+            v.src = srcUrl; v.playsInline = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'; v.volume = 0; v.muted = false;
+            await videoLoaded(v);
+            const videoQ = typeof getVideoQualitySetting === 'function' ? getVideoQualitySetting() : { fps:20, videoBitsPerSecond:2500000 };
+            const out = typeof getVideoOutputDimensions === 'function' ? getVideoOutputDimensions(v.videoWidth, v.videoHeight) : getImportedOutDimensions(v.videoWidth, v.videoHeight);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const scale = Math.max(0.75, out.width / 1000);
+            const label = getImportedVideoLabel();
+            const ts = file.lastModified ? new Date(file.lastModified) : new Date();
+            const gpsMeta = typeof getCurrentGpsMeta === 'function' ? getCurrentGpsMeta() : null;
+            const address = typeof getAddressForGps === 'function' ? await getAddressForGps(gpsMeta) : '';
+            const fixedInfo = getCaptureContext(label, ts, gpsMeta, address);
+            const tempLayout = typeof buildVideoFooterLayout === 'function' ? buildVideoFooterLayout(ctx, out.width, scale, fixedInfo) : null;
+            if (!tempLayout) throw new Error('Không tìm thấy hàm dựng chân video.');
+            canvas.width = out.width; canvas.height = out.height + tempLayout.footerH;
+            await makeVideoExtraImages(tempLayout);
+            const stream = canvas.captureStream(videoQ.fps || 20);
+            try {
+                const sourceStream = v.captureStream ? v.captureStream() : null;
+                const a = sourceStream?.getAudioTracks?.()[0];
+                if (a) stream.addTrack(a);
+            } catch(e) {}
+            const chunks = [];
+            let mimeType = typeof getSupportedMimeType === 'function' ? getSupportedMimeType() : 'video/webm';
+            const recOpts = { videoBitsPerSecond: videoQ.videoBitsPerSecond || 2500000 };
+            if (mimeType) recOpts.mimeType = mimeType;
+            const recorder = new MediaRecorder(stream, recOpts);
+            recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+            const done = new Promise(resolve => { recorder.onstop = resolve; });
+            recorder.start(500);
+            let raf = 0;
+            const startMs = ts.getTime();
+            const drawLoop = () => {
+                if (!v.paused && !v.ended) {
+                    drawImportedVideoFrame(ctx, v, out.width, out.height, tempLayout.footerH, tempLayout, fixedInfo, startMs);
+                    raf = requestAnimationFrame(drawLoop);
+                }
+            };
+            await v.play();
+            drawLoop();
+            await videoEnded(v);
+            cancelAnimationFrame(raf);
+            drawImportedVideoFrame(ctx, v, out.width, out.height, tempLayout.footerH, tempLayout, fixedInfo, startMs);
+            try { recorder.stop(); } catch(e) {}
+            await done;
+            URL.revokeObjectURL(srcUrl);
+            const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
+            const ext = (recorder.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
+            window.currentMediaFilename = `VIDEO_NHAP_${($('tab1-prefix')?.value || 'HT').trim().replace(/\s+/g,'_') || 'HT'}_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${canvas.width}x${canvas.height}.${ext}`;
+            if (window.currentMediaBlobUrl) { try { URL.revokeObjectURL(window.currentMediaBlobUrl); } catch(e){} }
+            window.currentMediaBlobUrl = URL.createObjectURL(blob);
+            window.currentMediaType = 'video';
+            if (typeof showMediaPreview === 'function') showMediaPreview();
+            status(`✅ Đã tạo video từ file máy: <b>${file.name}</b>. Video xuất <b>${canvas.width}×${canvas.height}</b>, dung lượng khoảng <b>${(blob.size/1024/1024).toFixed(1)} MB</b>.`, 'text-success');
+        } catch(e) {
+            console.error(VERSION, e);
+            status('❌ Không tạo được video từ file máy: ' + (e.message || e), 'text-danger');
+        } finally { if (ev?.target) ev.target.value=''; }
+    };
+    function appendHelpV95(){
+        try {
+            const help = document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
+            if (help && !$('gsht-v95-help-note')) {
+                const div = document.createElement('div');
+                div.id = 'gsht-v95-help-note';
+                div.className = 'alert alert-warning small mt-2';
+                div.innerHTML = '<b>V95 - Camera gốc / ảnh ngoài / video ngoài:</b> Có thể chụp bằng camera gốc hoặc chọn ảnh đã chụp sẵn để đưa vào kho TRƯỚC / QUÁ TRÌNH / SAU. App ưu tiên đọc thời gian và GPS trong EXIF của ảnh, sau đó chèn chân ảnh, ảnh phụ trợ và lưu vào kho như ảnh chụp trong app. Có thể chọn video trong máy để tạo video mới có chân thông tin; âm thanh gốc sẽ được giữ nếu trình duyệt hỗ trợ captureStream.';
+                help.appendChild(div);
+            }
+        } catch(e) {}
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(appendHelpV95, 1500));
+    else setTimeout(appendHelpV95, 1500);
 })();
 </script>
 
