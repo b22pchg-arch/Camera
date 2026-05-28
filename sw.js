@@ -1,8 +1,8 @@
-// GSHT PWA cache update V89 - autofocus and REC video options
+// GSHT PWA cache update V90 - camera device and quality probe
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v89-video-autofocus-rec-options';
+const GSHT_CACHE = 'gsht-pwa-v90-camera-device-quality-probe';
 const APP_SHELL = [
   './',
   './index.html',
