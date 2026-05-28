@@ -8509,5 +8509,193 @@ window.addEventListener('load', () => {
 
 </script>
 
+
+
+<style id="gsht-v86-ui-patch-style">
+/* GSHT V86: ẩn gọn Vosk/Whisper nâng cao và đưa nút quay video lên khung camera */
+#gsht-stt-advanced-body {
+    border: 1px solid #495057;
+    border-radius: 10px;
+    background: rgba(0,0,0,.26);
+    padding: 8px;
+    margin: 8px 0;
+}
+#gsht-stt-advanced-body.d-none { display: none !important; }
+#gsht-stt-advanced-body .form-label { font-size: 10.5px; }
+.gsht-stt-advanced-note {
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: #adb5bd;
+    border: 1px dashed #495057;
+    border-radius: 8px;
+    padding: 6px 8px;
+    background: rgba(0,0,0,.3);
+    margin-bottom: 8px;
+}
+#camera-video-quickbar {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 24;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    pointer-events: none;
+}
+#btn-record-video-floating {
+    pointer-events: auto;
+    border-width: 2px;
+    box-shadow: 0 3px 14px rgba(0,0,0,.65);
+    min-width: 112px;
+    max-width: min(52vw, 220px);
+    white-space: normal;
+    line-height: 1.15;
+    backdrop-filter: blur(4px);
+}
+#camera-video-quickbar .camera-video-hint {
+    max-width: 210px;
+    font-size: 10px;
+    line-height: 1.2;
+    color: #f8f9fa;
+    background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 7px;
+    padding: 3px 6px;
+    text-align: right;
+}
+@media (max-width: 430px) {
+    #camera-video-quickbar { top: 6px; right: 6px; }
+    #btn-record-video-floating { min-width: 92px; font-size: 11px !important; padding: 6px 8px !important; }
+    #camera-video-quickbar .camera-video-hint { display:none; }
+}
+</style>
+
+<script id="gsht-v86-ui-patch">
+(function(){
+    const VERSION = 'GSHT-V86';
+    function qs(sel, root=document){ return root.querySelector(sel); }
+    function byId(id){ return document.getElementById(id); }
+
+    function ensureSttAdvancedBody(){
+        const panel = qs('.offline-stt-panel');
+        const btn = byId('btn-toggle-stt-advanced');
+        const header = btn ? btn.closest('.d-flex') : null;
+        if (!panel || !header) return null;
+        let body = byId('gsht-stt-advanced-body');
+        if (!body) {
+            body = document.createElement('div');
+            body.id = 'gsht-stt-advanced-body';
+            body.className = 'd-none';
+            body.innerHTML = `<div class="gsht-stt-advanced-note"><i class="fa-solid fa-circle-info me-1"></i><b>Vosk / Whisper là chế độ nâng cao.</b> Mặc định nên dùng công cụ sẵn có của điện thoại và ghi âm lưu tạm. Chỉ mở phần này khi cần cấu hình model offline, kiểm tra runtime hoặc thử nhận dạng bằng file âm thanh.</div>`;
+            header.insertAdjacentElement('afterend', body);
+        }
+        const engineRow = byId('offline-stt-engine')?.closest('.row');
+        const modelBox = byId('offline-stt-model-url')?.closest('.border.border-secondary') || byId('offline-stt-model-url')?.closest('.border');
+        const fileTestBox = byId('standalone-whisper-audio-file')?.closest('.border');
+        [engineRow, modelBox, fileTestBox].filter(Boolean).forEach(el => {
+            if (el.parentElement !== body) body.appendChild(el);
+            el.classList.add('gsht-stt-advanced-managed');
+        });
+        return body;
+    }
+
+    function setAdvancedVisible(visible){
+        const body = ensureSttAdvancedBody();
+        if (!body) return;
+        body.classList.toggle('d-none', !visible);
+        const btn = byId('btn-toggle-stt-advanced');
+        if (btn) {
+            btn.innerHTML = visible ? '<i class="fa-solid fa-eye-slash me-1"></i>ẨN' : '<i class="fa-solid fa-eye me-1"></i>HIỆN';
+            btn.classList.toggle('btn-outline-warning', visible);
+            btn.classList.toggle('btn-outline-info', !visible);
+        }
+        try { localStorage.setItem('gsht_stt_advanced_visible_v86', visible ? '1' : '0'); } catch(e) {}
+    }
+
+    window.gshtToggleSttAdvanced = function(force){
+        const body = ensureSttAdvancedBody();
+        const next = (typeof force === 'boolean') ? force : !(body && !body.classList.contains('d-none'));
+        setAdvancedVisible(next);
+        const engine = byId('offline-stt-engine')?.value || 'system';
+        const model = byId('offline-stt-model-path');
+        const worker = byId('offline-stt-worker-path');
+        if (model) model.disabled = (engine === 'system');
+        if (worker) worker.disabled = (engine !== 'whisper');
+    };
+
+    window.gshtUpdateSttModeUi = function(){
+        const body = ensureSttAdvancedBody();
+        const engine = byId('offline-stt-engine')?.value || 'system';
+        let saved = false;
+        try { saved = localStorage.getItem('gsht_stt_advanced_visible_v86') === '1'; } catch(e) {}
+        const visible = saved || engine !== 'system';
+        if (body) body.classList.toggle('d-none', !visible);
+        const btn = byId('btn-toggle-stt-advanced');
+        if (btn) {
+            btn.innerHTML = visible ? '<i class="fa-solid fa-eye-slash me-1"></i>ẨN' : '<i class="fa-solid fa-eye me-1"></i>HIỆN';
+            btn.classList.toggle('btn-outline-warning', visible);
+            btn.classList.toggle('btn-outline-info', !visible);
+        }
+        const model = byId('offline-stt-model-path');
+        const worker = byId('offline-stt-worker-path');
+        if (model) model.disabled = (engine === 'system');
+        if (worker) worker.disabled = (engine !== 'whisper');
+    };
+
+    window.gshtSelectSystemSpeechMode = function(){
+        const engine = byId('offline-stt-engine');
+        if (engine) engine.value = 'system';
+        try { if (typeof saveOfflineSttPreference === 'function') saveOfflineSttPreference(); } catch(e) {}
+        try { localStorage.setItem('gsht_stt_advanced_visible_v86', '0'); } catch(e) {}
+        window.gshtUpdateSttModeUi();
+        try { setOfflineSttStatus('✅ Đã chọn chế độ mặc định: công cụ nhận dạng sẵn có của điện thoại/trình duyệt.', 'success'); } catch(e) {}
+        try { setOfflineSttPartial('Bấm BẮT ĐẦU NHẬN DIỆN để dùng công cụ sẵn có. Bấm GHI ÂM LƯU TẠM nếu muốn lưu/chia sẻ file âm thanh.'); } catch(e) {}
+    };
+
+    function copyRecordButtonState(){
+        const src = byId('btn-record-video');
+        const dst = byId('btn-record-video-floating');
+        if (!src || !dst) return;
+        const recording = (typeof isRecording !== 'undefined' && !!isRecording);
+        dst.disabled = !!src.disabled;
+        dst.className = 'btn btn-sm fw-bold camera-video-float ' + (recording ? 'btn-warning text-dark storage-alarm' : 'btn-danger text-white');
+        let html = src.innerHTML || '<i class="fa-solid fa-video me-1"></i>VIDEO';
+        html = html.replace(/QUAY VIDEO/gi, 'VIDEO').replace(/ĐANG KHỞI TẠO LUỒNG/gi, 'KHỞI TẠO').replace(/ĐANG QUAY/gi, 'ĐANG QUAY');
+        dst.innerHTML = html;
+        dst.title = recording ? 'Bấm để dừng quay video' : 'Bấm để quay video, vẫn xem được khung camera';
+    }
+
+    function ensureFloatingVideoButton(){
+        const container = byId('camera-container');
+        if (!container) return;
+        let bar = byId('camera-video-quickbar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'camera-video-quickbar';
+            bar.innerHTML = `<button id="btn-record-video-floating" type="button" class="btn btn-sm btn-danger text-white fw-bold camera-video-float" onclick="toggleRecording()"><i class="fa-solid fa-video me-1"></i>VIDEO</button><div class="camera-video-hint">Quay video ngay trên khung camera</div>`;
+            container.appendChild(bar);
+        }
+        const src = byId('btn-record-video');
+        if (src && !src.__gshtV86VideoObserver) {
+            const obs = new MutationObserver(copyRecordButtonState);
+            obs.observe(src, { attributes:true, childList:true, subtree:true, characterData:true });
+            src.__gshtV86VideoObserver = obs;
+        }
+        copyRecordButtonState();
+        if (!window.__gshtV86VideoMirrorTimer) window.__gshtV86VideoMirrorTimer = setInterval(copyRecordButtonState, 1000);
+    }
+
+    function initV86(){
+        try { ensureSttAdvancedBody(); window.gshtUpdateSttModeUi(); } catch(e) { console.warn(VERSION, 'stt advanced init failed', e); }
+        try { ensureFloatingVideoButton(); } catch(e) { console.warn(VERSION, 'floating video init failed', e); }
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(initV86, 900));
+    else setTimeout(initV86, 900);
+    window.addEventListener('load', () => setTimeout(initV86, 1200));
+})();
+</script>
+
 </body>
 </html>
