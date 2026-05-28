@@ -10800,6 +10800,10 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         const o = file ? gshtExternalTimeOverrideMap.get(file) : null;
         return o && gshtValidTimeMs(o.timestampMs) ? o : null;
     }
+    // V102: expose the exact WeakMap-backed time override helpers so the bulk-temp classifier
+    // can lock the timestamp shown in the temporary pool before importing each image.
+    window.gshtSetExternalTimeOverride = gshtSetExternalTimeOverride;
+    window.gshtGetExternalTimeOverride = gshtGetExternalTimeOverride;
     function status(html, cls='text-secondary') {
         const el = $('gsht-native-import-status');
         if (el) { el.className = 'small mt-2 ' + cls; el.innerHTML = html; }
@@ -11325,7 +11329,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 // GSHT V97: xem lại/tải/chia sẻ/xóa video đã tạo + kho tạm nhiều ảnh phân loại theo mốc ảnh SAU.
 (function(){
     'use strict';
-    const VERSION = 'GSHT-V97-VIDEO-REVIEW-BULK-TEMP';
+    const VERSION = 'GSHT-V102-BULK-TEMP-CLASSIFY-FIX';
     const $ = (id) => document.getElementById(id);
     const state = { pool: [], lastVideoObjectUrl: '', lastVideoName: '' };
 
@@ -11573,7 +11577,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             if (Number.isFinite(Number(ms)) && Number(ms) > 0) {
                 it.timestampMs = Number(ms);
                 it.timeStatus = Math.abs(Number(ms) - fallback) > 1000 ? 'exif' : 'file';
-                try { gshtSetExternalTimeOverride(it.file, it.timestampMs, it.timeStatus === 'exif' ? 'EXIF ảnh đã đọc ở kho tạm' : 'thời gian file đã đọc ở kho tạm'); } catch(e) {}
+                try { if (typeof window.gshtSetExternalTimeOverride === 'function') window.gshtSetExternalTimeOverride(it.file, it.timestampMs, it.timeStatus === 'exif' ? 'EXIF ảnh đã đọc ở kho tạm' : 'thời gian file đã đọc ở kho tạm'); } catch(e) {}
             } else {
                 it.timeStatus = 'file';
             }
@@ -11594,7 +11598,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         const added = [];
         for (const file of files) {
             const fallbackMs = Number(file?.lastModified) > 0 ? Number(file.lastModified) : Date.now();
-            try { gshtSetExternalTimeOverride(file, fallbackMs, 'thời gian file tạm trước khi đọc EXIF'); } catch(e) {}
+            try { if (typeof window.gshtSetExternalTimeOverride === 'function') window.gshtSetExternalTimeOverride(file, fallbackMs, 'thời gian file tạm trước khi đọc EXIF'); } catch(e) {}
             const url = await makeThumbUrl(file);
             const item = { id:'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2,8), file, name:file.name || 'image', timestampMs:fallbackMs, url, timeStatus:'reading' };
             state.pool.push(item);
@@ -11628,7 +11632,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             else type = 'QUÁ TRÌNH';
             try {
                 if (typeof window.gshtHandleExternalPhotos === 'function') {
-                    gshtSetExternalTimeOverride(it.file, it.timestampMs, 'thời gian đã đọc ở kho tạm');
+                    if (typeof window.gshtSetExternalTimeOverride === 'function') window.gshtSetExternalTimeOverride(it.file, it.timestampMs, 'thời gian đã đọc ở kho tạm');
                     await window.gshtHandleExternalPhotos({ target: { files: [it.file], value: '' } }, type);
                     ok++;
                 } else throw new Error('Không tìm thấy hàm nhập ảnh ngoài.');
@@ -11637,6 +11641,8 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             await new Promise(r=>setTimeout(r, 50));
         }
         setNativeStatus(`✅ Đã phân loại kho tạm: thành công <b>${ok}</b>, lỗi <b>${fail}</b>. Ảnh SAU theo lựa chọn; ảnh sớm nhất trước mốc SAU đầu tiên là TRƯỚC; ảnh còn lại là QUÁ TRÌNH.`, fail ? 'text-warning' : 'text-success');
+        const stDone = $('gsht-bulk-temp-status');
+        if (stDone) stDone.innerHTML = `✅ Phân loại xong: <b>${ok}</b> ảnh thành công${fail ? `, <b>${fail}</b> ảnh lỗi` : ''}. Nếu ảnh đã vào đúng kho, có thể bấm <b>XÓA KHO TẠM</b>.`;
     };
 
     function appendHelp(){
@@ -11848,6 +11854,30 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             help.appendChild(div);
         }
     } catch(e) {}
+})();
+</script>
+
+
+
+<script>
+// GSHT V102: fix bulk temporary photo classification after V101 async EXIF reading.
+(function(){
+  const VERSION = 'GSHT-V102-BULK-TEMP-CLASSIFY-FIX';
+  function bumpNote(){
+    try {
+      const st = document.getElementById('gsht-bulk-temp-status');
+      if (st && !st.dataset.gshtV102Note) {
+        st.dataset.gshtV102Note = '1';
+        if (!/Phân loại/i.test(st.textContent || '')) {
+          st.innerHTML = (st.innerHTML || '') + '<br><span class="text-info">V102: đã khóa thời gian từng ảnh trong kho tạm để phân loại TRƯỚC/Q.TRÌNH/SAU ổn định hơn.</span>';
+        }
+      }
+    } catch(e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(bumpNote, 2200));
+  else setTimeout(bumpNote, 2200);
+  window.addEventListener('load', () => setTimeout(bumpNote, 2600));
+  try { console.log(VERSION, 'loaded'); } catch(e) {}
 })();
 </script>
 
