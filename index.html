@@ -9380,5 +9380,407 @@ window.addEventListener('load', () => {
 })();
 </script>
 
+
+
+<style id="gsht-v90-camera-probe-style">
+#gsht-camera-probe-panel .form-label { font-size: 10.5px; }
+#gsht-camera-probe-panel .probe-result-box { max-height: 155px; overflow:auto; line-height:1.35; font-size:10.5px; }
+#gsht-camera-probe-panel .btn { white-space: nowrap; }
+#gsht-camera-probe-panel select { font-size: 11px; }
+</style>
+<script id="gsht-v90-camera-probe-patch">
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V90-CAMERA-PROBE';
+    const DEVICE_KEY = 'gsht_selected_camera_device_id_v90';
+    const QUALITY_KEY = 'gsht_selected_detected_quality_v90';
+    const SCAN_KEY = 'gsht_camera_scan_results_v90';
+    const byId = id => document.getElementById(id);
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    let selectedCameraDeviceId = '';
+    let selectedDetectedQuality = null;
+    let detectedCameras = [];
+    let detectedQualities = [];
+
+    function safeJsonParse(raw, fallback){ try { return raw ? JSON.parse(raw) : fallback; } catch(e) { return fallback; } }
+    function setProbeStatus(html, cls='text-secondary'){
+        const el = byId('gsht-camera-probe-status');
+        if (el) { el.className = 'probe-result-box border border-secondary rounded p-2 bg-black bg-opacity-25 ' + cls; el.innerHTML = html; }
+    }
+    function getCurrentTrack(){ return localStream?.getVideoTracks?.()[0] || null; }
+    function stopStream(stream){ try { stream?.getTracks?.().forEach(t => t.stop()); } catch(e){} }
+    function getFacingFromLabel(label){
+        const s = String(label || '').toLowerCase();
+        if (/front|user|trước|trước|selfie/.test(s)) return 'user';
+        if (/back|rear|environment|sau|wide|tele|ultra|macro/.test(s)) return 'environment';
+        return '';
+    }
+    function formatCameraLabel(device, idx){
+        const raw = device.label || `Camera ${idx + 1}`;
+        const facing = getFacingFromLabel(raw);
+        const tag = facing === 'user' ? 'Trước' : (facing === 'environment' ? 'Sau' : 'Không rõ');
+        return `${idx + 1}. ${raw} (${tag})`;
+    }
+    function getSavedDeviceId(){ try { return localStorage.getItem(DEVICE_KEY) || ''; } catch(e) { return ''; } }
+    function setSavedDeviceId(id){ selectedCameraDeviceId = id || ''; try { localStorage.setItem(DEVICE_KEY, selectedCameraDeviceId); } catch(e){} }
+    function getSavedQuality(){ return safeJsonParse(localStorage.getItem(QUALITY_KEY), null); }
+    function setSavedQuality(q){
+        selectedDetectedQuality = q || null;
+        try { q ? localStorage.setItem(QUALITY_KEY, JSON.stringify(q)) : localStorage.removeItem(QUALITY_KEY); } catch(e){}
+    }
+    function getDeviceConstraint(){
+        if (!selectedCameraDeviceId) return null;
+        return { exact: selectedCameraDeviceId };
+    }
+    function getTrackCapabilitiesSummary(track){
+        try {
+            const c = track?.getCapabilities?.();
+            if (!c) return '';
+            const parts = [];
+            if (c.width) parts.push(`rộng ${c.width.min || '?'}–${c.width.max || '?'}px`);
+            if (c.height) parts.push(`cao ${c.height.min || '?'}–${c.height.max || '?'}px`);
+            if (c.frameRate) parts.push(`fps ${c.frameRate.min || '?'}–${c.frameRate.max || '?'}`);
+            if (c.zoom) parts.push(`zoom ${c.zoom.min || '?'}–${c.zoom.max || '?'}x`);
+            if (Array.isArray(c.focusMode)) parts.push(`focus: ${c.focusMode.join(', ')}`);
+            return parts.join('; ');
+        } catch(e) { return ''; }
+    }
+    function nearestPresetForQuality(q){
+        if (!q) return 'balanced';
+        const h = Number(q.height || 0);
+        if (h <= 720) return 'saving';
+        if (h <= 1080) return 'balanced';
+        if (h <= 1440) return 'high';
+        return 'original';
+    }
+
+    function ensureCameraProbePanel(){
+        if (byId('gsht-camera-probe-panel')) return;
+        const html = `
+            <div id="gsht-camera-probe-panel" class="card bg-dark border-warning p-2 mb-2 shadow-sm">
+                <div class="small text-warning fw-bold mb-2"><i class="fa-solid fa-satellite-dish me-1"></i>DÒ CAM / DÒ CHẤT LƯỢNG CAMERA</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label text-info fw-bold mb-1" for="gsht-camera-device-select"><i class="fa-solid fa-camera me-1"></i>Camera sử dụng cho ảnh và video</label>
+                        <select id="gsht-camera-device-select" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="gshtSelectCameraDevice(this.value, true)">
+                            <option value="">Tự động theo trước/sau</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label text-info fw-bold mb-1" for="gsht-camera-quality-select"><i class="fa-solid fa-expand me-1"></i>Chất lượng dò được</label>
+                        <select id="gsht-camera-quality-select" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="gshtSelectDetectedQuality(this.value, true)">
+                            <option value="">Dùng mức chất lượng bên trên</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-3 d-grid gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-warning fw-bold" onclick="gshtScanCameras()"><i class="fa-solid fa-magnifying-glass me-1"></i>DÒ CAM</button>
+                        <button type="button" class="btn btn-sm btn-outline-info fw-bold" onclick="gshtScanCameraQualities()"><i class="fa-solid fa-gauge-high me-1"></i>DÒ CHẤT LƯỢNG</button>
+                    </div>
+                    <div class="col-12">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="gshtApplySelectedCameraAndQuality()"><i class="fa-solid fa-check me-1"></i>ÁP DỤNG CHO ẢNH / VIDEO</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" onclick="gshtClearCameraProbeSelection()"><i class="fa-solid fa-rotate-left me-1"></i>VỀ TỰ ĐỘNG</button>
+                        </div>
+                    </div>
+                    <div class="col-12"><div id="gsht-camera-probe-status" class="probe-result-box border border-secondary rounded p-2 bg-black bg-opacity-25 text-secondary">Bấm <b>DÒ CAM</b> để liệt kê camera trên thiết bị. Sau đó bấm <b>DÒ CHẤT LƯỢNG</b> để thử độ phân giải camera đang chọn.</div></div>
+                </div>
+            </div>`;
+        const qualityCard = byId('photo-quality-select')?.closest('.card');
+        const toolsBody = byId('camera-tools-body');
+        if (qualityCard) qualityCard.insertAdjacentHTML('afterend', html);
+        else if (toolsBody) toolsBody.insertAdjacentHTML('afterbegin', html);
+        else byId('camera-wrapper')?.insertAdjacentHTML('beforebegin', html);
+    }
+
+    function renderCameraDeviceSelect(){
+        const sel = byId('gsht-camera-device-select');
+        if (!sel) return;
+        const currentSettingDevice = getCurrentTrack()?.getSettings?.().deviceId || '';
+        const saved = selectedCameraDeviceId || getSavedDeviceId();
+        const selected = saved || currentSettingDevice || '';
+        sel.innerHTML = '<option value="">Tự động theo trước/sau</option>' + detectedCameras.map((d, idx) => `<option value="${String(d.deviceId).replace(/"/g,'&quot;')}">${formatCameraLabel(d, idx)}</option>`).join('');
+        if ([...sel.options].some(o => o.value === selected)) sel.value = selected;
+    }
+    function renderQualitySelect(){
+        const sel = byId('gsht-camera-quality-select');
+        if (!sel) return;
+        const saved = selectedDetectedQuality || getSavedQuality();
+        const savedKey = saved ? `${saved.width}x${saved.height}@${Math.round(saved.fps || 0)}` : '';
+        sel.innerHTML = '<option value="">Dùng mức chất lượng bên trên</option>' + detectedQualities.map(q => {
+            const key = `${q.width}x${q.height}@${Math.round(q.fps || 0)}`;
+            const label = `${q.width}×${q.height}${q.fps ? ` / ${Math.round(q.fps)}fps` : ''}${q.exact ? '' : ' (ước lượng)'}`;
+            return `<option value="${key}">${label}</option>`;
+        }).join('');
+        if (savedKey && [...sel.options].some(o => o.value === savedKey)) sel.value = savedKey;
+    }
+
+    async function ensureCameraPermissionForLabels(){
+        try {
+            let devices = await navigator.mediaDevices.enumerateDevices();
+            if (devices.some(d => d.kind === 'videoinput' && d.label)) return devices;
+            const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            stopStream(tmp);
+            await sleep(150);
+            return await navigator.mediaDevices.enumerateDevices();
+        } catch(e) {
+            throw new Error('Không cấp được quyền camera để dò thiết bị: ' + (e.message || e.name || e));
+        }
+    }
+
+    window.gshtScanCameras = async function(restartAfter=false){
+        ensureCameraProbePanel();
+        if (!navigator.mediaDevices?.enumerateDevices) {
+            setProbeStatus('Trình duyệt không hỗ trợ enumerateDevices().', 'text-danger');
+            return [];
+        }
+        setProbeStatus('<i class="fa-solid fa-spinner fa-spin me-1"></i>Đang dò danh sách camera...', 'text-info');
+        try {
+            const devices = await ensureCameraPermissionForLabels();
+            detectedCameras = devices.filter(d => d.kind === 'videoinput');
+            renderCameraDeviceSelect();
+            try { localStorage.setItem(SCAN_KEY, JSON.stringify({ cameras: detectedCameras.map(d => ({ deviceId: d.deviceId, label: d.label, groupId: d.groupId })), qualities: detectedQualities })); } catch(e) {}
+            const active = getCurrentTrack();
+            const cap = getTrackCapabilitiesSummary(active);
+            setProbeStatus(
+                `<b>Đã tìm thấy ${detectedCameras.length} camera.</b><br>` +
+                detectedCameras.map((d, i) => `• ${formatCameraLabel(d, i)}`).join('<br>') +
+                (cap ? `<hr class="my-1"><b>Camera đang chạy:</b> ${cap}` : ''),
+                'text-light'
+            );
+            if (restartAfter && isCameraOn) await initCamera();
+            return detectedCameras;
+        } catch(e) {
+            console.error(VERSION, e);
+            setProbeStatus('❌ ' + (e.message || e), 'text-danger');
+            return [];
+        }
+    };
+
+    window.gshtSelectCameraDevice = async function(deviceId, restart=true){
+        setSavedDeviceId(deviceId || '');
+        const dev = detectedCameras.find(d => d.deviceId === deviceId);
+        if (dev) {
+            const f = getFacingFromLabel(dev.label);
+            if (f) currentFacingMode = f;
+        }
+        if (restart && isCameraOn) await initCamera();
+    };
+
+    async function tryExactQuality(deviceId, w, h, fps=30){
+        const video = { width: { exact: w }, height: { exact: h }, frameRate: { ideal: fps } };
+        if (deviceId) video.deviceId = { exact: deviceId }; else video.facingMode = currentFacingMode;
+        const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+        const track = stream.getVideoTracks()[0];
+        const s = track.getSettings ? track.getSettings() : {};
+        const result = {
+            width: Math.round(s.width || w),
+            height: Math.round(s.height || h),
+            fps: s.frameRate || fps,
+            exact: Math.round(s.width || w) === w && Math.round(s.height || h) === h
+        };
+        stopStream(stream);
+        return result;
+    }
+
+    window.gshtScanCameraQualities = async function(){
+        ensureCameraProbePanel();
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setProbeStatus('Trình duyệt không hỗ trợ getUserMedia().', 'text-danger');
+            return [];
+        }
+        let deviceId = selectedCameraDeviceId || getSavedDeviceId();
+        if (!deviceId) {
+            const cur = getCurrentTrack()?.getSettings?.().deviceId;
+            if (cur) deviceId = cur;
+        }
+        setProbeStatus('<i class="fa-solid fa-spinner fa-spin me-1"></i>Đang dò chất lượng. App sẽ tạm ngắt camera trong vài giây để thử các mức phân giải...', 'text-info');
+        const wasOn = !!isCameraOn;
+        try {
+            if (localStream) { stopStream(localStream); localStream = null; }
+            const videoEl = byId('video-preview');
+            if (videoEl) videoEl.srcObject = null;
+            await sleep(250);
+            const candidates = [
+                [3840,2160,30], [2560,1440,30], [1920,1080,30], [1600,900,30],
+                [1280,720,30], [1024,768,25], [800,600,25], [640,480,25]
+            ];
+            const found = [];
+            const seen = new Set();
+            for (const [w,h,fps] of candidates) {
+                try {
+                    const r = await tryExactQuality(deviceId, w, h, fps);
+                    const key = `${r.width}x${r.height}`;
+                    if (!seen.has(key)) { seen.add(key); found.push(r); }
+                    setProbeStatus(`Đang dò... đã nhận ${found.length} mức:<br>${found.map(q => `• ${q.width}×${q.height}${q.fps ? ` / ${Math.round(q.fps)}fps` : ''}`).join('<br>')}`, 'text-info');
+                    await sleep(120);
+                } catch(e) {}
+            }
+            if (!found.length) {
+                const q = getPhotoQualitySetting();
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: deviceId ? { exact: deviceId } : undefined, facingMode: deviceId ? undefined : currentFacingMode, width:{ ideal:q.width }, height:{ ideal:q.height }, frameRate:{ ideal:q.fps || 25 } }, audio:false });
+                const s = stream.getVideoTracks()[0].getSettings();
+                found.push({ width: s.width || q.width, height: s.height || q.height, fps: s.frameRate || q.fps || 25, exact: false });
+                stopStream(stream);
+            }
+            detectedQualities = found.sort((a,b) => (b.width*b.height) - (a.width*a.height));
+            renderQualitySelect();
+            try { localStorage.setItem(SCAN_KEY, JSON.stringify({ cameras: detectedCameras.map(d => ({ deviceId: d.deviceId, label: d.label, groupId: d.groupId })), qualities: detectedQualities })); } catch(e) {}
+            setProbeStatus(`<b>Đã dò được ${detectedQualities.length} mức chất lượng.</b><br>${detectedQualities.map(q => `• ${q.width}×${q.height}${q.fps ? ` / ${Math.round(q.fps)}fps` : ''}${q.exact ? '' : ' (ước lượng)'}`).join('<br>')}<br><span class="text-warning">Chọn một mức rồi bấm ÁP DỤNG để dùng chung cho ảnh và video.</span>`, 'text-light');
+            return detectedQualities;
+        } catch(e) {
+            console.error(VERSION, e);
+            setProbeStatus('❌ Không dò được chất lượng: ' + (e.message || e), 'text-danger');
+            return [];
+        } finally {
+            if (wasOn) { isCameraOn = true; await sleep(200); try { await initCamera(); } catch(e){} }
+        }
+    };
+
+    window.gshtSelectDetectedQuality = async function(value, restart=false){
+        if (!value) {
+            setSavedQuality(null);
+            if (restart && isCameraOn) await initCamera();
+            return;
+        }
+        const q = detectedQualities.find(x => `${x.width}x${x.height}@${Math.round(x.fps || 0)}` === value);
+        if (!q) return;
+        setSavedQuality(q);
+        const preset = nearestPresetForQuality(q);
+        const sel = byId('photo-quality-select');
+        if (sel) sel.value = preset;
+        if (restart && isCameraOn) await initCamera();
+    };
+
+    window.gshtApplySelectedCameraAndQuality = async function(){
+        const devSel = byId('gsht-camera-device-select');
+        const qSel = byId('gsht-camera-quality-select');
+        if (devSel) setSavedDeviceId(devSel.value || '');
+        if (qSel) await gshtSelectDetectedQuality(qSel.value || '', false);
+        setProbeStatus('✅ Đã áp dụng camera/chất lượng đã chọn cho cả chụp ảnh và quay video. Đang mở lại camera...', 'text-success');
+        if (isCameraOn) await initCamera();
+    };
+
+    window.gshtClearCameraProbeSelection = async function(){
+        setSavedDeviceId('');
+        setSavedQuality(null);
+        const devSel = byId('gsht-camera-device-select'); if (devSel) devSel.value = '';
+        const qSel = byId('gsht-camera-quality-select'); if (qSel) qSel.value = '';
+        currentFacingMode = 'environment';
+        setProbeStatus('Đã về chế độ tự động. Nút xoay camera sẽ dùng trước/sau mặc định của thiết bị.', 'text-secondary');
+        if (isCameraOn) await initCamera();
+    };
+
+    function wrapCameraFunctions(){
+        selectedCameraDeviceId = getSavedDeviceId();
+        selectedDetectedQuality = getSavedQuality();
+        const cached = safeJsonParse(localStorage.getItem(SCAN_KEY), null);
+        if (cached) { detectedCameras = cached.cameras || []; detectedQualities = cached.qualities || []; }
+
+        if (typeof getPhotoQualitySetting === 'function' && !window.__gshtV90QualityWrapped) {
+            const oldGet = getPhotoQualitySetting;
+            getPhotoQualitySetting = function(){
+                const base = oldGet.apply(this, arguments);
+                const q = selectedDetectedQuality || getSavedQuality();
+                if (!q || !q.width || !q.height) return base;
+                const longEdge = Math.max(q.width, q.height);
+                return Object.assign({}, base, {
+                    width: q.width,
+                    height: q.height,
+                    maxLongEdge: Math.max(base.maxLongEdge || 0, longEdge),
+                    stitchPanelLongEdge: Math.max(base.stitchPanelLongEdge || 0, longEdge),
+                    videoMaxHeight: Math.max(q.width, q.height) === q.width ? q.height : q.width,
+                    fps: Math.round(q.fps || base.fps || 25),
+                    videoBitsPerSecond: Math.max(base.videoBitsPerSecond || 0, Math.round((q.width*q.height*(q.fps || base.fps || 25))*0.10)),
+                    label: `Dò được ${q.width}×${q.height}`
+                });
+            };
+            window.__gshtV90QualityWrapped = true;
+        }
+
+        if (typeof getCameraConstraints === 'function' && !window.__gshtV90ConstraintsWrapped) {
+            const oldConstraints = getCameraConstraints;
+            getCameraConstraints = function(){
+                const c = oldConstraints.apply(this, arguments) || { video: true };
+                const v = typeof c.video === 'object' ? Object.assign({}, c.video) : {};
+                selectedCameraDeviceId = getSavedDeviceId();
+                if (selectedCameraDeviceId) {
+                    delete v.facingMode;
+                    v.deviceId = { exact: selectedCameraDeviceId };
+                }
+                return Object.assign({}, c, { video: v });
+            };
+            window.__gshtV90ConstraintsWrapped = true;
+        }
+
+        if (typeof toggleCamera === 'function' && !window.__gshtV90ToggleWrapped) {
+            const oldToggle = toggleCamera;
+            toggleCamera = async function(){
+                if (detectedCameras.length > 1) {
+                    const cur = getSavedDeviceId() || getCurrentTrack()?.getSettings?.().deviceId || '';
+                    const idx = Math.max(0, detectedCameras.findIndex(d => d.deviceId === cur));
+                    const next = detectedCameras[(idx + 1) % detectedCameras.length];
+                    await gshtSelectCameraDevice(next.deviceId, true);
+                    renderCameraDeviceSelect();
+                    setProbeStatus(`Đã chuyển sang: <b>${formatCameraLabel(next, (idx + 1) % detectedCameras.length)}</b>`, 'text-info');
+                    return;
+                }
+                return oldToggle.apply(this, arguments);
+            };
+            window.__gshtV90ToggleWrapped = true;
+        }
+
+        if (typeof updateCameraFrameRatio === 'function' && !window.__gshtV90FrameNoteWrapped) {
+            const oldUpdate = updateCameraFrameRatio;
+            updateCameraFrameRatio = function(){
+                const ret = oldUpdate.apply(this, arguments);
+                try {
+                    const note = byId('camera-frame-note');
+                    const track = getCurrentTrack();
+                    const s = track?.getSettings?.() || {};
+                    const dev = detectedCameras.find(d => d.deviceId === (s.deviceId || selectedCameraDeviceId));
+                    const q = selectedDetectedQuality || getSavedQuality();
+                    if (note && (dev || q)) {
+                        note.innerHTML += `<br><span class="text-warning">Camera: <b>${dev?.label || (selectedCameraDeviceId ? 'đã chọn' : 'tự động')}</b>${q ? `; chất lượng dò được: <b>${q.width}×${q.height}${q.fps ? `/${Math.round(q.fps)}fps` : ''}</b>` : ''}</span>`;
+                    }
+                } catch(e) {}
+                return ret;
+            };
+            window.__gshtV90FrameNoteWrapped = true;
+        }
+    }
+
+    function addHelpNote(){
+        try {
+            const help = Array.from(document.querySelectorAll('#help-tab-pane, #help, .tab-pane')).find(el => /TAB MÁY ẢNH|QUAY VIDEO HIỆN TRƯỜNG/i.test(el.textContent || ''));
+            if (help && !byId('gsht-v90-help-note')) {
+                const p = document.createElement('div');
+                p.id = 'gsht-v90-help-note';
+                p.className = 'alert alert-info small mt-2';
+                p.innerHTML = '<b>Dò camera/chất lượng:</b> Với điện thoại có nhiều camera, bấm <b>DÒ CAM</b> để chọn đúng ống kính dùng cho ảnh và video. Bấm <b>DÒ CHẤT LƯỢNG</b> để thử các độ phân giải camera hỗ trợ, sau đó chọn một mức và bấm <b>ÁP DỤNG</b>. Lựa chọn này dùng chung cho chụp ảnh, ảnh ghép và quay video.';
+                help.appendChild(p);
+            }
+        } catch(e) {}
+    }
+
+    function initV90(){
+        try {
+            ensureCameraProbePanel();
+            wrapCameraFunctions();
+            renderCameraDeviceSelect();
+            renderQualitySelect();
+            addHelpNote();
+            if (detectedCameras.length || detectedQualities.length) {
+                setProbeStatus(`Đã nạp lựa chọn đã lưu. Camera: <b>${selectedCameraDeviceId ? 'đã chọn thủ công' : 'tự động'}</b>${selectedDetectedQuality ? `; chất lượng: <b>${selectedDetectedQuality.width}×${selectedDetectedQuality.height}</b>` : ''}.`, 'text-secondary');
+            }
+            setTimeout(() => { try { gshtScanCameras(false); } catch(e){} }, 1200);
+        } catch(e) { console.warn(VERSION, e); }
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(initV90, 600));
+    else setTimeout(initV90, 600);
+    window.addEventListener('load', () => setTimeout(initV90, 1300));
+})();
+</script>
+
 </body>
 </html>
