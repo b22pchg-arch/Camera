@@ -827,6 +827,33 @@ function showUpdateNotification() {
                                     <input type="number" id="max-record-time" class="form-control bg-dark text-info border-secondary text-center fw-bold" value="30" min="5" max="300">
                                 </div>
                             </div>
+                            <div class="col-12">
+                                <div id="video-focus-rec-options" class="border border-secondary rounded p-2 bg-black bg-opacity-25">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-12 col-md-5">
+                                            <div class="form-check form-switch d-flex align-items-center mb-0">
+                                                <input class="form-check-input ms-1 me-2" type="checkbox" role="switch" id="toggle-camera-autofocus" checked onchange="gshtSaveVideoCameraPrefs(); gshtApplyCameraAutoFocus('toggle');">
+                                                <label class="form-check-label text-info small fw-bold" for="toggle-camera-autofocus">
+                                                    <i class="fa-solid fa-crosshairs me-1"></i>Tự động lấy nét nếu camera hỗ trợ
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-7">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text bg-secondary text-light border-secondary small fw-bold" style="font-size:11px;">REC VIDEO:</span>
+                                                <select id="video-rec-display-mode" class="form-select bg-dark text-warning border-secondary fw-bold" onchange="gshtSaveVideoCameraPrefs();">
+                                                    <option value="overlay" selected>Hiện đỏ nhấp nháy trên khung video</option>
+                                                    <option value="footer">Thay chữ VIDEO ở dải chân</option>
+                                                    <option value="off">Không chèn REC vào video</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <div id="camera-autofocus-status" class="small text-secondary" style="font-size:10px; line-height:1.25;">Tự động lấy nét sẽ được áp dụng khi mở camera, chụp ảnh và quay video nếu thiết bị hỗ trợ.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="col-7">
                                 <button id="btn-record-video" class="btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger" onclick="toggleRecording()" style="font-size: 13px;">
                                     <i class="fa-solid fa-video me-1"></i> QUAY VIDEO
@@ -1400,6 +1427,8 @@ function showUpdateNotification() {
                     <li>Thiết lập <b>Thời gian quay tối đa</b>. Hết thời gian, app tự dừng quay và mở cửa sổ tải xuống.</li>
                     <li>Chất lượng video gồm kích thước canvas, FPS và bitrate được đồng bộ theo mức chất lượng đã chọn ở tab Máy Ảnh; trước khi quay app cố gắng áp lại ràng buộc camera để lấy đủ khung theo mức đã chọn.</li>
                     <li>Video có thể ghi âm hiện trường và đóng dấu dải chân đồng bộ như ảnh chụp: VIDEO, giờ/phút/giây, ngày, thứ, tọa độ, địa chỉ, tên/mã hiện trường, tổ đội/đơn vị/người thực hiện và ghi chú.</li>
+                    <li>Có thể bật <b>tự động lấy nét</b> nếu camera hỗ trợ. Tùy chọn này áp dụng khi mở camera, chụp ảnh và quay video.</li>
+                    <li>Có thể chọn vị trí <b>REC VIDEO</b>: nhấp nháy đỏ trên khung video hoặc thay thế chữ VIDEO ở dải chân thông tin.</li>
                     <li>Video không lưu lâu trong kho ảnh của app; sau khi quay nên tải ngay về máy để tránh đầy bộ nhớ.</li>
                 </ul>
 
@@ -6562,6 +6591,8 @@ function cancelImportFile() {
         { id:'toggle-show-qt', type:'checked' },
         { id:'toggle-subtitle', type:'checked' },
         { id:'max-record-time', type:'value' },
+        { id:'toggle-camera-autofocus', type:'checked' },
+        { id:'video-rec-display-mode', type:'value' },
         { id:'p2p-transfer-mode', type:'value' },
         { id:'animated-qr-delay', type:'value' },
         { id:'animated-qr-chunk-size', type:'value' },
@@ -9050,6 +9081,302 @@ window.addEventListener('load', () => {
         obs.observe(panel, { childList:true, subtree:true });
     } catch(e) {}
     try { console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
+})();
+</script>
+
+
+
+<style id="gsht-v89-video-focus-rec-style">
+#video-focus-rec-options select,
+#video-focus-rec-options input { cursor: pointer; }
+#camera-autofocus-status.text-success { color: #20c997 !important; }
+#camera-autofocus-status.text-warning { color: #ffc107 !important; }
+#camera-autofocus-status.text-danger { color: #ff6b6b !important; }
+</style>
+
+<script id="gsht-v89-video-focus-rec-patch">
+(function(){
+    const VERSION = 'GSHT V89 - Autofocus + REC display options';
+    const REC_MODE_KEY = 'gsht_video_rec_display_mode_v89';
+    const AUTOFOCUS_KEY = 'gsht_camera_autofocus_enabled_v89';
+
+    function byId(id){ return document.getElementById(id); }
+    function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+    window.gshtSaveVideoCameraPrefs = function(){
+        try {
+            const af = byId('toggle-camera-autofocus');
+            const rec = byId('video-rec-display-mode');
+            if (af) localStorage.setItem(AUTOFOCUS_KEY, af.checked ? '1' : '0');
+            if (rec) localStorage.setItem(REC_MODE_KEY, rec.value || 'overlay');
+        } catch(e) {}
+    };
+
+    function loadVideoCameraPrefs(){
+        try {
+            const af = byId('toggle-camera-autofocus');
+            const rec = byId('video-rec-display-mode');
+            const afSaved = localStorage.getItem(AUTOFOCUS_KEY);
+            const recSaved = localStorage.getItem(REC_MODE_KEY);
+            if (af && afSaved !== null) af.checked = afSaved !== '0';
+            if (rec && recSaved) rec.value = recSaved;
+        } catch(e) {}
+    }
+
+    function setAutoFocusStatus(text, level='secondary'){
+        const el = byId('camera-autofocus-status');
+        if (!el) return;
+        el.className = `small text-${level}`;
+        el.style.fontSize = '10px';
+        el.style.lineHeight = '1.25';
+        el.textContent = text;
+    }
+
+    function getVideoTrack(){
+        try { return localStream?.getVideoTracks?.()[0] || null; } catch(e) { return null; }
+    }
+
+    function autofocusEnabled(){
+        const el = byId('toggle-camera-autofocus');
+        return !el || el.checked;
+    }
+
+    function pickFocusMode(caps){
+        const modes = Array.isArray(caps?.focusMode) ? caps.focusMode.map(v => String(v).toLowerCase()) : [];
+        if (modes.includes('continuous')) return 'continuous';
+        if (modes.includes('auto')) return 'auto';
+        if (modes.includes('single-shot')) return 'single-shot';
+        if (modes.includes('manual')) return 'manual';
+        return '';
+    }
+
+    window.gshtApplyCameraAutoFocus = async function(reason='manual'){
+        if (!autofocusEnabled()) {
+            setAutoFocusStatus('Tự động lấy nét đang tắt theo tùy chọn người dùng.', 'secondary');
+            return false;
+        }
+        const track = getVideoTrack();
+        if (!track || typeof track.applyConstraints !== 'function') {
+            setAutoFocusStatus('Chưa có camera hoặc trình duyệt không cho điều khiển lấy nét.', 'warning');
+            return false;
+        }
+        let caps = {};
+        try { caps = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {}; } catch(e) { caps = {}; }
+        const mode = pickFocusMode(caps);
+        if (!mode) {
+            // Một số trình duyệt không báo capabilities nhưng vẫn chấp nhận advanced.focusMode.
+            for (const candidate of ['continuous', 'auto']) {
+                try {
+                    await track.applyConstraints({ advanced: [{ focusMode: candidate }] });
+                    setAutoFocusStatus(`Đã yêu cầu lấy nét ${candidate} cho camera.`, 'success');
+                    return true;
+                } catch(e) {}
+            }
+            setAutoFocusStatus('Camera/trình duyệt hiện không công bố chế độ lấy nét. Ảnh/video vẫn dùng lấy nét mặc định của máy.', 'warning');
+            return false;
+        }
+        try {
+            await track.applyConstraints({ advanced: [{ focusMode: mode }] });
+            setAutoFocusStatus(`Đang dùng lấy nét ${mode} cho camera (${reason}).`, 'success');
+            return true;
+        } catch(e) {
+            if (mode !== 'auto') {
+                try {
+                    await track.applyConstraints({ advanced: [{ focusMode: 'auto' }] });
+                    setAutoFocusStatus('Đã chuyển sang lấy nét auto cho camera.', 'success');
+                    return true;
+                } catch(e2) {}
+            }
+            setAutoFocusStatus('Thiết bị có báo hỗ trợ lấy nét nhưng trình duyệt không cho áp dụng ràng buộc này.', 'warning');
+            return false;
+        }
+    };
+
+    function getRecMode(){
+        const sel = byId('video-rec-display-mode');
+        return (sel && sel.value) || 'overlay';
+    }
+
+    function recBlinkColor(){
+        return (Math.floor(Date.now() / 500) % 2 === 0) ? '#ff3b30' : '#777777';
+    }
+
+    function drawRecOverlay(ctx, scale){
+        ctx.save();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.font = `bold ${Math.max(15, 20 * scale)}px Arial`;
+        const label = '● REC VIDEO';
+        const w = Math.max(150 * scale, ctx.measureText(label).width + 24 * scale);
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(14 * scale, 14 * scale, w, 34 * scale);
+        ctx.fillStyle = recBlinkColor();
+        ctx.fillText(label, 24 * scale, 31 * scale);
+        ctx.restore();
+    }
+
+    function ensureVideoFocusRecOptions(){
+        if (!byId('video-focus-rec-options')) {
+            const mediaControls = byId('media-controls')?.querySelector('.card-body') || byId('media-controls');
+            if (mediaControls) {
+                const wrap = document.createElement('div');
+                wrap.className = 'border border-secondary rounded p-2 bg-black bg-opacity-25 mb-2';
+                wrap.id = 'video-focus-rec-options';
+                wrap.innerHTML = `
+                    <div class="row g-2 align-items-center">
+                        <div class="col-12 col-md-5">
+                            <div class="form-check form-switch d-flex align-items-center mb-0">
+                                <input class="form-check-input ms-1 me-2" type="checkbox" role="switch" id="toggle-camera-autofocus" checked onchange="gshtSaveVideoCameraPrefs(); gshtApplyCameraAutoFocus('toggle');">
+                                <label class="form-check-label text-info small fw-bold" for="toggle-camera-autofocus"><i class="fa-solid fa-crosshairs me-1"></i>Tự động lấy nét nếu camera hỗ trợ</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-7">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-secondary text-light border-secondary small fw-bold" style="font-size:11px;">REC VIDEO:</span>
+                                <select id="video-rec-display-mode" class="form-select bg-dark text-warning border-secondary fw-bold" onchange="gshtSaveVideoCameraPrefs();">
+                                    <option value="overlay" selected>Hiện đỏ nhấp nháy trên khung video</option>
+                                    <option value="footer">Thay chữ VIDEO ở dải chân</option>
+                                    <option value="off">Không chèn REC vào video</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-12"><div id="camera-autofocus-status" class="small text-secondary" style="font-size:10px; line-height:1.25;">Tự động lấy nét sẽ được áp dụng khi mở camera, chụp ảnh và quay video nếu thiết bị hỗ trợ.</div></div>
+                    </div>`;
+                mediaControls.prepend(wrap);
+            }
+        }
+        loadVideoCameraPrefs();
+    }
+
+    // Đổi màu chữ REC ở dải chân khi chọn chế độ thay chữ VIDEO.
+    try {
+        if (typeof getTypeAccentColor === 'function' && !window.__gshtV89TypeAccentWrapped) {
+            const oldGetTypeAccentColor = getTypeAccentColor;
+            getTypeAccentColor = function(type){
+                const label = String(type || '').toUpperCase();
+                if (label.includes('REC VIDEO')) return recBlinkColor();
+                return oldGetTypeAccentColor.apply(this, arguments);
+            };
+            window.__gshtV89TypeAccentWrapped = true;
+        }
+    } catch(e) {}
+
+    // Bọc initCamera để áp dụng autofocus sau khi stream mới sẵn sàng.
+    try {
+        if (typeof initCamera === 'function' && !window.__gshtV89InitCameraWrapped) {
+            const oldInitCamera = initCamera;
+            initCamera = async function(){
+                const ret = await oldInitCamera.apply(this, arguments);
+                setTimeout(() => { try { gshtApplyCameraAutoFocus('mở camera'); } catch(e) {} }, 700);
+                return ret;
+            };
+            window.__gshtV89InitCameraWrapped = true;
+        }
+    } catch(e) {}
+
+    // Bọc capturePhoto để chụp ảnh sau khi đã yêu cầu lấy nét nếu có thể.
+    try {
+        if (typeof capturePhoto === 'function' && !window.__gshtV89CaptureWrapped) {
+            const oldCapturePhoto = capturePhoto;
+            capturePhoto = async function(type){
+                try { await gshtApplyCameraAutoFocus('chụp ảnh'); await sleep(120); } catch(e) {}
+                return oldCapturePhoto.apply(this, arguments);
+            };
+            window.__gshtV89CaptureWrapped = true;
+        }
+    } catch(e) {}
+
+    // Bổ sung autofocus vào bước áp chất lượng camera trước khi quay.
+    try {
+        if (typeof ensureRecordingCameraQuality === 'function' && !window.__gshtV89RecordingQualityWrapped) {
+            const oldEnsureRecordingCameraQuality = ensureRecordingCameraQuality;
+            ensureRecordingCameraQuality = async function(video, videoQ){
+                const ret = await oldEnsureRecordingCameraQuality.apply(this, arguments);
+                try { await gshtApplyCameraAutoFocus('quay video'); await sleep(120); } catch(e) {}
+                return ret;
+            };
+            window.__gshtV89RecordingQualityWrapped = true;
+        }
+    } catch(e) {}
+
+    // Ghi đè drawVideoFrame để điều khiển vị trí REC VIDEO.
+    try {
+        if (typeof drawVideoFrame === 'function' && !window.__gshtV89DrawVideoFrameWrapped) {
+            drawVideoFrame = function() {
+                if (!isRecording) return;
+                const video = document.getElementById('video-preview');
+                const canvas = document.getElementById('video-canvas');
+                const ctx = canvas.getContext('2d');
+                const recMode = getRecMode();
+                const footerType = recMode === 'footer' ? '● REC VIDEO' : (currentVideoFooterType || 'VIDEO');
+                const layout = currentVideoFooterLayout || buildVideoFooterLayout(ctx, canvas.width, Math.max(0.75, canvas.width / 1000), getCaptureContext(footerType, new Date(), getCurrentGpsMeta(), 'Chưa xác định địa chỉ'));
+                const videoRenderHeight = canvas.height - layout.footerH;
+                const scale = layout.scale || Math.max(0.75, canvas.width / 1000);
+
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                drawVideoFrameSourceFull(ctx, video, canvas.width, videoRenderHeight);
+
+                if (recMode === 'overlay') drawRecOverlay(ctx, scale);
+
+                if (document.getElementById('toggle-subtitle')?.checked && currentSubtitle) {
+                    ctx.save();
+                    ctx.font = `bold ${24 * scale}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const subWidth = ctx.measureText(currentSubtitle).width;
+                    const subX = canvas.width / 2;
+                    const subY = videoRenderHeight - 45 * scale;
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+                    ctx.fillRect(subX - subWidth/2 - 15*scale, subY - 18*scale, subWidth + 30*scale, 36*scale);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(currentSubtitle, subX, subY);
+                    ctx.restore();
+                }
+
+                const fY = videoRenderHeight;
+                const now = new Date();
+                const info = getCaptureContext(footerType, now, currentVideoFooterGpsMeta || getCurrentGpsMeta(), currentVideoFooterAddress || 'Chưa xác định địa chỉ');
+                layout.lines = getVideoFooterInfoLines(info);
+
+                ctx.fillStyle = '#090909';
+                ctx.fillRect(0, fY, canvas.width, layout.footerH);
+                ctx.strokeStyle = '#0dcaf0';
+                ctx.lineWidth = Math.max(2, 3 * scale);
+                ctx.strokeRect(0, fY, canvas.width, layout.footerH);
+
+                let extraX = canvas.width - layout.pad - (layout.orderedExtras.length * layout.imgBoxSize + Math.max(0, layout.orderedExtras.length - 1) * layout.pad);
+                layout.orderedExtras.forEach(key => {
+                    if (key === 'selfie') drawVideoExtraBox(ctx, cachedVideoExtras.selfie, 'NGƯỜI CHỤP', extraX, fY, layout);
+                    if (key === 'map') drawVideoExtraBox(ctx, cachedVideoExtras.map, 'BẢN ĐỒ', extraX, fY, layout);
+                    if (key === 'compass') drawVideoExtraBox(ctx, cachedVideoExtras.compass, 'LA BÀN', extraX, fY, layout);
+                    extraX += layout.imgBoxSize + layout.pad;
+                });
+
+                let y = fY + 18 * scale;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                y += drawFooterHeaderBlock(ctx, info, layout.textX, y, layout.maxTextW, scale, false);
+                y += 12 * scale;
+                ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+                layout.lines.forEach(row => {
+                    ctx.fillStyle = row.color;
+                    y += drawWrappedTextBlock(ctx, row.text, layout.textX, y, layout.maxTextW, layout.lineH, row.max, 'left');
+                });
+                animationFrameId = requestAnimationFrame(drawVideoFrame);
+            };
+            window.__gshtV89DrawVideoFrameWrapped = true;
+        }
+    } catch(e) { console.warn(VERSION, 'không thể vá drawVideoFrame', e); }
+
+    function initV89(){
+        ensureVideoFocusRecOptions();
+        setTimeout(() => { try { gshtApplyCameraAutoFocus('khởi tạo'); } catch(e) {} }, 900);
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(initV89, 500));
+    else setTimeout(initV89, 500);
+    window.addEventListener('load', () => setTimeout(initV89, 1000));
 })();
 </script>
 
