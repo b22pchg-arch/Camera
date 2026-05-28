@@ -11489,5 +11489,155 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 })();
 </script>
 
+
+
+<script>
+// GSHT V98: Ẩn/hiện khu CAMERA GỐC / NHẬP ẢNH NGOÀI / NHẬP VIDEO và đưa lên trước khu CẤU HÌNH / GHÉP / TIỆN ÍCH.
+(function(){
+    const VERSION = 'GSHT-V98-NATIVE-IMPORT-COLLAPSE-REORDER';
+    const STORE_KEY = 'gsht_native_import_panel_visible_v98';
+
+    function injectStyle(){
+        if (document.getElementById('gsht-native-import-v98-style')) return;
+        const css = document.createElement('style');
+        css.id = 'gsht-native-import-v98-style';
+        css.textContent = `
+            #native-camera-import-panel.gsht-native-v98-panel { position: relative; }
+            #native-camera-import-panel .gsht-native-v98-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            #native-camera-import-body.gsht-native-import-collapsed { display: none !important; }
+            #native-camera-import-panel.gsht-native-v98-panel.gsht-native-import-collapsed-shell { border-style: dashed !important; }
+            #native-camera-import-panel .gsht-native-v98-header-btn { white-space: nowrap; font-size: 10.5px; }
+            #native-camera-import-panel .gsht-native-v98-mini-note { font-size: 10px; line-height: 1.3; }
+        `;
+        document.head.appendChild(css);
+    }
+
+    function getStoredVisible(){
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw === null) return false; // mặc định ẩn để nhường không gian cho kho ảnh/camera.
+        return raw === '1';
+    }
+
+    function setPanelVisible(visible){
+        const panel = document.getElementById('native-camera-import-panel');
+        const body = document.getElementById('native-camera-import-body');
+        const btn = document.getElementById('btn-toggle-native-import-panel-v98');
+        const mini = document.getElementById('native-import-mini-note-v98');
+        if (!panel || !body) return;
+        body.classList.toggle('gsht-native-import-collapsed', !visible);
+        panel.classList.toggle('gsht-native-import-collapsed-shell', !visible);
+        if (btn) btn.innerHTML = visible
+            ? '<i class="fa-solid fa-eye-slash me-1"></i>ẨN'
+            : '<i class="fa-solid fa-eye me-1"></i>HIỆN';
+        if (mini) mini.style.display = visible ? 'none' : 'block';
+        localStorage.setItem(STORE_KEY, visible ? '1' : '0');
+    }
+
+    window.toggleNativeImportPanelV98 = function(){
+        const body = document.getElementById('native-camera-import-body');
+        const visible = body ? body.classList.contains('gsht-native-import-collapsed') : false;
+        setPanelVisible(visible);
+    };
+
+    function ensurePanelCollapsible(){
+        const panel = document.getElementById('native-camera-import-panel');
+        if (!panel) return false;
+        panel.classList.add('gsht-native-v98-panel');
+
+        let header = panel.querySelector(':scope > .d-flex.justify-content-between');
+        if (!header) header = panel.firstElementChild;
+        if (!header) return false;
+
+        const title = header.querySelector('.small.fw-bold') || header.firstElementChild;
+        if (title) title.classList.add('gsht-native-v98-title');
+
+        let body = document.getElementById('native-camera-import-body');
+        if (!body) {
+            body = document.createElement('div');
+            body.id = 'native-camera-import-body';
+            body.className = 'native-camera-import-body';
+            const nodes = Array.from(panel.childNodes).filter(node => node !== header);
+            nodes.forEach(node => body.appendChild(node));
+            panel.appendChild(body);
+        }
+
+        if (!document.getElementById('native-import-mini-note-v98')) {
+            const mini = document.createElement('div');
+            mini.id = 'native-import-mini-note-v98';
+            mini.className = 'small text-secondary mt-1 gsht-native-v98-mini-note';
+            mini.innerHTML = 'Đang ẩn. Bấm <b>HIỆN</b> để dùng camera gốc, nhập ảnh ngoài hoặc nhập/quay video bằng trình máy.';
+            header.insertAdjacentElement('afterend', mini);
+        }
+
+        if (!document.getElementById('btn-toggle-native-import-panel-v98')) {
+            const oldBadge = Array.from(header.children).find(el => /V\d+/.test(el.textContent || '') && el.classList?.contains('badge'));
+            if (oldBadge) oldBadge.textContent = 'V98';
+            const btn = document.createElement('button');
+            btn.id = 'btn-toggle-native-import-panel-v98';
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-warning fw-bold gsht-native-v98-header-btn';
+            btn.setAttribute('onclick', 'toggleNativeImportPanelV98()');
+            header.appendChild(btn);
+        }
+        setPanelVisible(getStoredVisible());
+        return true;
+    }
+
+    function movePanelBeforeCameraTools(){
+        const panel = document.getElementById('native-camera-import-panel');
+        if (!panel) return false;
+        let shell = document.getElementById('camera-tools-shell');
+        if (!shell) {
+            // Tìm dự phòng bằng tiêu đề nếu shell chưa được tạo lúc init.
+            shell = Array.from(document.querySelectorAll('div,section'))
+                .find(el => /KHU VỰC CẤU HÌNH\s*\/\s*GHÉP\s*\/\s*TIỆN ÍCH/i.test(el.textContent || ''));
+        }
+        if (shell && panel.nextElementSibling !== shell && shell.previousElementSibling !== panel) {
+            shell.insertAdjacentElement('beforebegin', panel);
+            return true;
+        }
+        return false;
+    }
+
+    function initV98(){
+        injectStyle();
+        ensurePanelCollapsible();
+        movePanelBeforeCameraTools();
+    }
+
+    function schedule(){
+        initV98();
+        [300, 900, 1600, 2600, 4200].forEach(t => setTimeout(initV98, t));
+        if (!window.__gshtNativeImportV98Observer) {
+            window.__gshtNativeImportV98Observer = new MutationObserver(() => {
+                clearTimeout(window.__gshtNativeImportV98Timer);
+                window.__gshtNativeImportV98Timer = setTimeout(initV98, 120);
+            });
+            window.__gshtNativeImportV98Observer.observe(document.body, { childList:true, subtree:true });
+        }
+    }
+
+    function appendHelpV98(){
+        const guide = document.getElementById('guide-content') || document.querySelector('#help-content, #huong-dan, .guide-content');
+        if (!guide || document.getElementById('gsht-v98-help-note')) return;
+        const div = document.createElement('div');
+        div.id = 'gsht-v98-help-note';
+        div.className = 'alert alert-warning small mt-2';
+        div.innerHTML = '<b>V98 - Camera gốc / nhập ảnh ngoài / nhập video:</b> Khu vực này đã được đưa lên trước KHU VỰC CẤU HÌNH / GHÉP / TIỆN ÍCH và có nút HIỆN/ẨN riêng. Mặc định app ẩn khu vực này để nhường không gian cho kho ảnh và camera; khi cần dùng camera gốc, nhập ảnh ngoài hoặc nhập/quay video bằng trình máy thì bấm HIỆN.';
+        guide.appendChild(div);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', schedule);
+        document.addEventListener('DOMContentLoaded', () => setTimeout(appendHelpV98, 1800));
+    } else {
+        schedule();
+        setTimeout(appendHelpV98, 1800);
+    }
+    window.addEventListener('load', () => { setTimeout(schedule, 1200); setTimeout(appendHelpV98, 2400); });
+    console.log(VERSION + ' loaded');
+})();
+</script>
+
 </body>
 </html>
