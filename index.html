@@ -1398,8 +1398,8 @@ function showUpdateNotification() {
                 <ul class="text-secondary ps-3 mb-3">
                     <li>Mở công tắc <b>HIỂN THỊ TIỆN ÍCH MỞ RỘNG</b>, sau đó mở nhóm <b>Quay Video / Ghi Âm</b>.</li>
                     <li>Thiết lập <b>Thời gian quay tối đa</b>. Hết thời gian, app tự dừng quay và mở cửa sổ tải xuống.</li>
-                    <li>Chất lượng video gồm kích thước canvas, FPS và bitrate được đồng bộ theo mức chất lượng đã chọn ở tab Máy Ảnh.</li>
-                    <li>Video có thể ghi âm hiện trường và đóng dấu thông tin thời gian, tọa độ, tổ đội ở dải chân video.</li>
+                    <li>Chất lượng video gồm kích thước canvas, FPS và bitrate được đồng bộ theo mức chất lượng đã chọn ở tab Máy Ảnh; trước khi quay app cố gắng áp lại ràng buộc camera để lấy đủ khung theo mức đã chọn.</li>
+                    <li>Video có thể ghi âm hiện trường và đóng dấu dải chân đồng bộ như ảnh chụp: VIDEO, giờ/phút/giây, ngày, thứ, tọa độ, địa chỉ, tên/mã hiện trường, tổ đội/đơn vị/người thực hiện và ghi chú.</li>
                     <li>Video không lưu lâu trong kho ảnh của app; sau khi quay nên tải ngay về máy để tránh đầy bộ nhớ.</li>
                 </ul>
 
@@ -1608,6 +1608,10 @@ function showUpdateNotification() {
     let offlineSttFinalText = '';
     
     let cachedVideoExtras = { compass: null, map: null, selfie: null };
+    let currentVideoFooterGpsMeta = null;
+    let currentVideoFooterAddress = '';
+    let currentVideoFooterLayout = null;
+    let currentVideoFooterType = 'VIDEO';
     let windowAutoMatches = [];
     let currentStoragePercent = 0;
     let globalExtras = { selfie: null, map: null, compass: null };
@@ -3985,99 +3989,282 @@ ${timeText}` : viewerTitleText);
     }
 
     // --- MODULE QUAY VIDEO CAO CẤP ---
+    // GSHT V88: quay đủ khung camera và đồng bộ chân video với chân ảnh chụp
     function toggleRecording() { if (isRecording) stopRecording(); else startRecording(); }
-    
+
+    function getVideoOutputDimensions(videoW, videoH) {
+        videoW = Math.max(1, Math.round(videoW || 1));
+        videoH = Math.max(1, Math.round(videoH || 1));
+        const videoQ = getVideoQualitySetting();
+        const maxH = Math.max(1, Math.round(videoQ.maxHeight || videoH));
+        const ratio = videoH > maxH ? (maxH / videoH) : 1;
+        return {
+            width: Math.max(2, Math.round(videoW * ratio)),
+            height: Math.max(2, Math.round(videoH * ratio)),
+            ratio
+        };
+    }
+
+    async function ensureRecordingCameraQuality(video, videoQ) {
+        try {
+            const track = localStream?.getVideoTracks?.()[0];
+            if (!track || !track.applyConstraints) return;
+            const q = getPhotoQualitySetting();
+            const constraints = {
+                width: { ideal: q.width },
+                height: { ideal: q.height },
+                frameRate: { ideal: videoQ.fps || q.fps || 25 }
+            };
+            try { constraints.resizeMode = 'none'; } catch(e) {}
+            await track.applyConstraints(constraints);
+            await new Promise(resolve => setTimeout(resolve, 250));
+            if (video && video.paused) { try { await video.play(); } catch(e) {} }
+            updateCameraFrameRatio();
+        } catch(e) {
+            console.warn('Không áp được chất lượng camera trước khi quay video:', e);
+        }
+    }
+
+    function getVideoFooterInfoLines(info) {
+        return [
+            { text: `Tọa độ: ${info.gpsLine}`, max: 2, color: '#ffffff' },
+            { text: `Địa chỉ: ${info.address}`, max: 3, color: '#ffffff' },
+            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 2, color: '#ffffff' },
+            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 2, color: '#ffffff' },
+            { text: `Ghi chú: ${info.note}`, max: 3, color: '#ffc107' }
+        ];
+    }
+
+    function buildVideoFooterLayout(ctx, canvasWidth, scale, info) {
+        const enabledExtras = ['selfie','map','compass'].filter(key => {
+            try { return getExtraInsertPref(key); } catch(e) { return true; }
+        });
+        const orderedExtras = enabledExtras; // Video dùng cùng bố cục mặc định của ảnh TRƯỚC/Q.TRÌNH: text bên trái, ảnh phụ trợ bên phải
+        const pad = 20 * scale;
+        const lineH = Math.max(25 * scale, 22);
+        const imgBoxSize = enabledExtras.length ? Math.min(240 * scale, canvasWidth * 0.16) : 0;
+        const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + Math.max(0, enabledExtras.length - 1) * pad) : 0;
+        const textX = pad;
+        const maxTextW = Math.max(280 * scale, canvasWidth - extrasTotalW - pad * 3);
+        const lines = getVideoFooterInfoLines(info);
+        const measureCtx = ctx || document.createElement('canvas').getContext('2d');
+        measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        const headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale, false);
+        const textBlockH = lines.reduce((sum, row) => sum + measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max), 0);
+        const footerH = Math.ceil(Math.max(
+            enabledExtras.length ? imgBoxSize + 48 * scale : 0,
+            18 * scale + headerH + 12 * scale + textBlockH + 22 * scale
+        ));
+        return { enabledExtras, orderedExtras, pad, lineH, imgBoxSize, extrasTotalW, textX, maxTextW, lines, headerH, footerH, scale };
+    }
+
+    function drawVideoFrameSourceFull(ctx, video, destW, destH) {
+        ctx.save();
+        if (currentFacingMode === 'user') { ctx.translate(destW, 0); ctx.scale(-1, 1); }
+        // Vẽ toàn bộ khung camera gốc vào vùng video, không crop. Vì destW/destH lấy theo đúng tỉ lệ videoWidth/videoHeight nên không bị méo.
+        ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, destW, destH);
+        ctx.restore();
+    }
+
+    function drawVideoExtraBox(ctx, cachedImg, labelText, xPos, fY, layout) {
+        if (!layout.imgBoxSize || !cachedImg || !cachedImg.complete) return;
+        const { imgBoxSize, scale } = layout;
+        const yPos = fY + 22 * scale;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(xPos, yPos, imgBoxSize, imgBoxSize);
+        drawImageContain(ctx, cachedImg, xPos, yPos, imgBoxSize, imgBoxSize);
+        const labelH = Math.max(20 * scale, imgBoxSize * 0.17);
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(xPos, yPos + imgBoxSize - labelH, imgBoxSize, labelH);
+        ctx.fillStyle = '#0dcaf0';
+        ctx.font = `bold ${Math.max(10, labelH * 0.55)}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, xPos + imgBoxSize / 2, yPos + imgBoxSize - labelH / 2, imgBoxSize - 4);
+    }
+
+    function updateVideoRecordButtonState(textHtml) {
+        const btn = document.getElementById('btn-record-video');
+        if (!btn) return;
+        if (isRecording) {
+            btn.className = 'btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm';
+        } else {
+            btn.className = 'btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger';
+        }
+        if (textHtml) btn.innerHTML = textHtml;
+    }
+
     async function startRecording() {
-        const video = document.getElementById("video-preview"); if (!localStream || !video.videoWidth) return alert("Camera chưa sẵn sàng!");
-        const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d"); const videoQ = getVideoQualitySetting(); let scaleFactor = 1; if (video.videoHeight > videoQ.maxHeight) scaleFactor = videoQ.maxHeight / video.videoHeight;
-        canvas.width = Math.round(video.videoWidth * scaleFactor);
-        const scaledVideoHeight = Math.round(video.videoHeight * scaleFactor);
-        const videoCanvasScale = canvas.width / 1000;
-        const imgBoxSize = Math.min(280 * videoCanvasScale, canvas.width * 0.18);
-        const footerH = imgBoxSize + 40 * videoCanvasScale;
-        canvas.height = scaledVideoHeight + footerH;
-        
+        const video = document.getElementById('video-preview');
+        if (!localStream || !video || !video.videoWidth) return alert('Camera chưa sẵn sàng!');
+
+        const videoQ = getVideoQualitySetting();
+        updateVideoRecordButtonState(`<i class="fa-solid fa-stop me-1"></i> ĐANG CHUẨN BỊ CAMERA...`);
+        await ensureRecordingCameraQuality(video, videoQ);
+
+        const canvas = document.getElementById('video-canvas');
+        const ctx = canvas.getContext('2d');
+        const out = getVideoOutputDimensions(video.videoWidth, video.videoHeight);
+        const scale = Math.max(0.75, out.width / 1000);
+
+        currentVideoFooterGpsMeta = getCurrentGpsMeta();
+        currentVideoFooterAddress = await getAddressForGps(currentVideoFooterGpsMeta);
+        currentVideoFooterType = 'VIDEO';
+        const initialInfo = getCaptureContext(currentVideoFooterType, new Date(), currentVideoFooterGpsMeta, currentVideoFooterAddress);
+
+        canvas.width = out.width;
+        currentVideoFooterLayout = buildVideoFooterLayout(ctx, out.width, scale, initialInfo);
+        canvas.height = out.height + currentVideoFooterLayout.footerH;
+
         cachedVideoExtras = { compass: null, map: null, selfie: null };
-        const getSourceDataUrl = (globalSource, canvasId) => { if (globalSource) return globalSource; if (canvasId) { let c = document.getElementById(canvasId); if (c && !c.classList.contains('d-none')) { try { return c.toDataURL("image/jpeg", getJpegQuality()); } catch(e) {} } } return null; };
-        const mapSrc = getSourceDataUrl(globalExtras.map, 'canvas-map'); const compassSrc = getSourceDataUrl(globalExtras.compass, 'canvas-compass'); const selfieSrc = globalExtras.selfie;
-        if (compassSrc && isCompassPermissionGranted) { let i = new Image(); i.src = compassSrc; cachedVideoExtras.compass = i; }
-        if (mapSrc) { let i = new Image(); i.src = mapSrc; cachedVideoExtras.map = i; }
-        if (selfieSrc) { let i = new Image(); i.src = selfieSrc; cachedVideoExtras.selfie = i; }
-        
-        const mimeType = getSupportedMimeType(); isRecording = true; recordingTime = 0; currentSubtitle = ""; drawVideoFrame();
-        const btn = document.getElementById("btn-record-video"); btn.className = "btn btn-warning text-dark w-100 py-2 fw-bold storage-alarm"; btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`;
-        
+        const getSourceDataUrl = (globalSource, canvasId) => {
+            if (globalSource) return globalSource;
+            if (canvasId) {
+                const c = document.getElementById(canvasId);
+                if (c && !c.classList.contains('d-none')) {
+                    try { return c.toDataURL('image/jpeg', getJpegQuality()); } catch(e) {}
+                }
+            }
+            return null;
+        };
+        const mapSrc = getSourceDataUrl(globalExtras.map, 'canvas-map');
+        const compassSrc = getSourceDataUrl(globalExtras.compass, 'canvas-compass');
+        const selfieSrc = globalExtras.selfie;
+        if (compassSrc && isCompassPermissionGranted && getExtraInsertPref('compass')) { const i = new Image(); i.src = compassSrc; cachedVideoExtras.compass = i; }
+        if (mapSrc && getExtraInsertPref('map')) { const i = new Image(); i.src = mapSrc; cachedVideoExtras.map = i; }
+        if (selfieSrc && getExtraInsertPref('selfie')) { const i = new Image(); i.src = selfieSrc; cachedVideoExtras.selfie = i; }
+
+        const mimeType = getSupportedMimeType();
+        isRecording = true;
+        recordingTime = 0;
+        currentSubtitle = '';
+        drawVideoFrame();
+        updateVideoRecordButtonState(`<i class="fa-solid fa-stop me-1"></i> ĐANG KHỞI TẠO LUỒNG...`);
+
         try {
             try { dynamicAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(errMic) { dynamicAudioStream = null; }
-            const canvasStream = canvas.captureStream(videoQ.fps); const combinedStream = new MediaStream();
-            if (canvasStream && canvasStream.getVideoTracks().length > 0) { combinedStream.addTrack(canvasStream.getVideoTracks()[0]); }
-            if (dynamicAudioStream && dynamicAudioStream.getAudioTracks().length > 0) { combinedStream.addTrack(dynamicAudioStream.getAudioTracks()[0]); }
-            
+            const canvasStream = canvas.captureStream(videoQ.fps);
+            const combinedStream = new MediaStream();
+            if (canvasStream && canvasStream.getVideoTracks().length > 0) combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
+            if (dynamicAudioStream && dynamicAudioStream.getAudioTracks().length > 0) combinedStream.addTrack(dynamicAudioStream.getAudioTracks()[0]);
+
             recordedChunks = [];
             try {
                 const recorderOptions = { videoBitsPerSecond: videoQ.videoBitsPerSecond, audioBitsPerSecond: 128000 };
                 if (mimeType !== '') recorderOptions.mimeType = mimeType;
                 mediaRecorder = new MediaRecorder(combinedStream, recorderOptions);
-            } 
-            catch (eAllocation) {
+            } catch (eAllocation) {
                 const pureCanvas = new MediaStream([canvasStream.getVideoTracks()[0]]);
                 mediaRecorder = new MediaRecorder(pureCanvas, { videoBitsPerSecond: videoQ.videoBitsPerSecond });
             }
-            
+
             mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
             mediaRecorder.onstop = () => {
                 if (recordedChunks.length === 0 || recordingTime < 1) return;
-                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' }); const ext = (mediaRecorder.mimeType && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
-                currentMediaFilename = `VIDEO_${document.getElementById("tab1-prefix").value.trim().replace(/\s+/g, '_') || "HT"}_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.${ext}`;
-                currentMediaBlobUrl = URL.createObjectURL(blob); currentMediaType = 'video'; showMediaPreview();
+                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
+                const ext = (mediaRecorder.mimeType && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
+                currentMediaFilename = `VIDEO_${document.getElementById('tab1-prefix').value.trim().replace(/\s+/g, '_') || 'HT'}_${new Date().toISOString().slice(0,10).replace(/-/g, '')}_${canvas.width}x${canvas.height}.${ext}`;
+                currentMediaBlobUrl = URL.createObjectURL(blob);
+                currentMediaType = 'video';
+                showMediaPreview();
                 if (dynamicAudioStream) { dynamicAudioStream.getTracks().forEach(t => t.stop()); dynamicAudioStream = null; }
-            }; 
-            
+            };
+
             mediaRecorder.start(500);
-            recordingInterval = setInterval(() => { 
-                recordingTime++; let dynamicMax = parseInt(document.getElementById("max-record-time").value) || 30; 
-                btn.innerHTML = `<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s)`; if (recordingTime >= dynamicMax) stopRecording(); 
+            recordingInterval = setInterval(() => {
+                recordingTime++;
+                const dynamicMax = parseInt(document.getElementById('max-record-time').value) || 30;
+                updateVideoRecordButtonState(`<i class="fa-solid fa-stop me-1"></i> ĐANG QUAY... (${recordingTime}s/${dynamicMax}s)`);
+                if (recordingTime >= dynamicMax) stopRecording();
             }, 1000);
-            if (document.getElementById("toggle-subtitle").checked) initLiveSubtitle();
-        } catch (gErr) { stopRecording(); alert("Trình duyệt không hỗ trợ Canvas stream."); }
+            if (document.getElementById('toggle-subtitle')?.checked) initLiveSubtitle();
+        } catch (gErr) {
+            stopRecording();
+            alert('Trình duyệt không hỗ trợ Canvas stream hoặc không cấp được luồng quay video.');
+        }
     }
-    
+
     function stopRecording() {
-        if (!isRecording) return; isRecording = false; clearInterval(recordingInterval); cancelAnimationFrame(animationFrameId);
-        try { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); } catch(e) {}
-        if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; currentSubtitle = ""; }
+        if (!isRecording) return;
+        isRecording = false;
+        clearInterval(recordingInterval);
+        cancelAnimationFrame(animationFrameId);
+        try { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); } catch(e) {}
+        if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; currentSubtitle = ''; }
         if (dynamicAudioStream) { dynamicAudioStream.getTracks().forEach(t => t.stop()); dynamicAudioStream = null; }
-        const btn = document.getElementById("btn-record-video"); btn.className = "btn btn-danger w-100 py-2 fw-bold shadow border border-2 border-danger"; btn.innerHTML = `<i class="fa-solid fa-video me-1"></i> QUAY VIDEO`;
+        currentVideoFooterLayout = null;
+        updateVideoRecordButtonState(`<i class="fa-solid fa-video me-1"></i> QUAY VIDEO`);
     }
-    
+
     function drawVideoFrame() {
         if (!isRecording) return;
-        const video = document.getElementById("video-preview"); const canvas = document.getElementById("video-canvas"); const ctx = canvas.getContext("2d");
-        const scale = canvas.width / 1000; const imgBoxSize = Math.min(280 * scale, canvas.width * 0.18); const footerH = imgBoxSize + 40 * scale; const videoRenderHeight = canvas.height - footerH;
-        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.save(); if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); } ctx.drawImage(video, 0, 0, canvas.width, videoRenderHeight); ctx.restore();
-        
-        if (document.getElementById("toggle-subtitle").checked && currentSubtitle) {
-            ctx.save(); ctx.font = `bold ${24 * scale}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            let subWidth = ctx.measureText(currentSubtitle).width; let subX = canvas.width / 2; let subY = videoRenderHeight - 45 * scale;
-            ctx.fillStyle = "rgba(0, 0, 0, 0.65)"; ctx.fillRect(subX - subWidth/2 - 15*scale, subY - 18*scale, subWidth + 30*scale, 36*scale);
-            ctx.fillStyle = "#ffffff"; ctx.fillText(currentSubtitle, subX, subY); ctx.restore();
+        const video = document.getElementById('video-preview');
+        const canvas = document.getElementById('video-canvas');
+        const ctx = canvas.getContext('2d');
+        const layout = currentVideoFooterLayout || buildVideoFooterLayout(ctx, canvas.width, Math.max(0.75, canvas.width / 1000), getCaptureContext('VIDEO', new Date(), getCurrentGpsMeta(), 'Chưa xác định địa chỉ'));
+        const videoRenderHeight = canvas.height - layout.footerH;
+        const scale = layout.scale || Math.max(0.75, canvas.width / 1000);
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawVideoFrameSourceFull(ctx, video, canvas.width, videoRenderHeight);
+
+        // Ký hiệu REC đặt trên vùng hình ảnh, không chen vào dải chân thông tin để chân video giống chân ảnh chụp.
+        ctx.save();
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.font = `bold ${Math.max(15, 20 * scale)}px Arial`;
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(14 * scale, 14 * scale, 150 * scale, 34 * scale);
+        ctx.fillStyle = (Math.floor(Date.now() / 500) % 2 === 0) ? '#ff3b30' : '#777';
+        ctx.fillText('● REC VIDEO', 24 * scale, 31 * scale);
+        ctx.restore();
+
+        if (document.getElementById('toggle-subtitle')?.checked && currentSubtitle) {
+            ctx.save();
+            ctx.font = `bold ${24 * scale}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const subWidth = ctx.measureText(currentSubtitle).width;
+            const subX = canvas.width / 2;
+            const subY = videoRenderHeight - 45 * scale;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+            ctx.fillRect(subX - subWidth/2 - 15*scale, subY - 18*scale, subWidth + 30*scale, 36*scale);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(currentSubtitle, subX, subY);
+            ctx.restore();
         }
-        
-        ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; ctx.fillRect(0, canvas.height - footerH, canvas.width, footerH);
-        const drawExtra = (cachedImg, x) => { if (cachedImg && cachedImg.complete) ctx.drawImage(cachedImg, x, canvas.height - footerH + 20 * scale, imgBoxSize, imgBoxSize); };
-        let pad = 20 * scale; let txtX = (pad + imgBoxSize) * 3 + pad;
-        drawExtra(cachedVideoExtras.compass, pad); drawExtra(cachedVideoExtras.map, pad + imgBoxSize + pad); drawExtra(cachedVideoExtras.selfie, pad + imgBoxSize + pad + imgBoxSize + pad);
-        
-        ctx.textAlign = "left"; ctx.textBaseline = "middle"; const lineGap = imgBoxSize / 4; let textY = canvas.height - footerH + 20*scale + lineGap/2;
-        if (Math.floor(Date.now() / 1000) % 2 === 0) { ctx.fillStyle = "#dc3545"; ctx.font = `bold ${lineGap * 0.7}px Arial`; ctx.fillText("● REC (VIDEO)", txtX, textY); }
-        else { ctx.fillStyle = "#555555"; ctx.font = `bold ${lineGap * 0.7}px Arial`; ctx.fillText("● REC (VIDEO)", txtX, textY); }
-        
-        textY += lineGap; ctx.fillStyle = "#0dcaf0"; ctx.font = `bold ${lineGap * 0.55}px Arial`;
-        const now = new Date(); const timeStr = `${now.toLocaleTimeString("vi-VN")} - ${now.toLocaleDateString("vi-VN")}`;
-        ctx.fillText(`THỜI GIAN: ${timeStr}`, txtX, textY);
-        textY += lineGap; ctx.fillStyle = "#ffffff"; ctx.fillText(`TỌA ĐỘ: ${currentGpsData.text}`, txtX, textY);
-        textY += lineGap; ctx.fillStyle = "#ffc107"; const teamText = document.getElementById("tab1-team").value.trim(); ctx.fillText(teamText ? `TỔ ĐỘI: ${teamText}` : "", txtX, textY);
+
+        const fY = videoRenderHeight;
+        const now = new Date();
+        const info = getCaptureContext(currentVideoFooterType || 'VIDEO', now, currentVideoFooterGpsMeta || getCurrentGpsMeta(), currentVideoFooterAddress || 'Chưa xác định địa chỉ');
+        // Cập nhật lines vì thời gian/ghi chú có thể thay đổi trong quá trình quay.
+        layout.lines = getVideoFooterInfoLines(info);
+
+        ctx.fillStyle = '#090909';
+        ctx.fillRect(0, fY, canvas.width, layout.footerH);
+        ctx.strokeStyle = '#0dcaf0';
+        ctx.lineWidth = Math.max(2, 3 * scale);
+        ctx.strokeRect(0, fY, canvas.width, layout.footerH);
+
+        let extraX = canvas.width - layout.pad - (layout.orderedExtras.length * layout.imgBoxSize + Math.max(0, layout.orderedExtras.length - 1) * layout.pad);
+        layout.orderedExtras.forEach(key => {
+            if (key === 'selfie') drawVideoExtraBox(ctx, cachedVideoExtras.selfie, 'NGƯỜI CHỤP', extraX, fY, layout);
+            if (key === 'map') drawVideoExtraBox(ctx, cachedVideoExtras.map, 'BẢN ĐỒ', extraX, fY, layout);
+            if (key === 'compass') drawVideoExtraBox(ctx, cachedVideoExtras.compass, 'LA BÀN', extraX, fY, layout);
+            extraX += layout.imgBoxSize + layout.pad;
+        });
+
+        let y = fY + 18 * scale;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        y += drawFooterHeaderBlock(ctx, info, layout.textX, y, layout.maxTextW, scale, false);
+        y += 12 * scale;
+        ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        layout.lines.forEach(row => {
+            ctx.fillStyle = row.color;
+            y += drawWrappedTextBlock(ctx, row.text, layout.textX, y, layout.maxTextW, layout.lineH, row.max, 'left');
+        });
         animationFrameId = requestAnimationFrame(drawVideoFrame);
     }
 
