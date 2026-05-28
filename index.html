@@ -10317,5 +10317,192 @@ window.addEventListener('load', () => {
 })();
 </script>
 
+
+
+<style id="gsht-v93-capture-speed-style">
+#gsht-camera-speed-panel .form-label { font-size: 10.5px; }
+#gsht-camera-speed-panel .small { line-height: 1.35; }
+#gsht-camera-speed-status { font-size: 10.5px; }
+.gsht-v93-fullshot-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px; }
+.gsht-v93-fullshot-grid .btn { font-size:11px; padding:6px 4px; }
+#camera-container .gsht-v93-preview-badge {
+    position:absolute; top:8px; left:8px; z-index:9;
+    background:rgba(0,0,0,.62); color:#fff; border:1px solid rgba(13,202,240,.7);
+    border-radius:999px; padding:3px 8px; font-size:10px; font-weight:700;
+    pointer-events:none; max-width:calc(100% - 16px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+</style>
+<script id="gsht-v93-camera-speed-fullframe-balance">
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V93-CAMERA-SPEED-FULLFRAME-BALANCE';
+    const CAPTURE_MODE_KEY = 'gsht_camera_capture_mode_v92';
+    const ASPECT_MODE_KEY = 'gsht_camera_aspect_mode_v92';
+    const SPEED_KEY = 'gsht_camera_capture_speed_mode_v93';
+    const byId = id => document.getElementById(id);
+
+    function getSpeedMode(){ try { return localStorage.getItem(SPEED_KEY) || 'fast-preview'; } catch(e){ return 'fast-preview'; } }
+    function setSpeedMode(v){ try { localStorage.setItem(SPEED_KEY, v || 'fast-preview'); } catch(e){} }
+    function setCaptureMode(v){ try { localStorage.setItem(CAPTURE_MODE_KEY, v || 'preview'); } catch(e){} }
+    function getCaptureMode(){ try { return localStorage.getItem(CAPTURE_MODE_KEY) || 'preview'; } catch(e){ return 'preview'; } }
+    function getAspectMode(){ try { return localStorage.getItem(ASPECT_MODE_KEY) || 'sensor-4-3'; } catch(e){ return 'sensor-4-3'; } }
+    function speedLabel(v){
+        return ({
+            'fast-preview': 'Nhanh - chụp đúng khung preview',
+            'quality-full': 'Đủ khung/full-frame - chậm hơn',
+            'mixed': 'Cân bằng - mặc định nhanh, có nút FULL riêng'
+        })[v || 'fast-preview'] || 'Nhanh - chụp đúng khung preview';
+    }
+    function setStatus(html, cls='text-secondary'){
+        const el = byId('gsht-camera-speed-status');
+        if (el) { el.className = 'small ' + cls; el.innerHTML = html; }
+        const fs = byId('gsht-camera-full-sensor-status');
+        if (fs && /preview|full|crop|khung|ImageCapture/i.test(html || '')) {
+            fs.innerHTML = html;
+            fs.className = 'small ' + cls;
+        }
+    }
+    function updateV92SelectLabels(){
+        const sel = byId('gsht-camera-capture-mode');
+        if (!sel) return;
+        const optPreview = sel.querySelector('option[value="preview"]');
+        const optAuto = sel.querySelector('option[value="auto-still"]');
+        const optStill = sel.querySelector('option[value="still-only"]');
+        if (optPreview) optPreview.textContent = 'NHANH - chụp từ preview đang nhìn thấy';
+        if (optAuto) optAuto.textContent = 'ĐỦ KHUNG - ưu tiên ImageCapture/full-frame, chậm hơn';
+        if (optStill) optStill.textContent = 'Chỉ thử full-frame - nếu không hỗ trợ thì báo lỗi';
+        sel.value = getCaptureMode();
+    }
+    function syncModeToSpeed(mode){
+        if (mode === 'quality-full') setCaptureMode('auto-still');
+        else setCaptureMode('preview');
+        const sel = byId('gsht-camera-capture-mode'); if (sel) sel.value = getCaptureMode();
+    }
+    function ensurePanel(){
+        if (byId('gsht-camera-speed-panel')) return;
+        const anchor = byId('gsht-camera-full-sensor-panel') || byId('gsht-camera-display-panel') || byId('gsht-camera-probe-panel');
+        if (!anchor) return;
+        const html = `
+        <div id="gsht-camera-speed-panel" class="col-12">
+            <div class="border border-warning rounded p-2 bg-black bg-opacity-25">
+                <div class="small text-warning fw-bold mb-2"><i class="fa-solid fa-gauge-high me-1"></i>CÂN BẰNG TỐC ĐỘ / ĐỦ KHUNG KHI CHỤP</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label text-info fw-bold mb-1" for="gsht-camera-speed-mode"><i class="fa-solid fa-camera me-1"></i>Chế độ thao tác hiện trường</label>
+                        <select id="gsht-camera-speed-mode" class="form-select form-select-sm bg-secondary text-white border-secondary" onchange="gshtSetCaptureSpeedMode(this.value)">
+                            <option value="fast-preview">Nhanh - chụp đúng khung preview</option>
+                            <option value="quality-full">Đủ khung/full-frame - chậm hơn</option>
+                            <option value="mixed">Cân bằng - mặc định nhanh, có nút FULL riêng</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-7">
+                        <label class="form-label text-info fw-bold mb-1"><i class="fa-solid fa-maximize me-1"></i>Chụp FULL khung khi thật cần không mất mép</label>
+                        <div class="gsht-v93-fullshot-grid">
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="gshtCaptureFullFrameOnce('TRƯỚC')">FULL TRƯỚC</button>
+                            <button type="button" class="btn btn-sm btn-outline-warning fw-bold text-warning" onclick="gshtCaptureFullFrameOnce('QUÁ TRÌNH')">FULL Q.TRÌNH</button>
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="gshtCaptureFullFrameOnce('SAU')">FULL SAU</button>
+                        </div>
+                    </div>
+                    <div class="col-12"><div id="gsht-camera-speed-status" class="small text-secondary"></div></div>
+                </div>
+            </div>
+        </div>`;
+        anchor.insertAdjacentHTML('afterend', html);
+        const sel = byId('gsht-camera-speed-mode'); if (sel) sel.value = getSpeedMode();
+    }
+    function ensurePreviewBadge(){
+        const container = byId('camera-container');
+        if (!container) return;
+        if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
+        let badge = byId('gsht-v93-preview-badge');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.id = 'gsht-v93-preview-badge';
+            badge.className = 'gsht-v93-preview-badge';
+            container.appendChild(badge);
+        }
+        const video = byId('video-preview');
+        const vw = video?.videoWidth || 0;
+        const vh = video?.videoHeight || 0;
+        const mode = getSpeedMode();
+        badge.textContent = `${mode === 'quality-full' ? 'FULL chậm' : 'NHANH preview'}${vw && vh ? ` · ${vw}×${vh}` : ''}`;
+        badge.style.borderColor = mode === 'quality-full' ? 'rgba(255,193,7,.85)' : 'rgba(13,202,240,.75)';
+    }
+    function updateStatus(){
+        const video = byId('video-preview');
+        const vw = video?.videoWidth || 0;
+        const vh = video?.videoHeight || 0;
+        const mode = getSpeedMode();
+        const cap = getCaptureMode();
+        const msg = mode === 'quality-full'
+            ? `Đang ưu tiên <b>đủ khung/full-frame</b>. Ảnh có thể rộng hơn preview nhưng chụp sẽ <b>chậm hơn</b> do ImageCapture/tạo bitmap. Preview hiện tại ${vw && vh ? `<b>${vw}×${vh}</b>` : 'chưa sẵn sàng'}.`
+            : `Đang ưu tiên <b>chụp nhanh từ preview</b>. Ảnh sẽ giống khung đang nhìn và nhanh hơn. Nếu cần không mất mép như camera gốc, dùng các nút <b>FULL TRƯỚC/Q.TRÌNH/SAU</b>. Preview ${vw && vh ? `<b>${vw}×${vh}</b>` : 'chưa sẵn sàng'}, tỉ lệ luồng: <b>${getAspectMode()}</b>.`;
+        setStatus(msg, mode === 'quality-full' ? 'text-warning' : 'text-info');
+        updateV92SelectLabels();
+        ensurePreviewBadge();
+    }
+    window.gshtSetCaptureSpeedMode = async function(mode){
+        mode = mode || 'fast-preview';
+        setSpeedMode(mode);
+        syncModeToSpeed(mode);
+        updateStatus();
+        // Nếu đang cần preview nhanh/khớp ảnh thì ưu tiên giữ contain/4:3, không ép ImageCapture.
+        try { if (typeof gshtSetCameraDisplayMode === 'function' && !localStorage.getItem('gsht_camera_preview_display_mode_v91_user_changed')) gshtSetCameraDisplayMode('fit'); } catch(e) {}
+        setStatus(`✅ Đã chọn: <b>${speedLabel(mode)}</b>. ${mode === 'quality-full' ? 'Chế độ này chậm hơn nhưng giữ được khung rộng hơn khi thiết bị hỗ trợ.' : 'Chế độ này nhanh và khớp preview hơn.'}`, mode === 'quality-full' ? 'text-warning' : 'text-success');
+    };
+    window.gshtCaptureFullFrameOnce = async function(type){
+        if (typeof capturePhoto !== 'function' && typeof window.capturePhoto !== 'function') return alert('Chưa tìm thấy hàm chụp ảnh.');
+        const oldMode = getCaptureMode();
+        const oldSpeed = getSpeedMode();
+        try {
+            setStatus(`Đang chụp <b>${type}</b> bằng chế độ <b>FULL khung</b>. Lần chụp này có thể chậm hơn...`, 'text-warning');
+            setCaptureMode('auto-still');
+            const sel = byId('gsht-camera-capture-mode'); if (sel) sel.value = 'auto-still';
+            await (window.capturePhoto || capturePhoto)(type);
+        } catch(e) {
+            console.error(VERSION, e);
+            alert('Không chụp FULL khung được: ' + (e.message || e));
+        } finally {
+            setCaptureMode(oldMode || (oldSpeed === 'quality-full' ? 'auto-still' : 'preview'));
+            const sel = byId('gsht-camera-capture-mode'); if (sel) sel.value = getCaptureMode();
+            setTimeout(updateStatus, 300);
+        }
+    };
+    function installDefaultsOnce(){
+        try {
+            if (!localStorage.getItem(SPEED_KEY)) {
+                localStorage.setItem(SPEED_KEY, 'fast-preview');
+                // Sau phản hồi thực tế: mặc định ưu tiên tốc độ/khớp preview; FULL khung dùng nút riêng.
+                localStorage.setItem(CAPTURE_MODE_KEY, 'preview');
+            }
+        } catch(e) {}
+    }
+    function appendHelp(){
+        try {
+            const help = Array.from(document.querySelectorAll('#help-tab-pane, #help, .tab-pane')).find(el => /TAB MÁY ẢNH|QUAY VIDEO HIỆN TRƯỜNG/i.test(el.textContent || ''));
+            if (help && !byId('gsht-v93-help-note')) {
+                const p = document.createElement('div');
+                p.id = 'gsht-v93-help-note';
+                p.className = 'alert alert-warning small mt-2';
+                p.innerHTML = '<b>Chụp nhanh và chụp đủ khung:</b> Trên PWA, preview video có thể hẹp hơn ảnh tĩnh full-frame. Vì vậy bản V93 đặt mặc định <b>chụp nhanh từ preview</b> để tốc độ tốt và ảnh giống khung đang nhìn. Khi cần ảnh rộng/ít crop hơn, dùng nút <b>FULL TRƯỚC / FULL Q.TRÌNH / FULL SAU</b>; chế độ này có thể chậm hơn vì trình duyệt phải lấy ảnh tĩnh full-frame.';
+                help.appendChild(p);
+            }
+        } catch(e) {}
+    }
+    function init(){
+        installDefaultsOnce();
+        ensurePanel();
+        updateV92SelectLabels();
+        syncModeToSpeed(getSpeedMode());
+        updateStatus();
+        appendHelp();
+        setInterval(() => { try { updateStatus(); } catch(e){} }, 2500);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 1200));
+    else setTimeout(init, 1200);
+    window.addEventListener('load', () => setTimeout(init, 1800));
+})();
+</script>
+
 </body>
 </html>
