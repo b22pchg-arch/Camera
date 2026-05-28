@@ -10335,7 +10335,7 @@ window.addEventListener('load', () => {
 <script id="gsht-v93-camera-speed-fullframe-balance">
 (function(){
     'use strict';
-    const VERSION = 'GSHT-V93-CAMERA-SPEED-FULLFRAME-BALANCE';
+    const VERSION = 'GSHT-V94-FULL-MODE-MAIN-CAPTURE';
     const CAPTURE_MODE_KEY = 'gsht_camera_capture_mode_v92';
     const ASPECT_MODE_KEY = 'gsht_camera_aspect_mode_v92';
     const SPEED_KEY = 'gsht_camera_capture_speed_mode_v93';
@@ -10501,6 +10501,183 @@ window.addEventListener('load', () => {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 1200));
     else setTimeout(init, 1200);
     window.addEventListener('load', () => setTimeout(init, 1800));
+})();
+</script>
+
+
+
+<style id="gsht-v94-full-mode-main-capture-style">
+#gsht-camera-speed-panel .gsht-v94-hidden { display:none !important; }
+#gsht-camera-speed-panel .gsht-v94-full-main-note {
+    border:1px dashed rgba(255,193,7,.65);
+    border-radius:8px;
+    padding:6px 8px;
+    background:rgba(255,193,7,.08);
+    color:#ffd45a;
+    font-size:10.5px;
+    line-height:1.35;
+}
+button.gsht-v94-capture-full-active {
+    border:2px solid #ffc107 !important;
+    box-shadow:0 0 0 .18rem rgba(255,193,7,.22), 0 .35rem .9rem rgba(0,0,0,.35) !important;
+}
+button.gsht-v94-capture-full-active .gsht-v94-full-word {
+    display:block;
+    font-size:10px;
+    line-height:1;
+    letter-spacing:.4px;
+    color:#fff3cd;
+}
+button.gsht-v94-capture-full-active .gsht-v94-type-word {
+    display:block;
+    font-size:12px;
+    line-height:1.1;
+}
+</style>
+<script id="gsht-v94-full-mode-main-capture">
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V94-FULL-MODE-MAIN-CAPTURE';
+    const SPEED_KEY = 'gsht_camera_capture_speed_mode_v93';
+    const CAPTURE_MODE_KEY = 'gsht_camera_capture_mode_v92';
+    const byId = id => document.getElementById(id);
+    function getSpeedMode(){ try { return localStorage.getItem(SPEED_KEY) || 'fast-preview'; } catch(e){ return 'fast-preview'; } }
+    function setCaptureMode(v){ try { localStorage.setItem(CAPTURE_MODE_KEY, v || 'preview'); } catch(e){} }
+    function getCaptureMode(){ try { return localStorage.getItem(CAPTURE_MODE_KEY) || 'preview'; } catch(e){ return 'preview'; } }
+    function shortType(type){
+        if (type === 'QUÁ TRÌNH') return 'Q.TRÌNH';
+        return type || '';
+    }
+    function captureButtonSelector(type){
+        return `button[onclick*="capturePhoto('${type}')"],button[onclick*='capturePhoto("${type}")']`;
+    }
+    function getCaptureButtons(){
+        const types = ['TRƯỚC', 'QUÁ TRÌNH', 'SAU'];
+        const out = [];
+        types.forEach(type => {
+            document.querySelectorAll(captureButtonSelector(type)).forEach(btn => out.push({ btn, type }));
+        });
+        return out;
+    }
+    function setMainButtonsFullActive(active){
+        getCaptureButtons().forEach(({btn, type}) => {
+            if (!btn.dataset.gshtV94OriginalHtml) btn.dataset.gshtV94OriginalHtml = btn.innerHTML;
+            if (!btn.dataset.gshtV94OriginalTitle) btn.dataset.gshtV94OriginalTitle = btn.getAttribute('title') || '';
+            if (active) {
+                btn.classList.add('gsht-v94-capture-full-active');
+                btn.setAttribute('title', 'Đang dùng chế độ FULL khung/ảnh tĩnh full-frame nếu camera hỗ trợ');
+                const icon = type === 'TRƯỚC' ? 'fa-circle-dot' : (type === 'SAU' ? 'fa-circle-check' : 'fa-circle-dot');
+                btn.innerHTML = `<i class="fa-solid ${icon} d-block mb-1"></i><span class="gsht-v94-full-word">FULL</span><span class="gsht-v94-type-word">${shortType(type)}</span>`;
+            } else {
+                btn.classList.remove('gsht-v94-capture-full-active');
+                btn.innerHTML = btn.dataset.gshtV94OriginalHtml || btn.innerHTML;
+                if (btn.dataset.gshtV94OriginalTitle) btn.setAttribute('title', btn.dataset.gshtV94OriginalTitle); else btn.removeAttribute('title');
+            }
+        });
+    }
+    function ensureNote(){
+        const panel = byId('gsht-camera-speed-panel');
+        if (!panel) return;
+        let note = byId('gsht-v94-full-main-note');
+        if (!note) {
+            note = document.createElement('div');
+            note.id = 'gsht-v94-full-main-note';
+            note.className = 'gsht-v94-full-main-note mt-2';
+            const status = byId('gsht-camera-speed-status');
+            if (status && status.parentElement) status.parentElement.insertAdjacentElement('afterend', note);
+            else panel.appendChild(note);
+        }
+    }
+    function updateFullShotGrid(mode){
+        document.querySelectorAll('.gsht-v93-fullshot-grid').forEach(grid => {
+            const wrap = grid.closest('.col-12, .col-md-7') || grid;
+            const shouldShow = mode === 'mixed';
+            wrap.classList.toggle('gsht-v94-hidden', !shouldShow);
+        });
+    }
+    function updateSelectText(){
+        const sel = byId('gsht-camera-speed-mode');
+        if (!sel) return;
+        const full = sel.querySelector('option[value="quality-full"]');
+        const mixed = sel.querySelector('option[value="mixed"]');
+        const fast = sel.querySelector('option[value="fast-preview"]');
+        if (fast) fast.textContent = 'Nhanh - nút chụp dùng preview';
+        if (full) full.textContent = 'FULL - nút chụp chính dùng full-frame';
+        if (mixed) mixed.textContent = 'Cân bằng - nút chính nhanh, hiện nút FULL riêng';
+    }
+    function applyModeToUi(){
+        const mode = getSpeedMode();
+        updateSelectText();
+        ensureNote();
+        if (mode === 'quality-full') {
+            setCaptureMode('auto-still');
+            const capSel = byId('gsht-camera-capture-mode'); if (capSel) capSel.value = 'auto-still';
+            setMainButtonsFullActive(true);
+            updateFullShotGrid(mode);
+            const note = byId('gsht-v94-full-main-note');
+            if (note) note.innerHTML = '<b>Đang bật chế độ FULL:</b> các nút <b>TRƯỚC / Q.TRÌNH / SAU</b> trong khung camera sẽ chụp full-frame/ảnh tĩnh nếu thiết bị hỗ trợ. Các nút FULL riêng được ẩn để tránh thao tác trùng.';
+        } else {
+            setCaptureMode('preview');
+            const capSel = byId('gsht-camera-capture-mode'); if (capSel) capSel.value = 'preview';
+            setMainButtonsFullActive(false);
+            updateFullShotGrid(mode);
+            const note = byId('gsht-v94-full-main-note');
+            if (note) {
+                note.innerHTML = mode === 'mixed'
+                    ? '<b>Chế độ cân bằng:</b> nút chụp chính dùng preview để nhanh; các nút FULL riêng được hiện bên dưới khi cần không mất mép.'
+                    : '<b>Chế độ nhanh:</b> nút chụp chính dùng preview, tốc độ cao và ảnh giống khung đang xem.';
+            }
+        }
+        try {
+            const badge = byId('gsht-v93-preview-badge');
+            if (badge) badge.textContent = (mode === 'quality-full' ? 'FULL nút chính' : (mode === 'mixed' ? 'NHANH + FULL riêng' : 'NHANH preview')) + (badge.textContent.includes('×') ? ' · ' + badge.textContent.split('·').pop().trim() : '');
+        } catch(e) {}
+    }
+    function wrapModeSetter(){
+        if (window.__gshtV94ModeSetterWrapped) return;
+        const old = window.gshtSetCaptureSpeedMode;
+        window.gshtSetCaptureSpeedMode = async function(mode){
+            if (typeof old === 'function') await old.apply(this, arguments);
+            try { localStorage.setItem(SPEED_KEY, mode || 'fast-preview'); } catch(e) {}
+            applyModeToUi();
+        };
+        window.__gshtV94ModeSetterWrapped = true;
+    }
+    function wrapCaptureModeSelect(){
+        const capSel = byId('gsht-camera-capture-mode');
+        if (!capSel || capSel.dataset.gshtV94Wrapped) return;
+        capSel.dataset.gshtV94Wrapped = '1';
+        capSel.addEventListener('change', () => {
+            if (getSpeedMode() === 'quality-full' && capSel.value !== 'auto-still') {
+                capSel.value = 'auto-still';
+                setCaptureMode('auto-still');
+                alert('Đang bật chế độ FULL nên nút chụp chính sẽ luôn ưu tiên full-frame. Muốn dùng preview nhanh, hãy đổi chế độ thao tác hiện trường sang Nhanh hoặc Cân bằng.');
+            }
+        });
+    }
+    function appendHelp(){
+        try {
+            const help = Array.from(document.querySelectorAll('#help-tab-pane, #help, .tab-pane')).find(el => /TAB MÁY ẢNH|Chụp nhanh và chụp đủ khung/i.test(el.textContent || ''));
+            if (help && !byId('gsht-v94-help-note')) {
+                const p = document.createElement('div');
+                p.id = 'gsht-v94-help-note';
+                p.className = 'alert alert-info small mt-2';
+                p.innerHTML = '<b>V94 - chế độ FULL rõ ràng hơn:</b> Khi chọn <b>FULL - nút chụp chính dùng full-frame</b>, các nút TRƯỚC / Q.TRÌNH / SAU sẽ tự chuyển thành nút FULL và các nút FULL riêng được ẩn đi. Khi chọn <b>Cân bằng</b>, nút chính chụp nhanh, còn nút FULL riêng sẽ hiện để dùng khi thật cần.';
+                help.appendChild(p);
+            }
+        } catch(e) {}
+    }
+    function init(){
+        wrapModeSetter();
+        updateSelectText();
+        applyModeToUi();
+        wrapCaptureModeSelect();
+        appendHelp();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(init, 1600));
+    else setTimeout(init, 1600);
+    window.addEventListener('load', () => setTimeout(init, 2200));
+    setInterval(() => { try { init(); } catch(e){} }, 3000);
 })();
 </script>
 
