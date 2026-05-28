@@ -11475,7 +11475,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     async function readTempExifTime(file){
         try {
             if (!/^image\/jpe?g$/i.test(file.type || '') && !/\.jpe?g$/i.test(file.name || '')) return file.lastModified || Date.now();
-            const buf = await file.slice(0, Math.min(file.size, 512 * 1024)).arrayBuffer();
+            const buf = await file.slice(0, Math.min(file.size, 128 * 1024)).arrayBuffer();
             const dv = new DataView(buf);
             if (dv.getUint16(0, false) !== 0xFFD8) return file.lastModified || Date.now();
             let off = 2;
@@ -11537,28 +11537,74 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         if (count) count.textContent = `${state.pool.length} ảnh`;
         if (!grid) return;
         if (!state.pool.length) { grid.innerHTML = '<div class="text-secondary small p-2">Chưa có ảnh trong kho tạm.</div>'; if(st) st.textContent=''; return; }
+        const selectedBeforeRender = new Set(Array.from(document.querySelectorAll('.gsht-temp-sau-check:checked')).map(cb=>cb.value));
         const sorted = [...state.pool].sort((a,b)=>a.timestampMs-b.timestampMs);
-        grid.innerHTML = sorted.map((it, idx) => `
+        grid.innerHTML = sorted.map((it, idx) => {
+            const checked = selectedBeforeRender.has(it.id) ? 'checked' : '';
+            const badge = it.timeStatus === 'reading'
+                ? '<span class="badge bg-warning text-dark" style="font-size:8.5px;">đang đọc</span>'
+                : (it.timeStatus === 'exif' ? '<span class="badge bg-success" style="font-size:8.5px;">EXIF</span>' : '<span class="badge bg-secondary" style="font-size:8.5px;">file</span>');
+            return `
             <div class="gsht-v97-temp-item" data-id="${esc(it.id)}">
-                <label class="gsht-v97-sau-check text-success fw-bold"><input type="checkbox" class="gsht-temp-sau-check" value="${esc(it.id)}">SAU</label>
+                <label class="gsht-v97-sau-check text-success fw-bold"><input type="checkbox" class="gsht-temp-sau-check" value="${esc(it.id)}" ${checked}>SAU</label>
                 <img src="${esc(it.url)}" alt="${esc(it.name)}">
-                <div class="gsht-v97-temp-meta"><b>#${idx+1}</b> ${esc(it.name)}<br>${esc(fmtTime(it.timestampMs))}</div>
-            </div>`).join('');
-        if (st) st.innerHTML = `Đã sắp xếp theo thời gian. Tick một hoặc nhiều ảnh <b class="text-success">SAU</b> rồi bấm <b>PHÂN LOẠI</b>.`;
+                <div class="gsht-v97-temp-meta"><b>#${idx+1}</b> ${esc(it.name)}<br>${esc(fmtTime(it.timestampMs))}<br>${badge}</div>
+            </div>`;
+        }).join('');
+        const reading = state.pool.filter(x => x.timeStatus === 'reading').length;
+        if (st && !reading) st.innerHTML = `Đã sắp xếp theo thời gian. Tick một hoặc nhiều ảnh <b class="text-success">SAU</b> rồi bấm <b>PHÂN LOẠI</b>.`;
+    }
+    function gshtBulkSleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+    function gshtWithTimeout(promise, ms, fallback){
+        return new Promise(resolve => {
+            let done = false;
+            const t = setTimeout(() => { if (!done) { done = true; resolve(fallback); } }, ms);
+            Promise.resolve(promise).then(v => { if (!done) { done = true; clearTimeout(t); resolve(v); } }).catch(() => { if (!done) { done = true; clearTimeout(t); resolve(fallback); } });
+        });
+    }
+    async function gshtProcessBulkTempTimesAsync(items){
+        const st = $('gsht-bulk-temp-status');
+        let done = 0;
+        for (const it of items) {
+            // Cho giao diện có thời gian vẽ ảnh trước khi đọc EXIF tiếp.
+            await gshtBulkSleep(25);
+            const fallback = Number(it.file?.lastModified) > 0 ? Number(it.file.lastModified) : it.timestampMs;
+            const ms = await gshtWithTimeout(readTempExifTime(it.file), 2200, fallback);
+            if (Number.isFinite(Number(ms)) && Number(ms) > 0) {
+                it.timestampMs = Number(ms);
+                it.timeStatus = Math.abs(Number(ms) - fallback) > 1000 ? 'exif' : 'file';
+                try { gshtSetExternalTimeOverride(it.file, it.timestampMs, it.timeStatus === 'exif' ? 'EXIF ảnh đã đọc ở kho tạm' : 'thời gian file đã đọc ở kho tạm'); } catch(e) {}
+            } else {
+                it.timeStatus = 'file';
+            }
+            done++;
+            if (st) st.innerHTML = `Đã hiển thị ảnh. Đang cập nhật thời gian EXIF nền: <b>${done}/${items.length}</b>. Có thể tick ảnh SAU sau khi dòng này hoàn tất.`;
+            renderTempPool();
+            await gshtBulkSleep(10);
+        }
+        state.pool.sort((a,b)=>a.timestampMs-b.timestampMs);
+        renderTempPool();
+        if (st) st.innerHTML = `✅ Đã đọc xong thời gian ${items.length} ảnh. Tick một hoặc nhiều ảnh <b class="text-success">SAU</b> rồi bấm <b>PHÂN LOẠI</b>.`;
     }
     window.gshtHandleBulkTempPhotoInput = async function(ev){
         const files = Array.from(ev?.target?.files || []).filter(f => /^image\//i.test(f.type || '') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name || ''));
         if (!files.length) return;
-        const st = $('gsht-bulk-temp-status'); if (st) st.innerHTML = `Đang đọc thời gian của ${files.length} ảnh...`;
+        const st = $('gsht-bulk-temp-status');
+        if (st) st.innerHTML = `Đang đưa ${files.length} ảnh vào kho tạm...`;
+        const added = [];
         for (const file of files) {
-            const timestampMs = await readTempExifTime(file);
-            gshtSetExternalTimeOverride(file, timestampMs, 'thời gian đã đọc ở kho tạm');
+            const fallbackMs = Number(file?.lastModified) > 0 ? Number(file.lastModified) : Date.now();
+            try { gshtSetExternalTimeOverride(file, fallbackMs, 'thời gian file tạm trước khi đọc EXIF'); } catch(e) {}
             const url = await makeThumbUrl(file);
-            state.pool.push({ id:'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2,8), file, name:file.name || 'image', timestampMs, url });
+            const item = { id:'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2,8), file, name:file.name || 'image', timestampMs:fallbackMs, url, timeStatus:'reading' };
+            state.pool.push(item);
+            added.push(item);
         }
         state.pool.sort((a,b)=>a.timestampMs-b.timestampMs);
         renderTempPool();
+        if (st) st.innerHTML = `✅ Đã hiển thị ${added.length} ảnh trong kho tạm. Đang đọc thời gian EXIF ở nền, không cần chờ trắng màn hình...`;
         if (ev?.target) ev.target.value = '';
+        setTimeout(() => { gshtProcessBulkTempTimesAsync(added).catch(err => { console.warn(VERSION, 'bulk time background failed', err); if (st) st.innerHTML = 'Đã hiển thị ảnh. Một số ảnh không đọc được EXIF nên dùng thời gian file.'; }); }, 80);
     };
     window.gshtClearBulkTempPhotos = function(){
         state.pool.forEach(it => { try { URL.revokeObjectURL(it.url); } catch(e){} });
@@ -11783,6 +11829,25 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(addHelpV99, 1800));
     else setTimeout(addHelpV99, 1800);
+})();
+</script>
+
+
+
+<script>
+// GSHT V101: tối ưu kho tạm nhiều ảnh - hiển thị ảnh ngay, đọc EXIF theo nền để tránh treo.
+(function(){
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V101: kho tạm nhiều ảnh hiển thị ngay, đọc EXIF theo nền'; } catch(e) {}
+    try {
+        const help = document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
+        if (help && !document.getElementById('gsht-v101-help-note')) {
+            const div = document.createElement('div');
+            div.id = 'gsht-v101-help-note';
+            div.className = 'alert alert-info small mt-2';
+            div.innerHTML = '<b>V101:</b> Khi tải nhiều ảnh vào kho tạm, app hiển thị ảnh ngay bằng thời gian file tạm, sau đó đọc thời gian EXIF ở nền theo từng ảnh. Cách này tránh treo ở dòng đang đọc thời gian và vẫn khóa đúng thời gian đã đọc vào ảnh khi phân loại.';
+            help.appendChild(div);
+        }
+    } catch(e) {}
 })();
 </script>
 
