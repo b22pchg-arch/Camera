@@ -2719,7 +2719,11 @@ function showCameraErrorUI(err) {
     }
     async function appendInfoStripToCanvas(canvas, type, sourceItems, noteOverride) {
         const gpsMeta = getGpsMetaFromPhotos(sourceItems || []);
-        const now = new Date();
+        const sourceTimes = (sourceItems || [])
+            .map(it => Number(it && (it.timestampMs || it.captureTimeMs || it.createdAtMs || it.timeMs)))
+            .filter(ms => Number.isFinite(ms) && ms > 0);
+        let now = sourceTimes.length ? new Date(Math.min(...sourceTimes)) : new Date();
+        if (/SAU/i.test(String(type || '')) && sourceTimes.length) now = new Date(Math.max(...sourceTimes));
         const address = await getAddressForGps(gpsMeta);
         const old = document.createElement('canvas'); old.width = canvas.width; old.height = canvas.height; old.getContext('2d').drawImage(canvas, 0, 0);
         const W = old.width, base = Math.max(1, W/1600), pad = Math.round(20*base), lineH = Math.round(28*base);
@@ -10774,8 +10778,28 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 // GSHT V96: nhập ảnh/video từ camera gốc hoặc thư viện máy, đọc EXIF thời gian/GPS nếu có, xử lý chân ảnh/video như ảnh chụp trong app.
 (function(){
     'use strict';
-    const VERSION = 'GSHT-V99-NATIVE-IMPORT-TIME-FOOTER';
+    const VERSION = 'GSHT-V100-IMPORT-TIME-LOCK';
     const $ = (id) => document.getElementById(id);
+    const gshtExternalTimeOverrideMap = new WeakMap();
+    function gshtValidTimeMs(ms){
+        ms = Number(ms);
+        if (!Number.isFinite(ms) || ms <= 0) return false;
+        const y = new Date(ms).getFullYear();
+        return y > 1990 && y < 2100;
+    }
+    function gshtSetExternalTimeOverride(file, timestampMs, sourceLabel){
+        if (file && gshtValidTimeMs(timestampMs)) {
+            gshtExternalTimeOverrideMap.set(file, {
+                timestampMs: Number(timestampMs),
+                date: new Date(Number(timestampMs)),
+                dateSource: sourceLabel || 'thời gian đã đọc ở kho tạm'
+            });
+        }
+    }
+    function gshtGetExternalTimeOverride(file){
+        const o = file ? gshtExternalTimeOverrideMap.get(file) : null;
+        return o && gshtValidTimeMs(o.timestampMs) ? o : null;
+    }
     function status(html, cls='text-secondary') {
         const el = $('gsht-native-import-status');
         if (el) { el.className = 'small mt-2 ' + cls; el.innerHTML = html; }
@@ -10912,6 +10936,8 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         return d instanceof Date && Number.isFinite(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100;
     }
     function gshtResolveExternalMediaDate(file, meta){
+        const forced = gshtGetExternalTimeOverride(file);
+        if (forced) return forced.date;
         if (gshtValidDate(meta?.date)) return meta.date;
         if (gshtValidDate(meta?.creationTime)) return meta.creationTime;
         if (Number.isFinite(Number(file?.lastModified)) && Number(file.lastModified) > 0) {
@@ -10921,6 +10947,8 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         return new Date();
     }
     function gshtDateSourceLabel(file, meta){
+        const forced = gshtGetExternalTimeOverride(file);
+        if (forced) return forced.dateSource || 'thời gian đã đọc ở kho tạm';
         if (gshtValidDate(meta?.date)) return meta?.dateSource || 'EXIF';
         if (gshtValidDate(meta?.creationTime)) return meta?.dateSource || 'metadata video';
         if (Number.isFinite(Number(file?.lastModified)) && Number(file.lastModified) > 0) return 'thời gian file';
@@ -11064,7 +11092,16 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         if (typeof updateUIState === 'function') updateUIState();
     }
     async function processExternalImageFile(type, file){
-        const exif = await readExifFromFile(file);
+        let exif = await readExifFromFile(file);
+        // V100: nếu bộ đọc EXIF chính không lấy được thời gian, dùng lại bộ đọc đang hiển thị đúng trong kho tạm.
+        try {
+            if (!gshtValidDate(exif?.date) && typeof readTempExifTime === 'function') {
+                const ms = await readTempExifTime(file);
+                if (gshtValidTimeMs(ms)) exif = Object.assign({}, exif, { date: new Date(ms), dateSource: 'EXIF/file fallback' });
+            }
+        } catch(_e) {}
+        const forced = gshtGetExternalTimeOverride(file);
+        if (forced) exif = Object.assign({}, exif, { date: forced.date, dateSource: forced.dateSource, forcedTimestampMs: forced.timestampMs });
         const bmp = await makeBitmapFromFile(file);
         try { return await drawImportedPhoto(type, file, bmp, exif); }
         finally { try { bmp.close?.(); } catch(e) {} }
@@ -11515,6 +11552,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         const st = $('gsht-bulk-temp-status'); if (st) st.innerHTML = `Đang đọc thời gian của ${files.length} ảnh...`;
         for (const file of files) {
             const timestampMs = await readTempExifTime(file);
+            gshtSetExternalTimeOverride(file, timestampMs, 'thời gian đã đọc ở kho tạm');
             const url = await makeThumbUrl(file);
             state.pool.push({ id:'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2,8), file, name:file.name || 'image', timestampMs, url });
         }
@@ -11544,6 +11582,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             else type = 'QUÁ TRÌNH';
             try {
                 if (typeof window.gshtHandleExternalPhotos === 'function') {
+                    gshtSetExternalTimeOverride(it.file, it.timestampMs, 'thời gian đã đọc ở kho tạm');
                     await window.gshtHandleExternalPhotos({ target: { files: [it.file], value: '' } }, type);
                     ok++;
                 } else throw new Error('Không tìm thấy hàm nhập ảnh ngoài.');
@@ -11729,7 +11768,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 // GSHT V99: sửa thời gian ảnh/video nhập ngoài và chống mất nội dung chân trang.
 (function(){
     'use strict';
-    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V99: chuẩn hóa thời gian EXIF/video và chân trang tự đủ cao'; } catch(e) {}
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V100: khóa đúng thời gian từng ảnh nhập ngoài/kho tạm vào chân ảnh'; } catch(e) {}
     function addHelpV99(){
         try {
             const help = document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
