@@ -1,8 +1,8 @@
-// GSHT PWA cache update V90 - camera device and quality probe
+// GSHT PWA cache update V91 - camera display optimization, no crop preview
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v90-camera-device-quality-probe';
+const GSHT_CACHE = 'gsht-pwa-v91-camera-display-optimization';
 const APP_SHELL = [
   './',
   './index.html',
@@ -107,3 +107,5 @@ self.addEventListener('fetch', event => {
 // GSHT V87 cache bump: stt advanced hidden fix
 
 // GSHT V88: video full-frame quality sync + photo-style video footer
+
+// GSHT V91: camera display optimization - default no crop, real aspect ratio preview.
