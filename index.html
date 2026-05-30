@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V107)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V108)</title>
     
     <link rel="manifest" href="manifest.json">
 	<link rel="icon" type="image/png" href="icon-192.png">
@@ -12491,13 +12491,10 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         if ((Number(file.size)||0) <= headSize + META_TAIL_BYTES_VIDEO) return head;
         try {
             const tail = await file.slice(Math.max(0, file.size - META_TAIL_BYTES_VIDEO), file.size).arrayBuffer();
-            let markerBytes;
-            try { markerBytes = new TextEncoder().encode(' GSHT_TAIL_SPLIT '); }
-            catch(e) { markerBytes = new Uint8Array([32,71,83,72,84,95,84,65,73,76,95,83,80,76,73,84,32]); }
-            const combined = new Uint8Array(head.byteLength + markerBytes.byteLength + tail.byteLength);
+            const combined = new Uint8Array(head.byteLength + tail.byteLength + 16);
             combined.set(new Uint8Array(head), 0);
-            combined.set(markerBytes, head.byteLength);
-            combined.set(new Uint8Array(tail), head.byteLength + markerBytes.byteLength);
+            combined.set(new TextEncoder().encode(' GSHT_TAIL_SPLIT '), head.byteLength);
+            combined.set(new Uint8Array(tail), head.byteLength + 16);
             return combined.buffer;
         } catch(e) { return head; }
     }
@@ -12701,6 +12698,437 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     window.addEventListener('load', () => setTimeout(init, 1000));
     setInterval(() => { try { installWraps(); } catch(e){} }, 2500);
     try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V107 robust media metadata lock'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
+})();
+</script>
+
+<script id="gsht-v108-trust-manual-progress-video">
+/* GSHT V108: chống sai timestamp khi ảnh/video đã qua nhiều thiết bị + tiến độ tạo video có chân trang.
+   - Không giả định EXIF còn nguyên: nếu metadata bị app trung gian xóa, hiển thị mức tin cậy thấp.
+   - Bổ sung khóa thời gian thủ công và suy luận từ tên file trước khi dùng file.lastModified.
+   - Tạo video nhập ngoài bằng pipeline có thanh tiến độ theo giai đoạn và theo currentTime/duration. */
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V108-MEDIA-TIME-TRUST-MANUAL-PROGRESS';
+    const $ = (id) => document.getElementById(id);
+    const LOCAL_TZ_OFFSET = '+07:00';
+    const STATE = { lastProgressUpdate: 0, busy: false };
+
+    function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function validMs(ms){ return Number.isFinite(ms) && ms > 315532800000 && ms < 4102444800000; }
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function fmtDateTimeInput(d){
+        try { return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; }
+        catch(e){ return ''; }
+    }
+    function fmtVi(ms){ try { return new Date(ms).toLocaleString('vi-VN'); } catch(e){ return ''; } }
+    function sourceConfidence(source){
+        const s = String(source || '').toLowerCase();
+        if (/người dùng|thu cong|thủ công|manual/.test(s)) return { level:'high', label:'Đã khóa tay', cls:'text-success', warn:false };
+        if (/datetimeoriginal|offsettime|quicktime|creationdate|mvhd|mp4\/mov|gps/.test(s)) return { level:'high', label:'Cao', cls:'text-success', warn:false };
+        if (/createdate|modifydate|xmp|filename|tên file|text metadata/.test(s)) return { level:'medium', label:'Trung bình', cls:'text-warning', warn:true };
+        return { level:'low', label:'Thấp', cls:'text-danger', warn:true };
+    }
+    function setImportStatus(html, cls='text-secondary'){
+        const el = $('gsht-native-import-status');
+        if (el) { el.className = 'small mt-2 ' + cls; el.innerHTML = html; }
+    }
+    function injectStyle(){
+        if ($('gsht-v108-style')) return;
+        const st = document.createElement('style');
+        st.id = 'gsht-v108-style';
+        st.textContent = `
+        .gsht-v108-time-panel{border:1px solid rgba(13,202,240,.45);border-radius:10px;background:rgba(0,0,0,.22);padding:8px;margin-top:8px;}
+        .gsht-v108-time-panel .form-label{font-size:10.5px;margin-bottom:2px;}
+        .gsht-v108-progress-shell{border:1px solid rgba(255,193,7,.55);border-radius:10px;background:rgba(0,0,0,.28);padding:8px;margin-top:8px;}
+        .gsht-v108-progress-wrap{height:16px;background:#111;border:1px solid #495057;border-radius:999px;overflow:hidden;}
+        .gsht-v108-progress-bar{height:100%;width:0%;background:linear-gradient(90deg,#0dcaf0,#20c997);transition:width .18s linear;}
+        .gsht-v108-progress-text{font-size:10.5px;line-height:1.35;margin-top:5px;color:#adb5bd;word-break:break-word;}
+        .gsht-v108-confidence{font-size:10px;border-radius:999px;padding:2px 6px;border:1px solid currentColor;white-space:nowrap;}
+        @media(max-width:430px){.gsht-v108-time-panel .btn{font-size:10.5px}.gsht-v108-time-panel input{font-size:11px}}
+        `;
+        document.head.appendChild(st);
+    }
+    function injectPanel(){
+        const host = $('native-camera-import-panel');
+        if (!host || $('gsht-v108-time-panel')) return;
+        injectStyle();
+        const panel = document.createElement('div');
+        panel.id = 'gsht-v108-time-panel';
+        panel.className = 'gsht-v108-time-panel';
+        panel.innerHTML = `
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <div class="small text-info fw-bold"><i class="fa-solid fa-clock-rotate-left me-1"></i> KHÓA THỜI GIAN ẢNH/VIDEO NHẬP NGOÀI</div>
+                <span id="gsht-v108-confidence-badge" class="gsht-v108-confidence text-secondary">Chưa đọc file</span>
+            </div>
+            <div class="small text-secondary mb-2" style="font-size:10.5px;line-height:1.35;">
+                Ảnh/video đã qua Zalo, Messenger, chỉnh sửa, nén lại hoặc copy qua nhiều máy có thể bị xóa EXIF. Khi nguồn thời gian báo <b>thấp</b>, hãy bật khóa thủ công trước khi chèn chân ảnh/video.
+            </div>
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-5">
+                    <label class="form-label text-warning fw-bold" for="gsht-import-manual-time">Thời gian cần khóa</label>
+                    <input id="gsht-import-manual-time" type="datetime-local" step="1" class="form-control form-control-sm bg-dark text-warning border-secondary">
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="form-check form-switch border border-secondary rounded p-2 bg-black bg-opacity-25">
+                        <input class="form-check-input ms-1 me-2" type="checkbox" id="gsht-import-manual-time-enable">
+                        <label class="form-check-label small text-info fw-bold" for="gsht-import-manual-time-enable">Dùng giờ khóa tay</label>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <button type="button" class="btn btn-sm btn-outline-warning w-100 fw-bold" id="gsht-import-set-now">GIỜ HIỆN TẠI</button>
+                </div>
+                <div class="col-6 col-md-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary w-100 fw-bold" id="gsht-import-clear-manual">TẮT KHÓA</button>
+                </div>
+            </div>
+            <div id="gsht-v108-time-decision" class="small text-secondary mt-2" style="font-size:10.5px;line-height:1.35;">Chưa có file được chọn.</div>
+        `;
+        const status = $('gsht-native-import-status');
+        if (status && status.parentNode) status.parentNode.insertBefore(panel, status.nextSibling); else host.appendChild(panel);
+
+        const progress = document.createElement('div');
+        progress.id = 'gsht-v108-progress-shell';
+        progress.className = 'gsht-v108-progress-shell d-none';
+        progress.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <div class="small text-warning fw-bold"><i class="fa-solid fa-film me-1"></i> TIẾN ĐỘ TẠO VIDEO CÓ CHÂN TRANG</div>
+                <span id="gsht-v108-progress-percent" class="badge bg-warning text-dark">0%</span>
+            </div>
+            <div class="gsht-v108-progress-wrap"><div id="gsht-v108-progress-bar" class="gsht-v108-progress-bar"></div></div>
+            <div id="gsht-v108-progress-text" class="gsht-v108-progress-text">Chưa tạo video.</div>
+        `;
+        panel.insertAdjacentElement('afterend', progress);
+        $('gsht-import-set-now')?.addEventListener('click', () => {
+            const input = $('gsht-import-manual-time');
+            if (input) input.value = fmtDateTimeInput(new Date());
+            const ck = $('gsht-import-manual-time-enable');
+            if (ck) ck.checked = true;
+            persistManualTimeUi();
+        });
+        $('gsht-import-clear-manual')?.addEventListener('click', () => {
+            const ck = $('gsht-import-manual-time-enable');
+            if (ck) ck.checked = false;
+            persistManualTimeUi();
+        });
+        $('gsht-import-manual-time')?.addEventListener('change', persistManualTimeUi);
+        $('gsht-import-manual-time-enable')?.addEventListener('change', persistManualTimeUi);
+        restoreManualTimeUi();
+    }
+    function persistManualTimeUi(){
+        try {
+            localStorage.setItem('gsht-v108-manual-time', $('gsht-import-manual-time')?.value || '');
+            localStorage.setItem('gsht-v108-manual-time-enable', $('gsht-import-manual-time-enable')?.checked ? '1' : '0');
+        } catch(e) {}
+    }
+    function restoreManualTimeUi(){
+        try {
+            const input = $('gsht-import-manual-time');
+            const ck = $('gsht-import-manual-time-enable');
+            if (input && !input.value) input.value = localStorage.getItem('gsht-v108-manual-time') || '';
+            if (ck) ck.checked = localStorage.getItem('gsht-v108-manual-time-enable') === '1';
+        } catch(e) {}
+    }
+    function getManualTimeMs(){
+        const ck = $('gsht-import-manual-time-enable');
+        const input = $('gsht-import-manual-time');
+        if (!ck?.checked || !input?.value) return null;
+        const ms = new Date(input.value).getTime();
+        return validMs(ms) ? ms : null;
+    }
+    function setProgress(percent, text, cls){
+        injectPanel();
+        const shell = $('gsht-v108-progress-shell');
+        const bar = $('gsht-v108-progress-bar');
+        const pct = $('gsht-v108-progress-percent');
+        const msg = $('gsht-v108-progress-text');
+        const p = Math.max(0, Math.min(100, Number(percent) || 0));
+        if (shell) shell.classList.remove('d-none');
+        if (bar) bar.style.width = p.toFixed(0) + '%';
+        if (pct) { pct.textContent = p.toFixed(0) + '%'; pct.className = 'badge ' + (cls || (p >= 100 ? 'bg-success' : 'bg-warning text-dark')); }
+        if (msg && text) msg.innerHTML = text;
+    }
+    function updateDecision(meta){
+        const conf = sourceConfidence(meta?.source);
+        const badge = $('gsht-v108-confidence-badge');
+        if (badge) { badge.className = 'gsht-v108-confidence ' + conf.cls; badge.textContent = 'Tin cậy: ' + conf.label; }
+        const el = $('gsht-v108-time-decision');
+        if (el && meta && validMs(meta.timestampMs)) {
+            const warn = conf.warn ? '<br><span class="text-warning">⚠️ Nguồn này có thể không phải thời điểm chụp/quay gốc nếu file đã qua ứng dụng trung gian. Có thể bật khóa tay để sửa.</span>' : '';
+            el.innerHTML = `Thời gian sẽ dùng: <b class="text-info">${esc(fmtVi(meta.timestampMs))}</b> <span class="text-secondary">(${esc(meta.source || '')})</span>.${warn}`;
+        }
+    }
+
+    function parseFilenameTime(file){
+        const name = String(file?.name || '');
+        const patterns = [
+            { re: /(?:IMG|VID|PXL|MVIMG|Screenshot|Screenrecorder|signal|telegram|zalo)[_\- ]?(\d{4})(\d{2})(\d{2})[_\- ]?(\d{2})(\d{2})(\d{2})/i, src:'tên file camera/app' },
+            { re: /(\d{4})[\-_.](\d{2})[\-_.](\d{2})[ T_\-.](\d{2})[\-_.:](\d{2})[\-_.:](\d{2})/, src:'tên file ISO' },
+            { re: /(\d{4})(\d{2})(\d{2})[_\- ](\d{2})(\d{2})(\d{2})/, src:'tên file dạng YYYYMMDD_HHMMSS' },
+            { re: /(\d{2})(\d{2})(\d{2})[_\- ](\d{2})(\d{2})(\d{2})/, src:'tên file dạng YYMMDD_HHMMSS' }
+        ];
+        for (const p of patterns) {
+            const m = name.match(p.re);
+            if (!m) continue;
+            let y = Number(m[1]);
+            if (y < 100) y += 2000;
+            const mo = Number(m[2]), d = Number(m[3]), h = Number(m[4]), mi = Number(m[5]), se = Number(m[6]);
+            if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || se > 59) continue;
+            const ms = new Date(y, mo - 1, d, h, mi, se).getTime();
+            if (validMs(ms)) return { timestampMs: ms, source: p.src, parser:'filename', confidence:'medium' };
+        }
+        return null;
+    }
+    async function resolveTime(file, kind){
+        injectPanel();
+        let meta = null;
+        try {
+            if (typeof window.gshtReadMediaTimestampLocked === 'function') meta = await window.gshtReadMediaTimestampLocked(file, kind);
+        } catch(e) {}
+        if (!meta || !validMs(meta.timestampMs)) {
+            const fb = validMs(file?.lastModified) ? file.lastModified : Date.now();
+            meta = { timestampMs: fb, source:'thời gian file lastModified', parser:'fallback' };
+        }
+        const manualMs = getManualTimeMs();
+        if (manualMs) meta = { timestampMs: manualMs, source:'người dùng khóa thủ công', parser:'manual', confidence:'high' };
+        else {
+            const conf = sourceConfidence(meta.source);
+            const fnMeta = parseFilenameTime(file);
+            // Nếu chỉ còn lastModified hoặc nguồn yếu, ưu tiên tên file vì lastModified thường là thời gian copy/tải lại.
+            if (fnMeta && (conf.level === 'low' || /lastmodified|fallback/i.test(String(meta.source || '')))) meta = fnMeta;
+        }
+        try {
+            if (typeof window.gshtSetExternalTimeOverride === 'function') window.gshtSetExternalTimeOverride(file, meta.timestampMs, meta.source + ' - V108 khóa trước xử lý');
+        } catch(e) {}
+        updateDecision(meta);
+        return meta;
+    }
+    window.gshtResolveImportTimestampV108 = resolveTime;
+
+    function loadVideoMeta(video){
+        return new Promise((resolve, reject) => {
+            let done = false;
+            const finish = (ok, err) => { if (done) return; done = true; cleanup(); ok ? resolve() : reject(err || new Error('Không đọc được video.')); };
+            const cleanup = () => { video.removeEventListener('loadedmetadata', onMeta); video.removeEventListener('error', onErr); clearTimeout(timer); };
+            const onMeta = () => finish(true);
+            const onErr = () => finish(false, new Error('Không đọc được metadata video.'));
+            const timer = setTimeout(() => { if (video.readyState >= 1 && video.videoWidth) finish(true); else finish(false, new Error('Quá thời gian chờ đọc video.')); }, 15000);
+            video.addEventListener('loadedmetadata', onMeta);
+            video.addEventListener('error', onErr);
+            try { video.load(); } catch(e) {}
+            if (video.readyState >= 1 && video.videoWidth) finish(true);
+        });
+    }
+    function waitVideoEnd(video){
+        return new Promise(resolve => {
+            let done = false;
+            const finish = () => { if (done) return; done = true; cleanup(); resolve(); };
+            const cleanup = () => { video.removeEventListener('ended', finish); video.removeEventListener('error', finish); clearInterval(timer); };
+            const timer = setInterval(() => {
+                const dur = Number(video.duration || 0);
+                if (video.ended || (Number.isFinite(dur) && dur > 0 && video.currentTime >= dur - 0.08)) finish();
+            }, 250);
+            video.addEventListener('ended', finish);
+            video.addEventListener('error', finish);
+        });
+    }
+    function getVideoLabel(){ return $('gsht-import-video-label')?.value || 'VIDEO'; }
+    function drawFrame(ctx, sourceVideo, outW, outH, footerH, layout, fixedInfo, startMs){
+        ctx.clearRect(0,0,outW,outH+footerH);
+        try { ctx.drawImage(sourceVideo, 0,0,sourceVideo.videoWidth,sourceVideo.videoHeight, 0,0,outW,outH); }
+        catch(e) { ctx.fillStyle = '#000'; ctx.fillRect(0,0,outW,outH); }
+        const fY = outH;
+        ctx.fillStyle = '#090909'; ctx.fillRect(0, fY, outW, footerH);
+        ctx.strokeStyle = '#dc3545'; ctx.lineWidth = Math.max(2, 3 * layout.scale); ctx.strokeRect(0, fY, outW, footerH);
+        const now = new Date(startMs + Math.max(0, sourceVideo.currentTime || 0) * 1000);
+        const info = Object.assign({}, fixedInfo, {
+            timeOnly: now.toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false}),
+            dateOnly: now.toLocaleDateString('vi-VN'),
+            weekdayOnly: typeof getVietnamWeekday === 'function' ? getVietnamWeekday(now) : ''
+        });
+        let y = fY + 18 * layout.scale;
+        y += drawFooterHeaderBlock(ctx, info, layout.textX, y, layout.maxTextW, layout.scale, false);
+        y += 12 * layout.scale;
+        ctx.font = `bold ${Math.max(16, 21 * layout.scale)}px Arial`;
+        (layout.lines || []).forEach(row => { ctx.fillStyle = row.color; y += drawWrappedTextBlock(ctx, row.text, layout.textX, y, layout.maxTextW, layout.lineH, row.max, 'left'); });
+        let extraX = outW - layout.pad - ((layout.orderedExtras || []).length * layout.imgBoxSize + Math.max(0, (layout.orderedExtras || []).length - 1) * layout.pad);
+        (layout.orderedExtras || []).forEach(key => {
+            const img = layout.cachedExtras && layout.cachedExtras[key];
+            const label = key === 'compass' ? 'LA BÀN' : (key === 'map' ? 'BẢN ĐỒ' : 'NGƯỜI CHỤP');
+            if (typeof drawVideoExtraBox === 'function') drawVideoExtraBox(ctx, img, label, extraX, fY, layout);
+            extraX += layout.imgBoxSize + layout.pad;
+        });
+    }
+    async function makeExtras(layout){
+        layout.cachedExtras = { compass:null, map:null, selfie:null };
+        const loadImg = (src) => new Promise(resolve => { if (!src) return resolve(null); const img = new Image(); img.onload=()=>resolve(img); img.onerror=()=>resolve(null); img.src=src; });
+        const getSource = (globalSource, canvasId) => {
+            if (globalSource) return globalSource;
+            const c = $(canvasId);
+            if (c && !c.classList.contains('d-none')) { try { return c.toDataURL('image/jpeg', typeof getJpegQuality==='function'?getJpegQuality():0.92); } catch(e){} }
+            return null;
+        };
+        try { if ((layout.enabledExtras || []).includes('compass')) layout.cachedExtras.compass = await loadImg(getSource(globalExtras?.compass, 'canvas-compass')); } catch(e) {}
+        try { if ((layout.enabledExtras || []).includes('map')) layout.cachedExtras.map = await loadImg(getSource(globalExtras?.map, 'canvas-map')); } catch(e) {}
+        try { if ((layout.enabledExtras || []).includes('selfie')) layout.cachedExtras.selfie = await loadImg(getSource(globalExtras?.selfie, 'img-selfie')); } catch(e) {}
+    }
+    async function createVideoWithProgress(ev){
+        const file = ev?.target?.files?.[0];
+        if (!file) return;
+        let srcUrl = '';
+        let raf = 0;
+        try {
+            STATE.busy = true;
+            setProgress(2, `Đã nhận video: <b>${esc(file.name || 'video')}</b>. Đang đọc metadata...`);
+            setImportStatus(`Đang tạo video có chân thông tin từ file <b>${esc(file.name)}</b>...`, 'text-info');
+
+            const meta = await resolveTime(file, 'video');
+            const conf = sourceConfidence(meta.source);
+            setProgress(10, `Đã khóa thời gian: <b>${esc(fmtVi(meta.timestampMs))}</b> <span class="${conf.cls}">(tin cậy ${esc(conf.label)})</span>. Đang mở video...`);
+
+            srcUrl = URL.createObjectURL(file);
+            const v = document.createElement('video');
+            v.src = srcUrl;
+            v.playsInline = true;
+            v.preload = 'auto';
+            v.crossOrigin = 'anonymous';
+            v.volume = 0;
+            v.muted = false;
+            await loadVideoMeta(v);
+            const duration = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0;
+            setProgress(16, `Video gốc: <b>${v.videoWidth}×${v.videoHeight}</b>${duration ? `, thời lượng <b>${duration.toFixed(1)} giây</b>` : ''}. Đang chuẩn bị khung xuất...`);
+
+            const videoQ = typeof getVideoQualitySetting === 'function' ? getVideoQualitySetting() : { fps:20, videoBitsPerSecond:2500000, maxHeight:720 };
+            const out = typeof getVideoOutputDimensions === 'function' ? getVideoOutputDimensions(v.videoWidth, v.videoHeight) : { width:v.videoWidth || 1280, height:v.videoHeight || 720 };
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const scale = Math.max(0.75, out.width / 1000);
+            const label = getVideoLabel();
+            const gpsMeta = typeof getCurrentGpsMeta === 'function' ? getCurrentGpsMeta() : null;
+            const address = typeof getAddressForGps === 'function' ? await getAddressForGps(gpsMeta) : '';
+            const fixedInfo = typeof getCaptureContext === 'function' ? getCaptureContext(label, new Date(meta.timestampMs), gpsMeta, address) : { type:label, timeOnly:'', dateOnly:'', weekdayOnly:'', gpsLine:'', address:'', prefix:'', team:'', note:'' };
+            const tempLayout = typeof buildVideoFooterLayout === 'function' ? buildVideoFooterLayout(ctx, out.width, scale, fixedInfo) : null;
+            if (!tempLayout) throw new Error('Không tìm thấy hàm dựng chân video.');
+            canvas.width = out.width;
+            canvas.height = out.height + tempLayout.footerH;
+            await makeExtras(tempLayout);
+            setProgress(22, `Đã dựng khung chân trang <b>${canvas.width}×${canvas.height}</b>. Đang khởi tạo bộ ghi video...`);
+
+            const stream = canvas.captureStream(videoQ.fps || 20);
+            try {
+                const sourceStream = v.captureStream ? v.captureStream() : null;
+                const a = sourceStream?.getAudioTracks?.()[0];
+                if (a) stream.addTrack(a);
+            } catch(e) {}
+            const chunks = [];
+            let mimeType = typeof getSupportedMimeType === 'function' ? getSupportedMimeType() : 'video/webm';
+            const recOpts = { videoBitsPerSecond: videoQ.videoBitsPerSecond || 2500000 };
+            if (mimeType) recOpts.mimeType = mimeType;
+            const recorder = new MediaRecorder(stream, recOpts);
+            recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+            const done = new Promise(resolve => { recorder.onstop = resolve; });
+            recorder.start(500);
+            setProgress(28, 'Đang chạy video và chèn chân trang theo từng khung hình...');
+
+            const startMs = meta.timestampMs;
+            let lastPct = 0;
+            const drawLoop = () => {
+                if (!v.paused && !v.ended) {
+                    drawFrame(ctx, v, out.width, out.height, tempLayout.footerH, tempLayout, fixedInfo, startMs);
+                    const now = Date.now();
+                    if (now - STATE.lastProgressUpdate > 250) {
+                        STATE.lastProgressUpdate = now;
+                        const p = duration ? Math.min(92, 28 + (v.currentTime / duration) * 64) : Math.min(90, lastPct + 0.25);
+                        lastPct = p;
+                        setProgress(p, `Đang tạo video: <b>${duration ? Math.min(v.currentTime, duration).toFixed(1) + '/' + duration.toFixed(1) + ' giây' : v.currentTime.toFixed(1) + ' giây'}</b>. Không đóng tab cho đến khi hoàn tất.`);
+                    }
+                    raf = requestAnimationFrame(drawLoop);
+                }
+            };
+            await v.play();
+            drawLoop();
+            await waitVideoEnd(v);
+            cancelAnimationFrame(raf);
+            drawFrame(ctx, v, out.width, out.height, tempLayout.footerH, tempLayout, fixedInfo, startMs);
+            setProgress(94, 'Đã chạy hết video. Đang đóng gói file xuất...');
+            try { recorder.stop(); } catch(e) {}
+            await done;
+            try { stream.getTracks().forEach(t => t.stop()); } catch(e) {}
+            const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
+            const ext = (recorder.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
+            const prefix = (($('tab1-prefix')?.value || 'HT').trim().replace(/\s+/g,'_') || 'HT');
+            currentMediaFilename = `VIDEO_NHAP_${prefix}_${new Date(meta.timestampMs).toISOString().slice(0,10).replace(/-/g,'')}_${canvas.width}x${canvas.height}.${ext}`;
+            if (currentMediaBlobUrl) { try { URL.revokeObjectURL(currentMediaBlobUrl); } catch(e){} }
+            currentMediaBlobUrl = URL.createObjectURL(blob);
+            currentMediaType = 'video';
+            if (typeof showMediaPreview === 'function') showMediaPreview();
+            setProgress(100, `✅ Hoàn tất. Video xuất <b>${canvas.width}×${canvas.height}</b>, dung lượng <b>${(blob.size/1024/1024).toFixed(1)} MB</b>, thời gian khóa: <b>${esc(fmtVi(meta.timestampMs))}</b>.`, 'bg-success');
+            setImportStatus(`✅ Đã tạo video có chân trang từ <b>${esc(file.name)}</b>. Nguồn thời gian: <b>${esc(meta.source)}</b>, mức tin cậy: <b>${esc(conf.label)}</b>.`, conf.warn ? 'text-warning' : 'text-success');
+        } catch(e) {
+            console.error(VERSION, e);
+            setProgress(100, '❌ Không tạo được video: ' + esc(e.message || e), 'bg-danger');
+            setImportStatus('❌ Không tạo được video từ file máy: ' + esc(e.message || e), 'text-danger');
+        } finally {
+            STATE.busy = false;
+            try { cancelAnimationFrame(raf); } catch(e) {}
+            if (srcUrl) { try { URL.revokeObjectURL(srcUrl); } catch(e) {} }
+            if (ev?.target) ev.target.value = '';
+        }
+    }
+    function wrapPhotoHandler(name){
+        const old = window[name];
+        if (typeof old !== 'function' || old.__gshtV108Wrapped) return;
+        const wrapped = async function(ev, type){
+            const files = Array.from(ev?.target?.files || []);
+            for (let i = 0; i < files.length; i++) {
+                try {
+                    const meta = await resolveTime(files[i], 'photo');
+                    const conf = sourceConfidence(meta.source);
+                    setImportStatus(`V108 khóa thời gian ảnh ${i+1}/${files.length}: <b>${esc(fmtVi(meta.timestampMs))}</b> <span class="${conf.cls}">(tin cậy ${esc(conf.label)}, ${esc(meta.source)})</span>. Đang chèn chân ảnh...`, conf.warn ? 'text-warning' : 'text-info');
+                } catch(e) {}
+            }
+            return old.apply(this, arguments);
+        };
+        wrapped.__gshtV108Wrapped = true;
+        wrapped.__gshtV107Wrapped = true;
+        window[name] = wrapped;
+    }
+    function install(){
+        injectPanel();
+        wrapPhotoHandler('gshtHandleExternalPhotos');
+        wrapPhotoHandler('gshtHandleNativeCameraPhoto');
+        if (typeof window.gshtHandleExternalVideo === 'function' && !window.gshtHandleExternalVideo.__gshtV108Wrapped) {
+            createVideoWithProgress.__gshtV108Wrapped = true;
+            createVideoWithProgress.__gshtV107Wrapped = true;
+            window.gshtHandleExternalVideo = createVideoWithProgress;
+        }
+        if (typeof window.gshtHandleNativeCameraVideo === 'function' && !window.gshtHandleNativeCameraVideo.__gshtV108Wrapped) {
+            const nativeWrapped = async function(ev){
+                const file = ev?.target?.files?.[0];
+                if (file) setImportStatus(`Đã nhận video từ camera gốc: <b>${esc(file.name || 'video camera')}</b>. Đang tạo video có chân trang và hiển thị tiến độ...`, 'text-info');
+                return createVideoWithProgress(ev);
+            };
+            nativeWrapped.__gshtV108Wrapped = true;
+            nativeWrapped.__gshtV107Wrapped = true;
+            window.gshtHandleNativeCameraVideo = nativeWrapped;
+        }
+    }
+    function addHelp(){
+        try {
+            const help = document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
+            if (help && !$('gsht-v108-help-note')) {
+                const div = document.createElement('div');
+                div.id = 'gsht-v108-help-note';
+                div.className = 'alert alert-warning small mt-2';
+                div.innerHTML = '<b>V108 - Chống sai thời gian media đã truyền qua nhiều thiết bị:</b> Nếu EXIF/metadata bị Zalo, Messenger, trình chỉnh sửa hoặc thao tác copy xóa mất, app không thể khôi phục tuyệt đối thời điểm chụp/quay gốc. Bản này thêm mức tin cậy nguồn thời gian, suy luận từ tên file khi metadata yếu, và ô <b>Khóa thời gian thủ công</b> để người dùng chốt giờ đúng trước khi chèn chân ảnh/video. Tính năng tạo video có chân trang từ video tải lên có thêm thanh tiến độ theo giai đoạn và theo thời lượng video.';
+                help.appendChild(div);
+            }
+        } catch(e) {}
+    }
+    function boot(){ install(); addHelp(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 600)); else setTimeout(boot, 600);
+    window.addEventListener('load', () => setTimeout(boot, 1200));
+    setInterval(() => { try { install(); } catch(e){} }, 2500);
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V108 media timestamp trust manual lock + video progress'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
 })();
 </script>
 
