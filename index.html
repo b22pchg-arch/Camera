@@ -13317,7 +13317,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             $('gsht-v109-now')?.addEventListener('click', () => { input.value = fmtInput(Date.now()); });
             $('gsht-v109-hidden-meta')?.addEventListener('click', () => {
                 if (typeof window.gshtShowHiddenMetadataPopup === 'function') window.gshtShowHiddenMetadataPopup(file, kind);
-                else alert('Chức năng xem thông tin ẩn V110 chưa sẵn sàng.');
+                else alert('Chức năng xem thông tin ẩn V111 chưa sẵn sàng.');
             });
             $('gsht-v109-apply')?.addEventListener('click', () => {
                 const ms = new Date(input.value).getTime();
@@ -13446,15 +13446,15 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 </script>
 
 
-<script id="gsht-v110-hidden-metadata-viewer">
-/* GSHT V110: xem toàn bộ thông tin ẩn có thể đọc được của ảnh/video.
+<script id="gsht-v111-hidden-metadata-viewer">
+/* GSHT V111: xem toàn bộ thông tin ẩn có thể đọc được của ảnh/video.
    - Nút độc lập trong khu vực nhập ảnh/video.
    - Nút nhanh trong popup xác nhận thời gian V109.
    - Đọc: thông tin file, kích thước media, timestamp đề xuất, ExifReader, exifr, XMP/text, cấu trúc MP4/MOV cơ bản.
    - Chạy offline, tự dùng exifreader.min.js / exifr.full.umd.js / mp4box.all.min.js nếu các file có sẵn cạnh index.html. */
 (function(){
     'use strict';
-    const VERSION = 'GSHT-V110-HIDDEN-METADATA-VIEWER';
+    const VERSION = 'GSHT-V111-HIDDEN-METADATA-VIEWER';
     const $ = id => document.getElementById(id);
     const MAX_TEXT_SCAN = 3 * 1024 * 1024;
     const MAX_FULL_MP4BOX = 80 * 1024 * 1024;
@@ -13495,7 +13495,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         return new Promise(resolve => {
             try {
                 if (testFn && testFn()) return resolve(true);
-                const id = 'gsht-v110-lib-' + src.replace(/[^a-z0-9]+/gi,'-');
+                const id = 'gsht-v111-lib-' + src.replace(/[^a-z0-9]+/gi,'-');
                 const old = document.getElementById(id);
                 if (old) { old.addEventListener('load', () => resolve(true), {once:true}); old.addEventListener('error', () => resolve(false), {once:true}); return; }
                 const s = document.createElement('script');
@@ -13545,9 +13545,9 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         const flat = flatten(safePlain(obj));
         const entries = Object.entries(flat).slice(0, limit);
         if (!entries.length) return '<div class="text-secondary small">Không có dữ liệu đọc được.</div>';
-        let html = '<div class="gsht-v110-table">';
-        for (const [k,v] of entries) html += `<div class="gsht-v110-row"><b>${esc(k)}</b><span>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</span></div>`;
-        if (Object.keys(flat).length > entries.length) html += `<div class="gsht-v110-row"><b>...</b><span>Còn ${Object.keys(flat).length - entries.length} mục, bấm Sao chép JSON để xem đầy đủ.</span></div>`;
+        let html = '<div class="gsht-v111-table">';
+        for (const [k,v] of entries) html += `<div class="gsht-v111-row"><b>${esc(k)}</b><span>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</span></div>`;
+        if (Object.keys(flat).length > entries.length) html += `<div class="gsht-v111-row"><b>...</b><span>Còn ${Object.keys(flat).length - entries.length} mục, bấm Sao chép JSON để xem đầy đủ.</span></div>`;
         html += '</div>';
         return html;
     }
@@ -13630,7 +13630,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             let re1 = new RegExp('(?:[A-Za-z0-9_\\-]+:)?' + escaped + '[^>]*>([^<]{1,500})<', 'ig');
             let m; while ((m = re1.exec(text)) && out.length < 200) add(name, m[1], 'XML/XMP tag');
-            let re2 = new RegExp('(?:[A-Za-z0-9_\\-]+:)?' + escaped + '\\s*=\\s*["\\']([^"\\']{1,500})["\\']', 'ig');
+            let re2 = new RegExp("(?:[A-Za-z0-9_\\-]+:)?" + escaped + "\\s*=\\s*[\"']([^\"']{1,500})[\"']", "ig");
             while ((m = re2.exec(text)) && out.length < 200) add(name, m[1], 'XML/XMP attribute');
             let re3 = new RegExp(escaped + '[\\s:=]{1,12}([^\\r\\n<>]{4,160})', 'ig');
             while ((m = re3.exec(text)) && out.length < 200) add(name, m[1], 'text scan');
@@ -13702,7 +13702,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         try {
             const loaded = window.MP4Box || await loadScriptOnce('mp4box.all.min.js', () => !!window.MP4Box);
             if (!window.MP4Box || typeof window.MP4Box.createFile !== 'function') return { available:false, note:'Không tìm thấy mp4box.all.min.js hoặc thư viện chưa nạp được.' };
-            if ((file.size || 0) > MAX_FULL_MP4BOX) return { available:true, skipped:`File lớn hơn ${bytes(MAX_FULL_MP4BOX)} nên V110 chỉ đọc cấu trúc MP4 nội bộ mẫu đầu/cuối để tránh treo máy.` };
+            if ((file.size || 0) > MAX_FULL_MP4BOX) return { available:true, skipped:`File lớn hơn ${bytes(MAX_FULL_MP4BOX)} nên V111 chỉ đọc cấu trúc MP4 nội bộ mẫu đầu/cuối để tránh treo máy.` };
             return await new Promise(async resolve => {
                 try {
                     const mp4box = window.MP4Box.createFile();
@@ -13764,35 +13764,35 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         };
     }
     function injectStyle(){
-        if ($('gsht-v110-style')) return;
+        if ($('gsht-v111-style')) return;
         const css = document.createElement('style');
-        css.id = 'gsht-v110-style';
+        css.id = 'gsht-v111-style';
         css.textContent = `
-        .gsht-v110-overlay{position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:10px;overscroll-behavior:contain;color:#e9ecef;}
-        .gsht-v110-dialog{width:min(920px,100%);height:min(92dvh,860px);display:flex;flex-direction:column;background:#0c1218;border:2px solid #ffc107;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.75);overflow:hidden;}
-        .gsht-v110-head{flex:0 0 auto;display:flex;gap:8px;align-items:flex-start;justify-content:space-between;padding:10px 12px;background:#120e04;border-bottom:1px solid #5a4300;}
-        .gsht-v110-title{font-size:13px;line-height:1.25;font-weight:900;color:#ffc107;overflow-wrap:anywhere;}
-        .gsht-v110-sub{font-size:10.5px;color:#adb5bd;line-height:1.35;margin-top:3px;}
-        .gsht-v110-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
-        .gsht-v110-actions .btn{font-size:10.5px;font-weight:800;}
-        .gsht-v110-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px;background:#101820;}
-        .gsht-v110-loading{display:flex;align-items:center;gap:8px;border:1px dashed #ffc107;border-radius:10px;padding:10px;background:rgba(255,193,7,.07);font-size:12px;color:#ffc107;}
-        .gsht-v110-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px;}
-        .gsht-v110-card{border:1px solid #495057;border-radius:12px;background:rgba(0,0,0,.35);padding:9px;min-width:0;}
-        .gsht-v110-card h6{font-size:12px;color:#0dcaf0;font-weight:900;margin:0 0 7px 0;}
-        .gsht-v110-table{display:block;border:1px solid #343a40;border-radius:10px;overflow:hidden;background:#05080c;}
-        .gsht-v110-row{display:grid;grid-template-columns:190px minmax(0,1fr);border-bottom:1px solid #212529;font-size:10.7px;line-height:1.35;}
-        .gsht-v110-row:last-child{border-bottom:0;}
-        .gsht-v110-row b{padding:6px 7px;background:#111820;color:#adb5bd;word-break:break-word;}
-        .gsht-v110-row span{padding:6px 7px;color:#e9ecef;word-break:break-word;white-space:pre-wrap;}
-        .gsht-v110-details{border:1px solid #495057;border-radius:12px;background:#0a0f14;margin-bottom:8px;overflow:hidden;}
-        .gsht-v110-details summary{cursor:pointer;padding:9px 10px;background:#111820;color:#ffc107;font-weight:900;font-size:12px;border-bottom:1px solid #343a40;}
-        .gsht-v110-details .inside{padding:8px;}
-        .gsht-v110-pre{max-height:48dvh;overflow:auto;background:#050505;border:1px solid #343a40;border-radius:10px;padding:8px;color:#d1e7dd;font-size:10.5px;line-height:1.35;white-space:pre-wrap;word-break:break-word;}
-        .gsht-v110-tool-panel{border:1px solid #ffc107;border-radius:10px;background:rgba(255,193,7,.06);padding:8px;margin-top:8px;}
-        .gsht-v110-tool-panel .small{font-size:10.5px;line-height:1.35;}
-        @media(max-width:430px){.gsht-v110-overlay{padding:0;align-items:stretch}.gsht-v110-dialog{width:100%;height:100dvh;border-radius:0;border-left:0;border-right:0}.gsht-v110-summary{grid-template-columns:1fr}.gsht-v110-row{grid-template-columns:112px minmax(0,1fr);font-size:10px}.gsht-v110-head{flex-direction:column}.gsht-v110-actions{width:100%;justify-content:stretch}.gsht-v110-actions .btn{flex:1 1 auto}.gsht-v110-pre{max-height:40dvh}}
-        @supports not (height:100dvh){.gsht-v110-dialog{height:92vh}.gsht-v110-pre{max-height:48vh}}
+        .gsht-v111-overlay{position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:10px;overscroll-behavior:contain;color:#e9ecef;}
+        .gsht-v111-dialog{width:min(920px,100%);height:min(92dvh,860px);display:flex;flex-direction:column;background:#0c1218;border:2px solid #ffc107;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.75);overflow:hidden;}
+        .gsht-v111-head{flex:0 0 auto;display:flex;gap:8px;align-items:flex-start;justify-content:space-between;padding:10px 12px;background:#120e04;border-bottom:1px solid #5a4300;}
+        .gsht-v111-title{font-size:13px;line-height:1.25;font-weight:900;color:#ffc107;overflow-wrap:anywhere;}
+        .gsht-v111-sub{font-size:10.5px;color:#adb5bd;line-height:1.35;margin-top:3px;}
+        .gsht-v111-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+        .gsht-v111-actions .btn{font-size:10.5px;font-weight:800;}
+        .gsht-v111-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px;background:#101820;}
+        .gsht-v111-loading{display:flex;align-items:center;gap:8px;border:1px dashed #ffc107;border-radius:10px;padding:10px;background:rgba(255,193,7,.07);font-size:12px;color:#ffc107;}
+        .gsht-v111-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px;}
+        .gsht-v111-card{border:1px solid #495057;border-radius:12px;background:rgba(0,0,0,.35);padding:9px;min-width:0;}
+        .gsht-v111-card h6{font-size:12px;color:#0dcaf0;font-weight:900;margin:0 0 7px 0;}
+        .gsht-v111-table{display:block;border:1px solid #343a40;border-radius:10px;overflow:hidden;background:#05080c;}
+        .gsht-v111-row{display:grid;grid-template-columns:190px minmax(0,1fr);border-bottom:1px solid #212529;font-size:10.7px;line-height:1.35;}
+        .gsht-v111-row:last-child{border-bottom:0;}
+        .gsht-v111-row b{padding:6px 7px;background:#111820;color:#adb5bd;word-break:break-word;}
+        .gsht-v111-row span{padding:6px 7px;color:#e9ecef;word-break:break-word;white-space:pre-wrap;}
+        .gsht-v111-details{border:1px solid #495057;border-radius:12px;background:#0a0f14;margin-bottom:8px;overflow:hidden;}
+        .gsht-v111-details summary{cursor:pointer;padding:9px 10px;background:#111820;color:#ffc107;font-weight:900;font-size:12px;border-bottom:1px solid #343a40;}
+        .gsht-v111-details .inside{padding:8px;}
+        .gsht-v111-pre{max-height:48dvh;overflow:auto;background:#050505;border:1px solid #343a40;border-radius:10px;padding:8px;color:#d1e7dd;font-size:10.5px;line-height:1.35;white-space:pre-wrap;word-break:break-word;}
+        .gsht-v111-tool-panel{border:1px solid #ffc107;border-radius:10px;background:rgba(255,193,7,.06);padding:8px;margin-top:8px;}
+        .gsht-v111-tool-panel .small{font-size:10.5px;line-height:1.35;}
+        @media(max-width:430px){.gsht-v111-overlay{padding:0;align-items:stretch}.gsht-v111-dialog{width:100%;height:100dvh;border-radius:0;border-left:0;border-right:0}.gsht-v111-summary{grid-template-columns:1fr}.gsht-v111-row{grid-template-columns:112px minmax(0,1fr);font-size:10px}.gsht-v111-head{flex-direction:column}.gsht-v111-actions{width:100%;justify-content:stretch}.gsht-v111-actions .btn{flex:1 1 auto}.gsht-v111-pre{max-height:40dvh}}
+        @supports not (height:100dvh){.gsht-v111-dialog{height:92vh}.gsht-v111-pre{max-height:48vh}}
         `;
         document.head.appendChild(css);
     }
@@ -13813,14 +13813,14 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             'Ghi chú': conf.warn ? 'Nên kiểm tra/sửa nếu file đã qua ứng dụng trung gian.' : 'Nguồn tương đối tốt nếu metadata chưa bị can thiệp.'
         });
         let html = `<div class="alert alert-warning small" style="font-size:10.8px;line-height:1.35;"><b>Lưu ý:</b> ${esc(meta.note)}</div>`;
-        html += `<div class="gsht-v110-summary"><div class="gsht-v110-card"><h6><i class="fa-solid fa-file me-1"></i>Thông tin file</h6>${renderFlatTable(basicRows)}</div><div class="gsht-v110-card"><h6><i class="fa-solid fa-clock me-1"></i>Media & thời gian</h6>${renderFlatTable(mediaRows)}</div></div>`;
-        html += `<details class="gsht-v110-details" open><summary>ExifReader: EXIF / XMP / IPTC / GPS / TIFF đọc được</summary><div class="inside">${renderFlatTable(meta.libraries.ExifReader?.tags || meta.libraries.ExifReader || {})}</div></details>`;
-        html += `<details class="gsht-v110-details"><summary>exifr: metadata đọc được</summary><div class="inside">${renderFlatTable(meta.libraries.exifr?.tags || meta.libraries.exifr || {})}</div></details>`;
-        html += `<details class="gsht-v110-details"><summary>MP4Box / cấu trúc MP4-MOV cơ bản</summary><div class="inside"><div class="gsht-v110-card mb-2"><h6>MP4Box</h6>${renderFlatTable(meta.libraries.MP4Box || {})}</div><div class="gsht-v110-card"><h6>Parser nội bộ</h6>${renderFlatTable(meta.internalScan.mp4Internal || {})}</div></div></details>`;
-        html += `<details class="gsht-v110-details"><summary>XMP/XML packet phát hiện được (${meta.internalScan.xmpPackets.length})</summary><div class="inside">${meta.internalScan.xmpPackets.length ? meta.internalScan.xmpPackets.map((p,i)=>`<div class="small text-info fw-bold mb-1">XMP #${i+1}</div><pre class="gsht-v110-pre">${esc(p)}</pre>`).join('') : '<div class="text-secondary small">Không phát hiện XMP packet trong phần mẫu đã quét.</div>'}</div></details>`;
-        html += `<details class="gsht-v110-details"><summary>Các cặp khóa/giá trị nghi vấn từ text scan (${meta.internalScan.textKeyValues.length})</summary><div class="inside">${renderFlatTable(meta.internalScan.textKeyValues)}</div></details>`;
-        html += `<details class="gsht-v110-details"><summary>Chuỗi metadata nghi vấn trong file (${meta.internalScan.importantStrings.length})</summary><div class="inside"><pre class="gsht-v110-pre">${esc(meta.internalScan.importantStrings.join('\n'))}</pre></div></details>`;
-        html += `<details class="gsht-v110-details"><summary>JSON đầy đủ</summary><div class="inside"><pre class="gsht-v110-pre" id="gsht-v110-json-pre">${esc(JSON.stringify(meta, null, 2))}</pre></div></details>`;
+        html += `<div class="gsht-v111-summary"><div class="gsht-v111-card"><h6><i class="fa-solid fa-file me-1"></i>Thông tin file</h6>${renderFlatTable(basicRows)}</div><div class="gsht-v111-card"><h6><i class="fa-solid fa-clock me-1"></i>Media & thời gian</h6>${renderFlatTable(mediaRows)}</div></div>`;
+        html += `<details class="gsht-v111-details" open><summary>ExifReader: EXIF / XMP / IPTC / GPS / TIFF đọc được</summary><div class="inside">${renderFlatTable(meta.libraries.ExifReader?.tags || meta.libraries.ExifReader || {})}</div></details>`;
+        html += `<details class="gsht-v111-details"><summary>exifr: metadata đọc được</summary><div class="inside">${renderFlatTable(meta.libraries.exifr?.tags || meta.libraries.exifr || {})}</div></details>`;
+        html += `<details class="gsht-v111-details"><summary>MP4Box / cấu trúc MP4-MOV cơ bản</summary><div class="inside"><div class="gsht-v111-card mb-2"><h6>MP4Box</h6>${renderFlatTable(meta.libraries.MP4Box || {})}</div><div class="gsht-v111-card"><h6>Parser nội bộ</h6>${renderFlatTable(meta.internalScan.mp4Internal || {})}</div></div></details>`;
+        html += `<details class="gsht-v111-details"><summary>XMP/XML packet phát hiện được (${meta.internalScan.xmpPackets.length})</summary><div class="inside">${meta.internalScan.xmpPackets.length ? meta.internalScan.xmpPackets.map((p,i)=>`<div class="small text-info fw-bold mb-1">XMP #${i+1}</div><pre class="gsht-v111-pre">${esc(p)}</pre>`).join('') : '<div class="text-secondary small">Không phát hiện XMP packet trong phần mẫu đã quét.</div>'}</div></details>`;
+        html += `<details class="gsht-v111-details"><summary>Các cặp khóa/giá trị nghi vấn từ text scan (${meta.internalScan.textKeyValues.length})</summary><div class="inside">${renderFlatTable(meta.internalScan.textKeyValues)}</div></details>`;
+        html += `<details class="gsht-v111-details"><summary>Chuỗi metadata nghi vấn trong file (${meta.internalScan.importantStrings.length})</summary><div class="inside"><pre class="gsht-v111-pre">${esc(meta.internalScan.importantStrings.join('\n'))}</pre></div></details>`;
+        html += `<details class="gsht-v111-details"><summary>JSON đầy đủ</summary><div class="inside"><pre class="gsht-v111-pre" id="gsht-v111-json-pre">${esc(JSON.stringify(meta, null, 2))}</pre></div></details>`;
         return html;
     }
     function copyText(text){
@@ -13838,58 +13838,58 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         injectStyle();
         kind = kind || guessKind(file);
         const overlay = document.createElement('div');
-        overlay.className = 'gsht-v110-overlay';
+        overlay.className = 'gsht-v111-overlay';
         overlay.innerHTML = `
-            <div class="gsht-v110-dialog" role="dialog" aria-modal="true">
-                <div class="gsht-v110-head">
+            <div class="gsht-v111-dialog" role="dialog" aria-modal="true">
+                <div class="gsht-v111-head">
                     <div class="min-w-0">
-                        <div class="gsht-v110-title"><i class="fa-solid fa-magnifying-glass me-1"></i> THÔNG TIN ẨN CỦA FILE: ${esc(file.name || '(không tên)')}</div>
-                        <div class="gsht-v110-sub">Đọc offline các metadata còn tồn tại trong file ảnh/video: EXIF, XMP, IPTC, GPS, QuickTime/MP4 và chuỗi text nghi vấn.</div>
+                        <div class="gsht-v111-title"><i class="fa-solid fa-magnifying-glass me-1"></i> THÔNG TIN ẨN CỦA FILE: ${esc(file.name || '(không tên)')}</div>
+                        <div class="gsht-v111-sub">Đọc offline các metadata còn tồn tại trong file ảnh/video: EXIF, XMP, IPTC, GPS, QuickTime/MP4 và chuỗi text nghi vấn.</div>
                     </div>
-                    <div class="gsht-v110-actions">
-                        <button type="button" class="btn btn-sm btn-outline-info" id="gsht-v110-copy" disabled><i class="fa-solid fa-copy me-1"></i>SAO CHÉP JSON</button>
-                        <button type="button" class="btn btn-sm btn-outline-warning" id="gsht-v110-download" disabled><i class="fa-solid fa-file-arrow-down me-1"></i>TẢI JSON</button>
-                        <button type="button" class="btn btn-sm btn-light" id="gsht-v110-close"><i class="fa-solid fa-xmark me-1"></i>ĐÓNG</button>
+                    <div class="gsht-v111-actions">
+                        <button type="button" class="btn btn-sm btn-outline-info" id="gsht-v111-copy" disabled><i class="fa-solid fa-copy me-1"></i>SAO CHÉP JSON</button>
+                        <button type="button" class="btn btn-sm btn-outline-warning" id="gsht-v111-download" disabled><i class="fa-solid fa-file-arrow-down me-1"></i>TẢI JSON</button>
+                        <button type="button" class="btn btn-sm btn-light" id="gsht-v111-close"><i class="fa-solid fa-xmark me-1"></i>ĐÓNG</button>
                     </div>
                 </div>
-                <div class="gsht-v110-body" id="gsht-v110-body"><div class="gsht-v110-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang đọc thông tin ẩn trong file, vui lòng chờ...</span></div></div>
+                <div class="gsht-v111-body" id="gsht-v111-body"><div class="gsht-v111-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang đọc thông tin ẩn trong file, vui lòng chờ...</span></div></div>
             </div>`;
         document.body.appendChild(overlay);
-        $('gsht-v110-close')?.addEventListener('click', () => overlay.remove());
+        $('gsht-v111-close')?.addEventListener('click', () => overlay.remove());
         let meta = null;
         try {
             setImportStatus(`Đang soi thông tin ẩn file <b>${esc(file.name || '')}</b>...`, 'text-info');
             meta = await readAllHiddenMetadata(file, kind);
-            const body = $('gsht-v110-body');
+            const body = $('gsht-v111-body');
             if (body) body.innerHTML = renderMetadata(meta);
-            const copyBtn = $('gsht-v110-copy'), downBtn = $('gsht-v110-download');
+            const copyBtn = $('gsht-v111-copy'), downBtn = $('gsht-v111-download');
             if (copyBtn) { copyBtn.disabled = false; copyBtn.onclick = async () => { await copyText(JSON.stringify(meta, null, 2)); copyBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>ĐÃ SAO CHÉP'; setTimeout(()=>copyBtn.innerHTML='<i class="fa-solid fa-copy me-1"></i>SAO CHÉP JSON',1200); }; }
             if (downBtn) { downBtn.disabled = false; downBtn.onclick = () => downloadJson(file, meta); }
             setImportStatus(`✅ Đã đọc thông tin ẩn file <b>${esc(file.name || '')}</b>.`, 'text-success');
         } catch(e) {
-            const body = $('gsht-v110-body');
+            const body = $('gsht-v111-body');
             if (body) body.innerHTML = `<div class="alert alert-danger small"><b>Không đọc được metadata:</b> ${esc(e?.message || e)}</div>`;
             setImportStatus(`❌ Lỗi đọc thông tin ẩn: ${esc(e?.message || e)}`, 'text-danger');
         }
     }
     function addToolPanel(){
         try {
-            if ($('gsht-v110-tool-panel')) return;
+            if ($('gsht-v111-tool-panel')) return;
             const anchor = $('gsht-native-import-status') || $('native-camera-import-panel');
             const parent = anchor?.parentElement || $('native-camera-import-panel') || document.body;
             const div = document.createElement('div');
-            div.id = 'gsht-v110-tool-panel';
-            div.className = 'gsht-v110-tool-panel';
+            div.id = 'gsht-v111-tool-panel';
+            div.className = 'gsht-v111-tool-panel';
             div.innerHTML = `
                 <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
                     <div class="small text-warning"><b><i class="fa-solid fa-magnifying-glass me-1"></i>SOI THÔNG TIN ẨN ẢNH/VIDEO</b><br><span class="text-secondary">Chọn một file để xem EXIF/XMP/GPS/QuickTime/MP4 còn ẩn trong file, không đưa file vào kho ảnh.</span></div>
                     <label class="btn btn-sm btn-outline-warning fw-bold mb-0">
                         <i class="fa-solid fa-file-circle-question me-1"></i> CHỌN FILE SOI
-                        <input id="gsht-v110-hidden-meta-input" type="file" hidden accept="image/*,video/*,.heic,.heif,.mov,.mp4,.m4v,.webp,.avif,.tif,.tiff">
+                        <input id="gsht-v111-hidden-meta-input" type="file" hidden accept="image/*,video/*,.heic,.heif,.mov,.mp4,.m4v,.webp,.avif,.tif,.tiff">
                     </label>
                 </div>`;
             if (anchor && anchor.parentElement) anchor.insertAdjacentElement('afterend', div); else parent.appendChild(div);
-            $('gsht-v110-hidden-meta-input')?.addEventListener('change', ev => {
+            $('gsht-v111-hidden-meta-input')?.addEventListener('change', ev => {
                 const file = ev.target.files && ev.target.files[0];
                 if (file) showHiddenMetadataPopup(file, guessKind(file));
                 ev.target.value = '';
@@ -13899,11 +13899,11 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     function addHelp(){
         try {
             const help = document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
-            if (help && !$('gsht-v110-help-note')) {
+            if (help && !$('gsht-v111-help-note')) {
                 const div = document.createElement('div');
-                div.id = 'gsht-v110-help-note';
+                div.id = 'gsht-v111-help-note';
                 div.className = 'alert alert-warning small mt-2';
-                div.innerHTML = '<b>V110 - Xem thông tin ẩn ảnh/video:</b> Trong khu vực Camera gốc / Nhập ảnh ngoài có nút <b>CHỌN FILE SOI</b> để mở cửa sổ xem toàn bộ metadata còn đọc được: thông tin file, kích thước media, timestamp đề xuất, EXIF/XMP/IPTC/GPS/QuickTime, cấu trúc MP4/MOV và chuỗi metadata nghi vấn. Trong popup xác nhận thời gian V109 cũng có nút <b>Thông tin ẩn</b> để soi ngay file đang xử lý.';
+                div.innerHTML = '<b>V111 - Xem thông tin ẩn ảnh/video:</b> Trong khu vực Camera gốc / Nhập ảnh ngoài có nút <b>CHỌN FILE SOI</b> để mở cửa sổ xem toàn bộ metadata còn đọc được: thông tin file, kích thước media, timestamp đề xuất, EXIF/XMP/IPTC/GPS/QuickTime, cấu trúc MP4/MOV và chuỗi metadata nghi vấn. Trong popup xác nhận thời gian V109 cũng có nút <b>Thông tin ẩn</b> để soi ngay file đang xử lý.';
                 help.appendChild(div);
             }
         } catch(e) {}
@@ -13913,8 +13913,8 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     window.addEventListener('load', () => setTimeout(boot, 1500));
     setInterval(() => { try { addToolPanel(); } catch(e){} }, 3000);
     window.gshtShowHiddenMetadataPopup = showHiddenMetadataPopup;
-    window.gshtReadAllHiddenMetadataV110 = readAllHiddenMetadata;
-    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V110 hidden metadata viewer'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
+    window.gshtReadAllHiddenMetadataV111 = readAllHiddenMetadata;
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V111 hidden metadata viewer'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
 })();
 </script>
 
