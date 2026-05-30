@@ -13918,5 +13918,426 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 })();
 </script>
 
+
+<script id="gsht-v112-hidden-metadata-editor">
+/* GSHT V112: Sửa metadata ẩn và lưu thành file mới.
+   - Bổ sung vào popup soi thông tin ẩn V111.
+   - Ghi metadata dạng XMP/GSHT vào JPEG, PNG, WebP; với MP4/MOV/HEIC/AVIF dùng top-level free box hoặc marker đính kèm an toàn nhất có thể.
+   - Trình duyệt không được tự ghi đè file gốc; app tạo file mới để tải/lưu/chia sẻ. */
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V112-HIDDEN-METADATA-EDITOR';
+    const $ = id => document.getElementById(id);
+    const QT_EPOCH_DELTA = 2082844800;
+
+    function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function xmlEsc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c])); }
+    function validMs(ms){ return Number.isFinite(ms) && ms > 315532800000 && ms < 4102444800000; }
+    function fmtVi(ms){ try { return validMs(ms) ? new Date(ms).toLocaleString('vi-VN', {hour12:false}) : ''; } catch(e){ return ''; } }
+    function fmtISO(ms){ try { return validMs(ms) ? new Date(ms).toISOString() : ''; } catch(e){ return ''; } }
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function fmtInput(ms){ const d = validMs(ms) ? new Date(ms) : new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'T'+pad2(d.getHours())+':'+pad2(d.getMinutes())+':'+pad2(d.getSeconds()); }
+    function inputToMs(v){ const ms = new Date(v).getTime(); return validMs(ms) ? ms : Date.now(); }
+    function extOf(name){ const m = String(name||'').match(/\.([^.]+)$/); return m ? m[1].toLowerCase() : ''; }
+    function baseName(name){ return String(name || 'file').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_') || 'file'; }
+    function bytes(n){ n=Number(n||0); if(n>=1073741824) return (n/1073741824).toFixed(2)+' GB'; if(n>=1048576) return (n/1048576).toFixed(2)+' MB'; if(n>=1024) return (n/1024).toFixed(1)+' KB'; return n+' B'; }
+    function guessKind(file){ const t=String(file?.type||'').toLowerCase(), e=extOf(file?.name); if(t.startsWith('video/') || /^(mp4|mov|m4v|3gp|webm|avi|mkv)$/i.test(e)) return 'video'; if(t.startsWith('image/') || /^(jpg|jpeg|heic|heif|png|webp|avif|gif|tif|tiff)$/i.test(e)) return 'photo'; return 'file'; }
+    function setStatus(html, cls='text-info'){ const el=$('gsht-native-import-status'); if(el){ el.className='small mt-2 '+cls; el.innerHTML=html; } }
+    function injectStyle(){
+        if ($('gsht-v112-style')) return;
+        const css = document.createElement('style');
+        css.id = 'gsht-v112-style';
+        css.textContent = `
+        .gsht-v112-overlay{position:fixed;inset:0;z-index:2147483200;background:rgba(0,0,0,.95);display:flex;align-items:center;justify-content:center;padding:10px;color:#e9ecef;overscroll-behavior:contain;}
+        .gsht-v112-dialog{width:min(980px,100%);height:min(94dvh,900px);display:flex;flex-direction:column;background:#0b1117;border:2px solid #20c997;border-radius:16px;box-shadow:0 22px 70px rgba(0,0,0,.8);overflow:hidden;}
+        .gsht-v112-head{flex:0 0 auto;display:flex;gap:8px;align-items:flex-start;justify-content:space-between;padding:10px 12px;background:#031511;border-bottom:1px solid #146c43;}
+        .gsht-v112-title{font-size:13px;line-height:1.25;font-weight:900;color:#20c997;overflow-wrap:anywhere;}
+        .gsht-v112-sub{font-size:10.5px;color:#adb5bd;line-height:1.35;margin-top:3px;}
+        .gsht-v112-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+        .gsht-v112-actions .btn{font-size:10.5px;font-weight:800;}
+        .gsht-v112-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px;background:#101820;}
+        .gsht-v112-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+        .gsht-v112-card{border:1px solid #495057;border-radius:12px;background:rgba(0,0,0,.35);padding:9px;min-width:0;margin-bottom:8px;}
+        .gsht-v112-card h6{font-size:12px;color:#20c997;font-weight:900;margin:0 0 7px 0;}
+        .gsht-v112-card label{font-size:10.5px;font-weight:800;color:#adb5bd;margin-bottom:2px;}
+        .gsht-v112-card .form-control,.gsht-v112-card .form-select{font-size:11px;background:#0b1117;color:#e9ecef;border-color:#495057;}
+        .gsht-v112-table{display:block;border:1px solid #343a40;border-radius:10px;overflow:hidden;background:#05080c;}
+        .gsht-v112-row{display:grid;grid-template-columns:190px minmax(0,1fr);border-bottom:1px solid #212529;font-size:10.7px;line-height:1.35;}
+        .gsht-v112-row:last-child{border-bottom:0}.gsht-v112-row b{padding:6px 7px;background:#111820;color:#adb5bd;word-break:break-word}.gsht-v112-row span{padding:6px 7px;color:#e9ecef;word-break:break-word;white-space:pre-wrap;}
+        .gsht-v112-pre{max-height:34dvh;overflow:auto;background:#050505;border:1px solid #343a40;border-radius:10px;padding:8px;color:#d1e7dd;font-size:10.5px;line-height:1.35;white-space:pre-wrap;word-break:break-word;}
+        .gsht-v112-progress{border:1px dashed #20c997;border-radius:10px;padding:8px;background:rgba(32,201,151,.08);font-size:11px;line-height:1.35;color:#bdf7df;}
+        .gsht-v112-foot{flex:0 0 auto;display:flex;gap:7px;flex-wrap:wrap;padding:9px 10px;background:#07100d;border-top:1px solid #146c43;}.gsht-v112-foot .btn{font-size:11px;font-weight:900;}
+        @media(max-width:430px){.gsht-v112-overlay{padding:0;align-items:stretch}.gsht-v112-dialog{width:100%;height:100dvh;border-radius:0;border-left:0;border-right:0}.gsht-v112-head{flex-direction:column}.gsht-v112-actions{width:100%;justify-content:stretch}.gsht-v112-actions .btn{flex:1 1 auto}.gsht-v112-grid{grid-template-columns:1fr}.gsht-v112-row{grid-template-columns:112px minmax(0,1fr);font-size:10px}.gsht-v112-foot .btn{flex:1 1 auto}.gsht-v112-pre{max-height:30dvh}}
+        @supports not (height:100dvh){.gsht-v112-dialog{height:94vh}}
+        `;
+        document.head.appendChild(css);
+    }
+    function flatten(obj, prefix='', out={}, depth=0){
+        if (obj == null || depth > 6) return out;
+        if (typeof obj !== 'object' || obj instanceof Date || Array.isArray(obj)) { out[prefix || 'value'] = obj; return out; }
+        for (const [k,v] of Object.entries(obj)) {
+            const key = prefix ? prefix + '.' + k : k;
+            if (v && typeof v === 'object' && !(v instanceof Date) && !Array.isArray(v)) {
+                if (('description' in v) || ('value' in v) || ('values' in v)) out[key] = v.description ?? v.value ?? v.values ?? '';
+                else flatten(v, key, out, depth+1);
+            } else out[key] = v;
+        }
+        return out;
+    }
+    function findVal(flat, patterns){
+        const entries = Object.entries(flat || {});
+        for (const pat of patterns) {
+            const re = pat instanceof RegExp ? pat : new RegExp(pat, 'i');
+            for (const [k,v] of entries) {
+                if (re.test(k) && v != null && String(v).trim() !== '') return String(Array.isArray(v) ? v.join(', ') : v).trim();
+            }
+        }
+        return '';
+    }
+    function renderTable(obj, limit=160){
+        const flat = flatten(obj || {}); const entries = Object.entries(flat).slice(0, limit);
+        if (!entries.length) return '<div class="text-secondary small">Không có dữ liệu.</div>';
+        let html='<div class="gsht-v112-table">';
+        entries.forEach(([k,v]) => html += `<div class="gsht-v112-row"><b>${esc(k)}</b><span>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</span></div>`);
+        if (Object.keys(flat).length > entries.length) html += `<div class="gsht-v112-row"><b>...</b><span>Còn ${Object.keys(flat).length - entries.length} mục trong JSON đầy đủ.</span></div>`;
+        return html + '</div>';
+    }
+    function safePlain(value, depth=0, seen=new WeakSet()){
+        try {
+            if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+            if (value instanceof Date) return value.toISOString();
+            if (typeof value === 'bigint') return String(value);
+            if (typeof value !== 'object') return String(value);
+            if (seen.has(value)) return '[Circular]';
+            if (depth > 6) return '[DepthLimit]';
+            seen.add(value);
+            if (Array.isArray(value)) return value.slice(0,250).map(v => safePlain(v, depth+1, seen));
+            const out = {}; for (const k of Object.keys(value).slice(0,700)) out[k] = safePlain(value[k], depth+1, seen); return out;
+        } catch(e) { return String(value); }
+    }
+    function utf8(s){ return new TextEncoder().encode(String(s ?? '')); }
+    function ascii(s){ const a = new Uint8Array(String(s).length); for (let i=0;i<a.length;i++) a[i]=String(s).charCodeAt(i)&255; return a; }
+    function concat(parts){ const len=parts.reduce((n,p)=>n+p.length,0); const out=new Uint8Array(len); let off=0; for(const p of parts){ out.set(p, off); off+=p.length; } return out; }
+    function u32be(n){ const a=new Uint8Array(4); a[0]=(n>>>24)&255; a[1]=(n>>>16)&255; a[2]=(n>>>8)&255; a[3]=n&255; return a; }
+    function u32le(n){ const a=new Uint8Array(4); a[0]=n&255; a[1]=(n>>>8)&255; a[2]=(n>>>16)&255; a[3]=(n>>>24)&255; return a; }
+    function utf8Base64(s){ const bin=utf8(s); let str=''; const step=0x8000; for(let i=0;i<bin.length;i+=step) str += String.fromCharCode.apply(null, bin.slice(i,i+step)); return btoa(str); }
+    function downloadBlob(blob, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000); }
+    async function copyText(text){ if(navigator.clipboard?.writeText) return navigator.clipboard.writeText(text); const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+
+    function buildPayload(file, meta, values){
+        return {
+            schema:'GSHT-METADATA-V112',
+            app:'Giám Sát Hiện Trường PWA',
+            createdAt:new Date().toISOString(),
+            createdAtLocal:new Date().toLocaleString('vi-VN', {hour12:false}),
+            sourceFile:{name:file.name||'', type:file.type||'', size:file.size||0, lastModified:file.lastModified||null, lastModifiedISO:fmtISO(file.lastModified)},
+            originalTimestampCandidate:meta?.timestampCandidate || {},
+            values:values
+        };
+    }
+    function makeXmp(payload){
+        const v = payload.values || {};
+        const json = JSON.stringify(payload);
+        const b64 = utf8Base64(json);
+        const dt = v.dateTimeISO || new Date().toISOString();
+        const metaDate = new Date().toISOString();
+        const creators = String(v.creator || '').split(/[;,]/).map(s=>s.trim()).filter(Boolean);
+        const creatorItems = creators.length ? creators.map(c=>`<rdf:li>${xmlEsc(c)}</rdf:li>`).join('') : '<rdf:li></rdf:li>';
+        return `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>\n`+
+`<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="GSHT PWA ${VERSION}">\n`+
+`<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n`+
+`<rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/" xmlns:tiff="http://ns.adobe.com/tiff/1.0/" xmlns:exif="http://ns.adobe.com/exif/1.0/" xmlns:gsht="https://gsht.local/ns/1.0/" `+
+`xmp:CreateDate="${xmlEsc(dt)}" xmp:ModifyDate="${xmlEsc(dt)}" xmp:MetadataDate="${xmlEsc(metaDate)}" photoshop:DateCreated="${xmlEsc(dt)}" exif:DateTimeOriginal="${xmlEsc(dt)}" `+
+`tiff:Make="${xmlEsc(v.make||'')}" tiff:Model="${xmlEsc(v.model||'')}" xmp:CreatorTool="${xmlEsc(v.software||'GSHT PWA')}" `+
+`exif:GPSLatitude="${xmlEsc(v.gpsLatitude||'')}" exif:GPSLongitude="${xmlEsc(v.gpsLongitude||'')}" gsht:TimestampMs="${xmlEsc(v.timestampMs||'')}" gsht:PayloadBase64="${xmlEsc(b64)}">\n`+
+`<dc:title><rdf:Alt><rdf:li xml:lang="x-default">${xmlEsc(v.title||'')}</rdf:li></rdf:Alt></dc:title>\n`+
+`<dc:description><rdf:Alt><rdf:li xml:lang="x-default">${xmlEsc(v.description||'')}</rdf:li></rdf:Alt></dc:description>\n`+
+`<dc:creator><rdf:Seq>${creatorItems}</rdf:Seq></dc:creator>\n`+
+`<dc:rights><rdf:Alt><rdf:li xml:lang="x-default">${xmlEsc(v.copyright||'')}</rdf:li></rdf:Alt></dc:rights>\n`+
+`<gsht:FieldCode>${xmlEsc(v.fieldCode||'')}</gsht:FieldCode><gsht:Team>${xmlEsc(v.team||'')}</gsht:Team><gsht:Note>${xmlEsc(v.note||'')}</gsht:Note><gsht:Location>${xmlEsc(v.location||'')}</gsht:Location><gsht:Json>${xmlEsc(json)}</gsht:Json>\n`+
+`</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n<?xpacket end="w"?>`;
+    }
+    function makeJpegApp1(xmp){
+        const id = ascii('http://ns.adobe.com/xap/1.0/\0');
+        const body = concat([id, utf8(xmp)]);
+        const len = body.length + 2;
+        if (len > 65535) throw new Error('XMP quá dài cho JPEG APP1. Hãy rút gọn ghi chú/JSON bổ sung.');
+        return concat([new Uint8Array([0xFF,0xE1,(len>>8)&255,len&255]), body]);
+    }
+    function makeJpegCom(text){
+        const body = utf8(text).slice(0, 65000); const len=body.length+2;
+        return concat([new Uint8Array([0xFF,0xFE,(len>>8)&255,len&255]), body]);
+    }
+    async function writeJpeg(file, xmp, payload){
+        const orig = new Uint8Array(await file.arrayBuffer());
+        if (orig[0] !== 0xFF || orig[1] !== 0xD8) throw new Error('Không phải JPEG hợp lệ.');
+        let insert = 2;
+        while (insert + 4 < orig.length && orig[insert] === 0xFF) {
+            const marker = orig[insert+1];
+            if ((marker >= 0xE0 && marker <= 0xEF) || marker === 0xFE) {
+                const segLen = (orig[insert+2]<<8) + orig[insert+3];
+                if (!segLen || insert + 2 + segLen > orig.length) break;
+                insert += 2 + segLen;
+            } else break;
+        }
+        const app1 = makeJpegApp1(xmp);
+        const com = makeJpegCom('GSHT_METADATA_JSON_V112=' + JSON.stringify(payload));
+        return new Blob([orig.slice(0, insert), app1, com, orig.slice(insert)], {type:file.type || 'image/jpeg'});
+    }
+    const CRC_TABLE = (() => { const t = new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); t[n]=c>>>0; } return t; })();
+    function crc32(arr){ let c=0xFFFFFFFF; for(let i=0;i<arr.length;i++) c = CRC_TABLE[(c ^ arr[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+    function pngChunk(type, data){ const typeBytes=ascii(type); const body=concat([typeBytes, data]); const crc=u32be(crc32(body)); return concat([u32be(data.length), typeBytes, data, crc]); }
+    function makeItxt(keyword, text){ return concat([ascii(keyword), new Uint8Array([0,0,0,0,0]), utf8(text)]); }
+    async function writePng(file, xmp, payload){
+        const orig = new Uint8Array(await file.arrayBuffer());
+        const sig = [137,80,78,71,13,10,26,10];
+        if (!sig.every((b,i)=>orig[i]===b)) throw new Error('Không phải PNG hợp lệ.');
+        if (orig.length < 33) throw new Error('PNG quá ngắn.');
+        const ihdrLen = (orig[8]<<24) | (orig[9]<<16) | (orig[10]<<8) | orig[11];
+        const insert = 8 + 4 + 4 + ihdrLen + 4;
+        const xmpChunk = pngChunk('iTXt', makeItxt('XML:com.adobe.xmp', xmp));
+        const gshtChunk = pngChunk('iTXt', makeItxt('GSHT_METADATA', JSON.stringify(payload)));
+        return new Blob([orig.slice(0, insert), xmpChunk, gshtChunk, orig.slice(insert)], {type:file.type || 'image/png'});
+    }
+    function webpChunk(type, data){ const pad = data.length % 2 ? new Uint8Array([0]) : new Uint8Array(0); return concat([ascii(type), u32le(data.length), data, pad]); }
+    async function writeWebp(file, xmp, payload){
+        const orig = new Uint8Array(await file.arrayBuffer());
+        if (String.fromCharCode(...orig.slice(0,4)) !== 'RIFF' || String.fromCharCode(...orig.slice(8,12)) !== 'WEBP') throw new Error('Không phải WebP hợp lệ.');
+        const xmpChunk = webpChunk('XMP ', utf8(xmp));
+        const gshtChunk = webpChunk('GSHT', utf8(JSON.stringify(payload)));
+        const out = concat([orig, xmpChunk, gshtChunk]);
+        const riffSize = out.length - 8;
+        out.set(u32le(riffSize), 4);
+        return new Blob([out], {type:file.type || 'image/webp'});
+    }
+    function makeMp4FreeBox(text){
+        const data = utf8('GSHT_METADATA_JSON_V112\0' + text);
+        const size = 8 + data.length;
+        if (size > 0xFFFFFFFF) throw new Error('Metadata quá lớn để ghi free box MP4.');
+        return concat([u32be(size), ascii('free'), data]);
+    }
+    async function writeIsoBmffOrFallback(file, xmp, payload){
+        const orig = new Uint8Array(await file.arrayBuffer());
+        const text = JSON.stringify(payload) + '\n' + xmp;
+        let addon;
+        const isRiff = String.fromCharCode(...orig.slice(0,4)) === 'RIFF';
+        const maybeIso = String.fromCharCode(...orig.slice(4,8)) === 'ftyp' || String.fromCharCode(...orig.slice(4,8)).includes('ftyp') || /\.(mp4|mov|m4v|heic|heif|avif)$/i.test(file.name || '');
+        if (!isRiff && maybeIso) addon = makeMp4FreeBox(text);
+        else addon = utf8('\n\n-----GSHT_METADATA_JSON_V112_START-----\n' + text + '\n-----GSHT_METADATA_JSON_V112_END-----\n');
+        return new Blob([orig, addon], {type:file.type || 'application/octet-stream'});
+    }
+    async function buildEditedFile(file, payload){
+        const ext = extOf(file.name); const xmp = makeXmp(payload);
+        if (/^(jpe?g)$/i.test(ext) || /^image\/jpe?g/i.test(file.type || '')) return writeJpeg(file, xmp, payload);
+        if (/^png$/i.test(ext) || /^image\/png/i.test(file.type || '')) return writePng(file, xmp, payload);
+        if (/^webp$/i.test(ext) || /^image\/webp/i.test(file.type || '')) return writeWebp(file, xmp, payload);
+        return writeIsoBmffOrFallback(file, xmp, payload);
+    }
+    function initValuesFromMeta(file, meta){
+        const flat = flatten(meta || {});
+        const ts = Number(meta?.timestampCandidate?.timestampMs || file.lastModified || Date.now());
+        return {
+            title: findVal(flat, [/title/i, /ImageDescription/i]) || baseName(file.name),
+            description: findVal(flat, [/description/i, /ImageDescription/i, /caption/i]),
+            creator: findVal(flat, [/creator/i, /artist/i, /author/i]),
+            copyright: findVal(flat, [/copyright/i, /rights/i]),
+            software: findVal(flat, [/software/i, /CreatorTool/i, /encoder/i]) || 'GSHT PWA',
+            make: findVal(flat, [/\.Make$/i, /Make\.description/i, /cameraMake/i]),
+            model: findVal(flat, [/\.Model$/i, /Model\.description/i, /cameraModel/i]),
+            gpsLatitude: findVal(flat, [/GPSLatitude/i, /latitude/i]),
+            gpsLongitude: findVal(flat, [/GPSLongitude/i, /longitude/i]),
+            location: findVal(flat, [/location\.ISO6709/i, /ISO6709/i, /Location/i]),
+            fieldCode: document.getElementById('tab1-prefix')?.value || '',
+            team: document.getElementById('tab1-team')?.value || '',
+            note: document.getElementById('tab1-note')?.value || '',
+            timestampMs: validMs(ts) ? ts : Date.now(),
+            dateTimeInput: fmtInput(validMs(ts) ? ts : Date.now()),
+            extraJson: ''
+        };
+    }
+    function formHtml(file, meta, vals){
+        const ts = meta?.timestampCandidate || {};
+        return `
+        <div class="alert alert-warning small" style="font-size:10.7px;line-height:1.35;"><b>Lưu ý an toàn:</b> Trình duyệt không được tự ghi đè trực tiếp file gốc đã chọn. Nút lưu sẽ tạo <b>file mới</b> có nhúng metadata V112/XMP; với JPEG/PNG/WebP ghi theo cấu trúc chuẩn hơn, với video/HEIC/AVIF ghi dạng khối metadata đính kèm để app có thể đọc lại.</div>
+        <div class="gsht-v112-grid">
+            <div class="gsht-v112-card"><h6><i class="fa-solid fa-pen-to-square me-1"></i>Sửa thông tin cần lưu vào file</h6>
+                <div class="row g-2">
+                    <div class="col-12"><label>Thời gian ảnh/video</label><input id="gsht-v112-datetime" type="datetime-local" step="1" class="form-control form-control-sm" value="${esc(vals.dateTimeInput)}"></div>
+                    <div class="col-12"><label>Tiêu đề / tên hiện trường</label><input id="gsht-v112-title" class="form-control form-control-sm" value="${esc(vals.title)}"></div>
+                    <div class="col-12"><label>Mô tả / ghi chú metadata</label><textarea id="gsht-v112-description" class="form-control form-control-sm" rows="2">${esc(vals.description)}</textarea></div>
+                    <div class="col-6"><label>Người tạo / người chụp</label><input id="gsht-v112-creator" class="form-control form-control-sm" value="${esc(vals.creator)}"></div>
+                    <div class="col-6"><label>Bản quyền / đơn vị</label><input id="gsht-v112-copyright" class="form-control form-control-sm" value="${esc(vals.copyright)}"></div>
+                    <div class="col-6"><label>Phần mềm</label><input id="gsht-v112-software" class="form-control form-control-sm" value="${esc(vals.software)}"></div>
+                    <div class="col-6"><label>Hãng/Model thiết bị</label><input id="gsht-v112-model" class="form-control form-control-sm" value="${esc(vals.model)}"></div>
+                    <div class="col-6"><label>Make</label><input id="gsht-v112-make" class="form-control form-control-sm" value="${esc(vals.make)}"></div>
+                    <div class="col-6"><label>Vị trí dạng ISO6709/địa điểm</label><input id="gsht-v112-location" class="form-control form-control-sm" value="${esc(vals.location)}"></div>
+                    <div class="col-6"><label>GPS Latitude</label><input id="gsht-v112-lat" class="form-control form-control-sm" value="${esc(vals.gpsLatitude)}"></div>
+                    <div class="col-6"><label>GPS Longitude</label><input id="gsht-v112-lon" class="form-control form-control-sm" value="${esc(vals.gpsLongitude)}"></div>
+                    <div class="col-6"><label>Mã hiện trường</label><input id="gsht-v112-field" class="form-control form-control-sm" value="${esc(vals.fieldCode)}"></div>
+                    <div class="col-6"><label>Tổ đội / người thực hiện</label><input id="gsht-v112-team" class="form-control form-control-sm" value="${esc(vals.team)}"></div>
+                    <div class="col-12"><label>JSON bổ sung tùy chọn</label><textarea id="gsht-v112-extra-json" class="form-control form-control-sm" rows="3" placeholder='VD: {"soPhieu":"...","nguoiKiemTra":"..."}'>${esc(vals.extraJson)}</textarea></div>
+                </div>
+            </div>
+            <div class="gsht-v112-card"><h6><i class="fa-solid fa-circle-info me-1"></i>Thông tin file đang xem</h6>
+                ${renderTable({file:{name:file.name,type:file.type,size:bytes(file.size),lastModified:fmtVi(file.lastModified)}, timestampCandidate:ts, media:meta?.media || {}})}
+                <div class="gsht-v112-progress mt-2" id="gsht-v112-progress">Sẵn sàng sửa và lưu file mới.</div>
+            </div>
+        </div>
+        <div class="gsht-v112-card"><h6><i class="fa-solid fa-database me-1"></i>Metadata đang đọc được trước khi sửa</h6><pre class="gsht-v112-pre" id="gsht-v112-json-pre">${esc(JSON.stringify(meta, null, 2))}</pre></div>`;
+    }
+    function readEditorValues(){
+        let extra = {};
+        const raw = $('gsht-v112-extra-json')?.value?.trim() || '';
+        if (raw) { try { extra = JSON.parse(raw); } catch(e) { throw new Error('JSON bổ sung không hợp lệ: ' + e.message); } }
+        const timestampMs = inputToMs($('gsht-v112-datetime')?.value || '');
+        return {
+            timestampMs,
+            dateTimeLocal: fmtVi(timestampMs),
+            dateTimeISO: fmtISO(timestampMs),
+            title: $('gsht-v112-title')?.value || '',
+            description: $('gsht-v112-description')?.value || '',
+            creator: $('gsht-v112-creator')?.value || '',
+            copyright: $('gsht-v112-copyright')?.value || '',
+            software: $('gsht-v112-software')?.value || 'GSHT PWA',
+            make: $('gsht-v112-make')?.value || '',
+            model: $('gsht-v112-model')?.value || '',
+            gpsLatitude: $('gsht-v112-lat')?.value || '',
+            gpsLongitude: $('gsht-v112-lon')?.value || '',
+            location: $('gsht-v112-location')?.value || '',
+            fieldCode: $('gsht-v112-field')?.value || '',
+            team: $('gsht-v112-team')?.value || '',
+            note: document.getElementById('tab1-note')?.value || '',
+            extra
+        };
+    }
+    async function saveWithPickerOrDownload(blob, outName, type, progressEl){
+        const fileObj = new File([blob], outName, {type:type || blob.type || 'application/octet-stream', lastModified:Date.now()});
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({ suggestedName:outName });
+                const writable = await handle.createWritable();
+                await writable.write(blob); await writable.close();
+                if(progressEl) progressEl.innerHTML = `✅ Đã lưu file mới: <b>${esc(outName)}</b>`;
+                return {mode:'picker'};
+            } catch(e) {
+                if (e && e.name === 'AbortError') throw e;
+            }
+        }
+        downloadBlob(blob, outName);
+        if(progressEl) progressEl.innerHTML = `✅ Đã tạo file mới để tải xuống: <b>${esc(outName)}</b>`;
+        return {mode:'download', file:fileObj};
+    }
+    async function shareEditedFile(blob, outName, type, progressEl){
+        const fileObj = new File([blob], outName, {type:type || blob.type || 'application/octet-stream', lastModified:Date.now()});
+        if (navigator.canShare && navigator.canShare({files:[fileObj]}) && navigator.share) {
+            await navigator.share({files:[fileObj], title:'File đã sửa metadata', text:'File đã nhúng metadata V112 từ GSHT PWA'});
+            if(progressEl) progressEl.innerHTML = `✅ Đã mở bảng chia sẻ file mới: <b>${esc(outName)}</b>`;
+        } else {
+            downloadBlob(blob, outName);
+            if(progressEl) progressEl.innerHTML = `⚠️ Thiết bị không hỗ trợ chia sẻ file trực tiếp. Đã chuyển sang tải xuống: <b>${esc(outName)}</b>`;
+        }
+    }
+    async function createEditedBlob(file, meta){
+        const vals = readEditorValues();
+        const payload = buildPayload(file, meta, vals);
+        const blob = await buildEditedFile(file, payload);
+        return {blob, payload};
+    }
+    async function showEditorPopup(file, kind){
+        if (!file) return;
+        injectStyle();
+        kind = kind || guessKind(file);
+        const overlay = document.createElement('div');
+        overlay.className = 'gsht-v112-overlay';
+        overlay.innerHTML = `
+        <div class="gsht-v112-dialog" role="dialog" aria-modal="true">
+            <div class="gsht-v112-head"><div class="min-w-0"><div class="gsht-v112-title"><i class="fa-solid fa-tags me-1"></i> SỬA THÔNG TIN ẨN FILE: ${esc(file.name || '(không tên)')}</div><div class="gsht-v112-sub">Đọc metadata hiện có, cho phép sửa các trường quan trọng và lưu ra file mới có nhúng metadata.</div></div><div class="gsht-v112-actions"><button class="btn btn-sm btn-outline-info" id="gsht-v112-copy" disabled><i class="fa-solid fa-copy me-1"></i>SAO CHÉP JSON</button><button class="btn btn-sm btn-light" id="gsht-v112-close"><i class="fa-solid fa-xmark me-1"></i>ĐÓNG</button></div></div>
+            <div class="gsht-v112-body" id="gsht-v112-body"><div class="gsht-v112-progress"><i class="fa-solid fa-circle-notch fa-spin me-1"></i>Đang đọc thông tin ẩn để mở trình sửa...</div></div>
+            <div class="gsht-v112-foot"><button class="btn btn-success" id="gsht-v112-save" disabled><i class="fa-solid fa-floppy-disk me-1"></i>LƯU FILE MỚI</button><button class="btn btn-outline-success" id="gsht-v112-share" disabled><i class="fa-solid fa-share-nodes me-1"></i>CHIA SẺ FILE MỚI</button><button class="btn btn-outline-warning" id="gsht-v112-json" disabled><i class="fa-solid fa-file-arrow-down me-1"></i>TẢI JSON METADATA</button><button class="btn btn-outline-light" id="gsht-v112-close2"><i class="fa-solid fa-xmark me-1"></i>ĐÓNG</button></div>
+        </div>`;
+        document.body.appendChild(overlay);
+        const close = () => overlay.remove();
+        $('gsht-v112-close')?.addEventListener('click', close); $('gsht-v112-close2')?.addEventListener('click', close);
+        let meta = null;
+        try {
+            setStatus(`Đang mở trình sửa thông tin ẩn file <b>${esc(file.name || '')}</b>...`, 'text-info');
+            if (typeof window.gshtReadAllHiddenMetadataV111 === 'function') meta = await window.gshtReadAllHiddenMetadataV111(file, kind);
+            else if (typeof window.gshtReadMediaTimestampLocked === 'function') meta = {timestampCandidate: await window.gshtReadMediaTimestampLocked(file, kind === 'video' ? 'video' : 'photo')};
+            else meta = {timestampCandidate:{timestampMs:file.lastModified || Date.now(), source:'file.lastModified'}};
+            meta = safePlain(meta);
+            const vals = initValuesFromMeta(file, meta);
+            $('gsht-v112-body').innerHTML = formHtml(file, meta, vals);
+            ['gsht-v112-save','gsht-v112-share','gsht-v112-json','gsht-v112-copy'].forEach(id => { const b=$(id); if(b) b.disabled=false; });
+            const outName = () => baseName(file.name) + '_metadata_edited.' + (extOf(file.name) || 'bin');
+            const progress = () => $('gsht-v112-progress');
+            $('gsht-v112-copy').onclick = async () => { await copyText(JSON.stringify(meta, null, 2)); $('gsht-v112-copy').innerHTML='<i class="fa-solid fa-check me-1"></i>ĐÃ SAO CHÉP'; setTimeout(()=>$('gsht-v112-copy').innerHTML='<i class="fa-solid fa-copy me-1"></i>SAO CHÉP JSON',1200); };
+            $('gsht-v112-json').onclick = async () => {
+                const valsNow = readEditorValues(); const payload = buildPayload(file, meta, valsNow);
+                downloadBlob(new Blob([JSON.stringify(payload, null, 2)], {type:'application/json;charset=utf-8'}), baseName(file.name) + '_metadata_v112.json');
+            };
+            $('gsht-v112-save').onclick = async () => {
+                try { const p=progress(); if(p) p.innerHTML='<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Đang ghi metadata vào file mới...'; const res=await createEditedBlob(file, meta); await saveWithPickerOrDownload(res.blob, outName(), file.type, p); setStatus(`✅ Đã tạo file mới có metadata V112: <b>${esc(outName())}</b>. Có thể chọn lại file này bằng nút SOI để kiểm tra.`, 'text-success'); }
+                catch(e){ if(e?.name !== 'AbortError'){ const p=progress(); if(p) p.innerHTML='❌ Lỗi lưu file mới: '+esc(e?.message || e); setStatus('❌ Lỗi lưu metadata: '+esc(e?.message || e), 'text-danger'); } }
+            };
+            $('gsht-v112-share').onclick = async () => {
+                try { const p=progress(); if(p) p.innerHTML='<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Đang tạo file mới để chia sẻ...'; const res=await createEditedBlob(file, meta); await shareEditedFile(res.blob, outName(), file.type, p); }
+                catch(e){ const p=progress(); if(p) p.innerHTML='❌ Lỗi chia sẻ file mới: '+esc(e?.message || e); }
+            };
+            setStatus(`✅ Đã mở trình sửa thông tin ẩn file <b>${esc(file.name || '')}</b>.`, 'text-success');
+        } catch(e) {
+            $('gsht-v112-body').innerHTML = `<div class="alert alert-danger small"><b>Không mở được trình sửa metadata:</b> ${esc(e?.message || e)}</div>`;
+            setStatus('❌ Lỗi mở trình sửa thông tin ẩn: '+esc(e?.message || e), 'text-danger');
+        }
+    }
+    function installToolPanel(){
+        try {
+            const input = $('gsht-v111-hidden-meta-input');
+            if (input && !input.__gshtV112Capture) {
+                input.__gshtV112Capture = true;
+                input.addEventListener('change', ev => {
+                    ev.stopImmediatePropagation(); ev.preventDefault();
+                    const file = ev.target.files && ev.target.files[0];
+                    if (file) showEditorPopup(file, guessKind(file));
+                    setTimeout(() => { try { ev.target.value=''; } catch(e){} }, 0);
+                }, true);
+            }
+            const panel = $('gsht-v111-tool-panel');
+            if (panel && !$('gsht-v112-open-editor-btn')) {
+                const extra = document.createElement('div');
+                extra.className = 'small text-success mt-2';
+                extra.innerHTML = '<b>V112:</b> Nút <b>CHỌN FILE SOI</b> bây giờ mở cửa sổ vừa xem vừa sửa metadata. Sau khi sửa, bấm <b>LƯU FILE MỚI</b> hoặc <b>CHIA SẺ FILE MỚI</b>.';
+                panel.appendChild(extra);
+            }
+            if (!$('gsht-v111-tool-panel') && !$('gsht-v112-tool-panel')) {
+                const anchor = $('gsht-native-import-status') || $('native-camera-import-panel');
+                const div = document.createElement('div');
+                div.id='gsht-v112-tool-panel'; div.className='gsht-v111-tool-panel';
+                div.innerHTML = `<div class="d-flex align-items-center justify-content-between gap-2 flex-wrap"><div class="small text-success"><b><i class="fa-solid fa-tags me-1"></i>SOI / SỬA THÔNG TIN ẨN ẢNH/VIDEO</b><br><span class="text-secondary">Chọn một file để xem, sửa và lưu metadata vào file mới.</span></div><label class="btn btn-sm btn-outline-success fw-bold mb-0"><i class="fa-solid fa-file-pen me-1"></i> CHỌN FILE SỬA<input id="gsht-v112-meta-input" type="file" hidden accept="image/*,video/*,.heic,.heif,.mov,.mp4,.m4v,.webp,.avif,.tif,.tiff"></label></div>`;
+                if (anchor && anchor.parentElement) anchor.insertAdjacentElement('afterend', div); else document.body.appendChild(div);
+                $('gsht-v112-meta-input')?.addEventListener('change', ev => { const f=ev.target.files&&ev.target.files[0]; if(f) showEditorPopup(f, guessKind(f)); ev.target.value=''; });
+            }
+        } catch(e) { console.warn(VERSION, 'installToolPanel failed', e); }
+    }
+    function addHelp(){
+        try {
+            const help = document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
+            if (help && !$('gsht-v112-help-note')) {
+                const div = document.createElement('div'); div.id='gsht-v112-help-note'; div.className='alert alert-success small mt-2';
+                div.innerHTML = '<b>V112 - Sửa và lưu thông tin ẩn:</b> Nút <b>CHỌN FILE SOI</b> mở cửa sổ xem/sửa metadata. Người dùng sửa thời gian, mô tả, người tạo, GPS, mã hiện trường, tổ đội... rồi bấm <b>LƯU FILE MỚI</b>. Trình duyệt không ghi đè âm thầm lên file gốc; app tạo file mới có nhúng metadata V112/XMP để tải hoặc chia sẻ.';
+                help.appendChild(div);
+            }
+        } catch(e) {}
+    }
+    function boot(){ injectStyle(); installToolPanel(); addHelp(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 1200)); else setTimeout(boot, 1200);
+    window.addEventListener('load', () => setTimeout(boot, 1700));
+    setInterval(() => { try { installToolPanel(); } catch(e){} }, 3000);
+    window.gshtShowHiddenMetadataPopup = showEditorPopup;
+    window.gshtShowHiddenMetadataEditorV112 = showEditorPopup;
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V112 hidden metadata editor'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
+})();
+
+</script>
+
 </body>
 </html>
