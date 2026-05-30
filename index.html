@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V109)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V107)</title>
     
     <link rel="manifest" href="manifest.json">
 	<link rel="icon" type="image/png" href="icon-192.png">
@@ -13219,7 +13219,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         .gsht-v109-time-card{border:1px solid rgba(255,193,7,.65);border-radius:12px;background:rgba(255,193,7,.07);padding:9px;}
         .gsht-v109-time-card label{font-size:11px;font-weight:800;color:#ffc107;margin-bottom:4px;}
         .gsht-v109-time-card input{font-weight:700;color:#ffc107!important;background:#111!important;border-color:#6c757d!important;}
-        .gsht-v109-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;}
+        .gsht-v109-tools{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;}
         .gsht-v109-foot{flex:0 0 auto;padding:10px;background:#05080c;border-top:1px solid #343a40;display:grid;grid-template-columns:1fr 1fr;gap:7px;}
         .gsht-v109-foot .btn{font-size:11px;font-weight:800;white-space:normal;line-height:1.25;min-height:38px;}
         .gsht-v109-warn{font-size:10.5px;line-height:1.35;margin-top:7px;}
@@ -13294,6 +13294,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
                                 <button type="button" class="btn btn-sm btn-outline-secondary" id="gsht-v109-minus-min">- 1 phút</button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary" id="gsht-v109-plus-min">+ 1 phút</button>
                                 <button type="button" class="btn btn-sm btn-outline-warning" id="gsht-v109-now">Giờ hiện tại</button>
+                                <button type="button" class="btn btn-sm btn-outline-info" id="gsht-v109-hidden-meta"><i class="fa-solid fa-magnifying-glass me-1"></i>Thông tin ẩn</button>
                             </div>
                             <div class="gsht-v109-warn ${conf.warn ? 'text-warning' : 'text-success'}">
                                 ${conf.warn ? '⚠️ Nguồn thời gian này có thể sai nếu file đã qua ứng dụng trung gian. Sửa trực tiếp ô trên rồi bấm ÁP DỤNG.' : '✅ Nguồn thời gian tương đối tốt, vẫn có thể sửa nếu người dùng biết thời điểm đúng hơn.'}
@@ -13314,6 +13315,10 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             $('gsht-v109-minus-min')?.addEventListener('click', () => plusSeconds(input, -60));
             $('gsht-v109-plus-min')?.addEventListener('click', () => plusSeconds(input, 60));
             $('gsht-v109-now')?.addEventListener('click', () => { input.value = fmtInput(Date.now()); });
+            $('gsht-v109-hidden-meta')?.addEventListener('click', () => {
+                if (typeof window.gshtShowHiddenMetadataPopup === 'function') window.gshtShowHiddenMetadataPopup(file, kind);
+                else alert('Chức năng xem thông tin ẩn V110 chưa sẵn sàng.');
+            });
             $('gsht-v109-apply')?.addEventListener('click', () => {
                 const ms = new Date(input.value).getTime();
                 if (!validMs(ms)) { alert('Thời gian chưa hợp lệ.'); return; }
@@ -13437,6 +13442,479 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     window.addEventListener('load', () => setTimeout(boot, 1400));
     setInterval(() => { try { install(); } catch(e){} }, 3000);
     try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V109 per-file timestamp review popup'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
+})();
+</script>
+
+
+<script id="gsht-v110-hidden-metadata-viewer">
+/* GSHT V110: xem toàn bộ thông tin ẩn có thể đọc được của ảnh/video.
+   - Nút độc lập trong khu vực nhập ảnh/video.
+   - Nút nhanh trong popup xác nhận thời gian V109.
+   - Đọc: thông tin file, kích thước media, timestamp đề xuất, ExifReader, exifr, XMP/text, cấu trúc MP4/MOV cơ bản.
+   - Chạy offline, tự dùng exifreader.min.js / exifr.full.umd.js / mp4box.all.min.js nếu các file có sẵn cạnh index.html. */
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V110-HIDDEN-METADATA-VIEWER';
+    const $ = id => document.getElementById(id);
+    const MAX_TEXT_SCAN = 3 * 1024 * 1024;
+    const MAX_FULL_MP4BOX = 80 * 1024 * 1024;
+    const QT_EPOCH_DELTA = 2082844800;
+
+    function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function validMs(ms){ return Number.isFinite(ms) && ms > 315532800000 && ms < 4102444800000; }
+    function fmtVi(ms){ try { return validMs(ms) ? new Date(ms).toLocaleString('vi-VN', {hour12:false}) : ''; } catch(e){ return ''; } }
+    function fmtISO(ms){ try { return validMs(ms) ? new Date(ms).toISOString() : ''; } catch(e){ return ''; } }
+    function extOf(name){ const m = String(name||'').match(/\.([^.]+)$/); return m ? m[1].toLowerCase() : ''; }
+    function bytes(n){
+        n = Number(n || 0);
+        if (n >= 1024*1024*1024) return (n/1024/1024/1024).toFixed(2) + ' GB';
+        if (n >= 1024*1024) return (n/1024/1024).toFixed(2) + ' MB';
+        if (n >= 1024) return (n/1024).toFixed(1) + ' KB';
+        return n + ' B';
+    }
+    function setImportStatus(html, cls='text-info'){
+        const el = $('gsht-native-import-status');
+        if (el) { el.className = 'small mt-2 ' + cls; el.innerHTML = html; }
+    }
+    function guessKind(file){
+        const t = String(file?.type || '').toLowerCase();
+        const e = extOf(file?.name);
+        if (t.startsWith('video/') || /^(mp4|mov|m4v|3gp|webm|avi|mkv)$/i.test(e)) return 'video';
+        if (t.startsWith('image/') || /^(jpg|jpeg|heic|heif|png|webp|avif|gif|tif|tiff)$/i.test(e)) return 'photo';
+        return 'file';
+    }
+    function confidenceFromSource(source){
+        const s = String(source || '').toLowerCase();
+        if (/người dùng|thu cong|thủ công|manual|popup|xác nhận|sửa/.test(s)) return { label:'Đã xác nhận', cls:'text-success', warn:false };
+        if (/datetimeoriginal|offsettime|quicktime|creationdate|mvhd|mp4\/mov|gps/.test(s)) return { label:'Cao', cls:'text-success', warn:false };
+        if (/createdate|modifydate|xmp|filename|tên file|text metadata/.test(s)) return { label:'Trung bình', cls:'text-warning', warn:true };
+        return { label:'Thấp', cls:'text-danger', warn:true };
+    }
+    function loadScriptOnce(src, testFn){
+        return new Promise(resolve => {
+            try {
+                if (testFn && testFn()) return resolve(true);
+                const id = 'gsht-v110-lib-' + src.replace(/[^a-z0-9]+/gi,'-');
+                const old = document.getElementById(id);
+                if (old) { old.addEventListener('load', () => resolve(true), {once:true}); old.addEventListener('error', () => resolve(false), {once:true}); return; }
+                const s = document.createElement('script');
+                s.id = id;
+                s.src = src;
+                s.onload = () => resolve(true);
+                s.onerror = () => resolve(false);
+                document.head.appendChild(s);
+            } catch(e) { resolve(false); }
+        });
+    }
+    function safePlain(value, depth=0, seen=new WeakSet()){
+        try {
+            if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+            if (value instanceof Date) return value.toISOString();
+            if (typeof Blob !== 'undefined' && value instanceof Blob) return `[Blob ${value.type || ''} ${value.size || 0} bytes]`;
+            if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) return `[ArrayBuffer ${value.byteLength} bytes]`;
+            if (ArrayBuffer.isView && ArrayBuffer.isView(value)) return Array.from(value).slice(0, 64).concat(value.length > 64 ? [`... ${value.length-64} mục nữa`] : []);
+            if (typeof value === 'bigint') return String(value);
+            if (typeof value === 'function') return `[Function ${value.name || ''}]`;
+            if (typeof value !== 'object') return String(value);
+            if (seen.has(value)) return '[Circular]';
+            if (depth > 6) return '[DepthLimit]';
+            seen.add(value);
+            if (Array.isArray(value)) return value.slice(0, 250).map(v => safePlain(v, depth+1, seen)).concat(value.length > 250 ? [`... ${value.length-250} mục nữa`] : []);
+            const out = {};
+            for (const k of Object.keys(value).slice(0, 600)) out[k] = safePlain(value[k], depth+1, seen);
+            const extra = Object.keys(value).length - Object.keys(out).length;
+            if (extra > 0) out.__truncatedKeys = extra;
+            return out;
+        } catch(e) { return String(value); }
+    }
+    function flatten(obj, prefix='', out={}){
+        if (obj == null) return out;
+        if (typeof obj !== 'object' || obj instanceof Date || Array.isArray(obj)) { out[prefix || 'value'] = obj; return out; }
+        for (const [k,v] of Object.entries(obj)) {
+            const key = prefix ? prefix + '.' + k : k;
+            if (v && typeof v === 'object' && !(v instanceof Date) && !Array.isArray(v)) {
+                const maybeTag = ('description' in v) || ('value' in v) || ('values' in v);
+                if (maybeTag) out[key] = v.description ?? v.value ?? v.values ?? v;
+                else flatten(v, key, out);
+            } else out[key] = v;
+        }
+        return out;
+    }
+    function renderFlatTable(obj, limit=220){
+        const flat = flatten(safePlain(obj));
+        const entries = Object.entries(flat).slice(0, limit);
+        if (!entries.length) return '<div class="text-secondary small">Không có dữ liệu đọc được.</div>';
+        let html = '<div class="gsht-v110-table">';
+        for (const [k,v] of entries) html += `<div class="gsht-v110-row"><b>${esc(k)}</b><span>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</span></div>`;
+        if (Object.keys(flat).length > entries.length) html += `<div class="gsht-v110-row"><b>...</b><span>Còn ${Object.keys(flat).length - entries.length} mục, bấm Sao chép JSON để xem đầy đủ.</span></div>`;
+        html += '</div>';
+        return html;
+    }
+    async function mediaDimensions(file, kind){
+        const url = URL.createObjectURL(file);
+        try {
+            if (kind === 'video') {
+                return await new Promise(resolve => {
+                    const v = document.createElement('video');
+                    const done = data => { try { URL.revokeObjectURL(url); } catch(e){} resolve(data); };
+                    v.preload = 'metadata'; v.muted = true; v.playsInline = true;
+                    v.onloadedmetadata = () => done({ width:v.videoWidth || null, height:v.videoHeight || null, durationSeconds:Number.isFinite(v.duration) ? Number(v.duration.toFixed(3)) : null });
+                    v.onerror = () => done({ error:'Không đọc được metadata video bằng HTMLVideoElement' });
+                    v.src = url;
+                });
+            }
+            return await new Promise(resolve => {
+                const img = new Image();
+                const done = data => { try { URL.revokeObjectURL(url); } catch(e){} resolve(data); };
+                img.onload = () => done({ width:img.naturalWidth || null, height:img.naturalHeight || null });
+                img.onerror = () => done({ error:'Trình duyệt không preview/đọc kích thước ảnh này' });
+                img.src = url;
+            });
+        } catch(e){ try { URL.revokeObjectURL(url); } catch(_){} return { error:String(e?.message || e) }; }
+    }
+    async function readBufferSample(file){
+        const headLen = Math.min(file.size || 0, MAX_TEXT_SCAN);
+        const head = headLen ? await file.slice(0, headLen).arrayBuffer() : new ArrayBuffer(0);
+        let tail = null;
+        if ((file.size || 0) > headLen + 1024) {
+            const tailStart = Math.max(headLen, (file.size || 0) - MAX_TEXT_SCAN);
+            tail = await file.slice(tailStart, file.size).arrayBuffer();
+        }
+        return { head, tail, sampledBytes: head.byteLength + (tail ? tail.byteLength : 0), truncated: (file.size || 0) > headLen + (tail ? tail.byteLength : 0) };
+    }
+    function decodeText(buffer){
+        if (!buffer) return '';
+        try { return new TextDecoder('utf-8', {fatal:false}).decode(buffer); } catch(e) {}
+        try { return new TextDecoder('iso-8859-1').decode(buffer); } catch(e) {}
+        const arr = new Uint8Array(buffer); let s = '';
+        for (let i=0; i<arr.length; i++) s += String.fromCharCode(arr[i]);
+        return s;
+    }
+    function extractXmpPackets(text){
+        const packets = [];
+        const sources = [
+            {start:'<x:xmpmeta', end:'</x:xmpmeta>'},
+            {start:'<rdf:RDF', end:'</rdf:RDF>'},
+            {start:'<?xpacket', end:'<?xpacket end='}
+        ];
+        for (const p of sources) {
+            let pos = 0;
+            while (packets.length < 5) {
+                const s = text.indexOf(p.start, pos); if (s < 0) break;
+                let e = text.indexOf(p.end, s); if (e < 0) e = Math.min(text.length, s + 30000); else e += p.end.length;
+                const snippet = text.slice(s, e).replace(/\u0000/g,'').trim();
+                if (snippet && !packets.includes(snippet)) packets.push(snippet.slice(0, 60000));
+                pos = e + 1;
+            }
+        }
+        return packets;
+    }
+    function extractImportantStrings(text){
+        const clean = String(text || '').replace(/\u0000/g, ' ').replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]+/g, ' ');
+        const keywords = /(DateTimeOriginal|CreateDate|ModifyDate|OffsetTime|GPS|Latitude|Longitude|Altitude|Make|Model|Software|Lens|Artist|Copyright|description|creator|quicktime|creationdate|location|ISO6709|encoder|major_brand|compatible_brands|com\.apple|xmp|exif|iptc|photoshop|tiff)/i;
+        const re = /[\x20-\x7E\u00A0-\uFFFF]{4,240}/g;
+        const out = [];
+        let m;
+        while ((m = re.exec(clean)) && out.length < 350) {
+            const s = m[0].replace(/\s+/g,' ').trim();
+            if (keywords.test(s) && !out.includes(s)) out.push(s);
+        }
+        return out;
+    }
+    function extractKeyValuesFromText(text){
+        const out = [];
+        const add = (k,v,src) => { if (!v) return; const val = String(v).replace(/\s+/g,' ').trim(); if (!val) return; if (!out.some(x => x.key === k && x.value === val)) out.push({key:k, value:val.slice(0,500), source:src}); };
+        const names = ['DateTimeOriginal','CreateDate','ModifyDate','OffsetTimeOriginal','OffsetTimeDigitized','OffsetTime','GPSLatitude','GPSLongitude','GPSAltitude','Make','Model','Software','LensModel','Artist','Copyright','ImageDescription','com.apple.quicktime.creationdate','com.apple.quicktime.location.ISO6709','creationdate','creation_time'];
+        for (const name of names) {
+            const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            let re1 = new RegExp('(?:[A-Za-z0-9_\\-]+:)?' + escaped + '[^>]*>([^<]{1,500})<', 'ig');
+            let m; while ((m = re1.exec(text)) && out.length < 200) add(name, m[1], 'XML/XMP tag');
+            let re2 = new RegExp('(?:[A-Za-z0-9_\\-]+:)?' + escaped + '\\s*=\\s*["\\']([^"\\']{1,500})["\\']', 'ig');
+            while ((m = re2.exec(text)) && out.length < 200) add(name, m[1], 'XML/XMP attribute');
+            let re3 = new RegExp(escaped + '[\\s:=]{1,12}([^\\r\\n<>]{4,160})', 'ig');
+            while ((m = re3.exec(text)) && out.length < 200) add(name, m[1], 'text scan');
+        }
+        return out;
+    }
+    function u32(dv, off){ if (off + 4 > dv.byteLength) return 0; return dv.getUint32(off, false); }
+    function u64(dv, off){ if (off + 8 > dv.byteLength) return 0; const hi = dv.getUint32(off, false), lo = dv.getUint32(off+4, false); return hi * 4294967296 + lo; }
+    function type4(dv, off){ if (off + 4 > dv.byteLength) return ''; return String.fromCharCode(dv.getUint8(off), dv.getUint8(off+1), dv.getUint8(off+2), dv.getUint8(off+3)); }
+    function parseMp4Boxes(buffer){
+        const dv = new DataView(buffer);
+        const boxes = [];
+        const mvhd = [];
+        const containers = new Set(['moov','trak','mdia','minf','stbl','udta','edts','dinf','meta','ilst']);
+        function walk(start, end, depth, path){
+            let off = start;
+            while (off + 8 <= end && boxes.length < 800) {
+                let size = u32(dv, off), type = type4(dv, off+4), header = 8;
+                if (!/^[\w .-]{4}$/.test(type)) break;
+                if (size === 1) { size = u64(dv, off+8); header = 16; }
+                else if (size === 0) size = end - off;
+                if (!size || size < header || off + size > end + 16) break;
+                const boxEnd = Math.min(end, off + size);
+                const fullPath = path ? path + '/' + type : type;
+                boxes.push({ path:fullPath, type, offset:off, size });
+                if (type === 'mvhd') {
+                    try {
+                        const version = dv.getUint8(off + header);
+                        let creation = version === 1 ? u64(dv, off + header + 4) : u32(dv, off + header + 4);
+                        let modify = version === 1 ? u64(dv, off + header + 12) : u32(dv, off + header + 8);
+                        const creationMs = (creation - QT_EPOCH_DELTA) * 1000;
+                        const modifyMs = (modify - QT_EPOCH_DELTA) * 1000;
+                        mvhd.push({ path:fullPath, version, creationSecondsSince1904:creation, creationTimeUTC:fmtISO(creationMs), modifyTimeUTC:fmtISO(modifyMs) });
+                    } catch(e) {}
+                }
+                if (depth < 5 && containers.has(type)) {
+                    let childStart = off + header;
+                    if (type === 'meta') childStart += 4;
+                    if (childStart + 8 < boxEnd) walk(childStart, boxEnd, depth+1, fullPath);
+                }
+                off += size;
+            }
+        }
+        walk(0, dv.byteLength, 0, '');
+        return { boxes, mvhd };
+    }
+    async function readExifReader(file){
+        const result = { available:false };
+        try {
+            const loaded = window.ExifReader || await loadScriptOnce('exifreader.min.js', () => !!window.ExifReader);
+            if (!window.ExifReader || typeof window.ExifReader.load !== 'function') return { available:false, note:'Không tìm thấy exifreader.min.js hoặc thư viện chưa nạp được.' };
+            result.available = true;
+            const raw = await window.ExifReader.load(file, { async:true, expanded:true, length:'auto' });
+            result.tags = safePlain(raw);
+            result.flat = flatten(result.tags);
+            return result;
+        } catch(e) { return { available:!!window.ExifReader, error:String(e?.message || e) }; }
+    }
+    async function readExifr(file){
+        try {
+            const loaded = window.exifr || await loadScriptOnce('exifr.full.umd.js', () => !!window.exifr);
+            if (!window.exifr || typeof window.exifr.parse !== 'function') return { available:false, note:'Không tìm thấy exifr.full.umd.js hoặc thư viện chưa nạp được.' };
+            const raw = await window.exifr.parse(file, { tiff:true, xmp:true, exif:true, gps:true, iptc:true, jfif:true, ihdr:true, mergeOutput:false, reviveValues:false });
+            return { available:true, tags:safePlain(raw), flat:flatten(safePlain(raw)) };
+        } catch(e) { return { available:!!window.exifr, error:String(e?.message || e) }; }
+    }
+    async function readMp4Box(file){
+        if (guessKind(file) !== 'video') return { skipped:'Không phải video.' };
+        try {
+            const loaded = window.MP4Box || await loadScriptOnce('mp4box.all.min.js', () => !!window.MP4Box);
+            if (!window.MP4Box || typeof window.MP4Box.createFile !== 'function') return { available:false, note:'Không tìm thấy mp4box.all.min.js hoặc thư viện chưa nạp được.' };
+            if ((file.size || 0) > MAX_FULL_MP4BOX) return { available:true, skipped:`File lớn hơn ${bytes(MAX_FULL_MP4BOX)} nên V110 chỉ đọc cấu trúc MP4 nội bộ mẫu đầu/cuối để tránh treo máy.` };
+            return await new Promise(async resolve => {
+                try {
+                    const mp4box = window.MP4Box.createFile();
+                    let done = false;
+                    const finish = data => { if (done) return; done = true; resolve(data); };
+                    mp4box.onError = e => finish({ available:true, error:String(e) });
+                    mp4box.onReady = info => finish({ available:true, info:safePlain(info) });
+                    const ab = await file.arrayBuffer();
+                    ab.fileStart = 0;
+                    mp4box.appendBuffer(ab);
+                    mp4box.flush();
+                    setTimeout(() => finish({ available:true, warning:'MP4Box không trả onReady trong thời gian chờ.' }), 3500);
+                } catch(e) { resolve({ available:true, error:String(e?.message || e) }); }
+            });
+        } catch(e) { return { available:false, error:String(e?.message || e) }; }
+    }
+    async function readTimestampCandidate(file, kind){
+        try {
+            if (typeof window.gshtReadMediaTimestampLocked === 'function') {
+                const meta = await window.gshtReadMediaTimestampLocked(file, kind === 'video' ? 'video' : 'photo');
+                if (meta && validMs(meta.timestampMs)) return Object.assign({}, safePlain(meta), { localTime:fmtVi(meta.timestampMs), isoTime:fmtISO(meta.timestampMs), confidence:confidenceFromSource(meta.source).label });
+            }
+        } catch(e) { return { error:String(e?.message || e) }; }
+        return { timestampMs:file.lastModified || null, localTime:fmtVi(file.lastModified), isoTime:fmtISO(file.lastModified), source:'file.lastModified fallback', confidence:'Thấp' };
+    }
+    async function readAllHiddenMetadata(file, kind){
+        kind = kind || guessKind(file);
+        const basic = {
+            name:file.name || '', type:file.type || '', extension:extOf(file.name), sizeBytes:file.size || 0, sizeText:bytes(file.size || 0),
+            lastModifiedMs:file.lastModified || null, lastModifiedLocal:fmtVi(file.lastModified), lastModifiedISO:fmtISO(file.lastModified)
+        };
+        const [media, timestamp] = await Promise.all([mediaDimensions(file, kind), readTimestampCandidate(file, kind)]);
+        const sample = await readBufferSample(file);
+        const headText = decodeText(sample.head), tailText = decodeText(sample.tail);
+        const joinedText = headText + '\n' + tailText;
+        const xmpPackets = extractXmpPackets(joinedText);
+        const textKeyValues = extractKeyValuesFromText(joinedText);
+        const importantStrings = extractImportantStrings(joinedText);
+        const mp4Internal = (kind === 'video') ? parseMp4Boxes(sample.head) : { skipped:'Không phải video.' };
+        const [exifReader, exifrData, mp4box] = await Promise.all([readExifReader(file), readExifr(file), readMp4Box(file)]);
+        return {
+            version:VERSION,
+            generatedAtLocal:new Date().toLocaleString('vi-VN', {hour12:false}),
+            note:'Trình duyệt chỉ đọc được metadata còn tồn tại trong file được chọn. Nếu ứng dụng trung gian đã xóa EXIF/XMP/QuickTime thì không thể khôi phục chính xác từ file này.',
+            basic, media, timestampCandidate:timestamp,
+            libraries:{
+                ExifReader: exifReader,
+                exifr: exifrData,
+                MP4Box: mp4box
+            },
+            internalScan:{
+                sampledBytes:sample.sampledBytes,
+                truncated:sample.truncated,
+                xmpPackets,
+                textKeyValues,
+                importantStrings,
+                mp4Internal
+            }
+        };
+    }
+    function injectStyle(){
+        if ($('gsht-v110-style')) return;
+        const css = document.createElement('style');
+        css.id = 'gsht-v110-style';
+        css.textContent = `
+        .gsht-v110-overlay{position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:10px;overscroll-behavior:contain;color:#e9ecef;}
+        .gsht-v110-dialog{width:min(920px,100%);height:min(92dvh,860px);display:flex;flex-direction:column;background:#0c1218;border:2px solid #ffc107;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.75);overflow:hidden;}
+        .gsht-v110-head{flex:0 0 auto;display:flex;gap:8px;align-items:flex-start;justify-content:space-between;padding:10px 12px;background:#120e04;border-bottom:1px solid #5a4300;}
+        .gsht-v110-title{font-size:13px;line-height:1.25;font-weight:900;color:#ffc107;overflow-wrap:anywhere;}
+        .gsht-v110-sub{font-size:10.5px;color:#adb5bd;line-height:1.35;margin-top:3px;}
+        .gsht-v110-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+        .gsht-v110-actions .btn{font-size:10.5px;font-weight:800;}
+        .gsht-v110-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px;background:#101820;}
+        .gsht-v110-loading{display:flex;align-items:center;gap:8px;border:1px dashed #ffc107;border-radius:10px;padding:10px;background:rgba(255,193,7,.07);font-size:12px;color:#ffc107;}
+        .gsht-v110-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px;}
+        .gsht-v110-card{border:1px solid #495057;border-radius:12px;background:rgba(0,0,0,.35);padding:9px;min-width:0;}
+        .gsht-v110-card h6{font-size:12px;color:#0dcaf0;font-weight:900;margin:0 0 7px 0;}
+        .gsht-v110-table{display:block;border:1px solid #343a40;border-radius:10px;overflow:hidden;background:#05080c;}
+        .gsht-v110-row{display:grid;grid-template-columns:190px minmax(0,1fr);border-bottom:1px solid #212529;font-size:10.7px;line-height:1.35;}
+        .gsht-v110-row:last-child{border-bottom:0;}
+        .gsht-v110-row b{padding:6px 7px;background:#111820;color:#adb5bd;word-break:break-word;}
+        .gsht-v110-row span{padding:6px 7px;color:#e9ecef;word-break:break-word;white-space:pre-wrap;}
+        .gsht-v110-details{border:1px solid #495057;border-radius:12px;background:#0a0f14;margin-bottom:8px;overflow:hidden;}
+        .gsht-v110-details summary{cursor:pointer;padding:9px 10px;background:#111820;color:#ffc107;font-weight:900;font-size:12px;border-bottom:1px solid #343a40;}
+        .gsht-v110-details .inside{padding:8px;}
+        .gsht-v110-pre{max-height:48dvh;overflow:auto;background:#050505;border:1px solid #343a40;border-radius:10px;padding:8px;color:#d1e7dd;font-size:10.5px;line-height:1.35;white-space:pre-wrap;word-break:break-word;}
+        .gsht-v110-tool-panel{border:1px solid #ffc107;border-radius:10px;background:rgba(255,193,7,.06);padding:8px;margin-top:8px;}
+        .gsht-v110-tool-panel .small{font-size:10.5px;line-height:1.35;}
+        @media(max-width:430px){.gsht-v110-overlay{padding:0;align-items:stretch}.gsht-v110-dialog{width:100%;height:100dvh;border-radius:0;border-left:0;border-right:0}.gsht-v110-summary{grid-template-columns:1fr}.gsht-v110-row{grid-template-columns:112px minmax(0,1fr);font-size:10px}.gsht-v110-head{flex-direction:column}.gsht-v110-actions{width:100%;justify-content:stretch}.gsht-v110-actions .btn{flex:1 1 auto}.gsht-v110-pre{max-height:40dvh}}
+        @supports not (height:100dvh){.gsht-v110-dialog{height:92vh}.gsht-v110-pre{max-height:48vh}}
+        `;
+        document.head.appendChild(css);
+    }
+    function renderMetadata(meta){
+        const ts = meta.timestampCandidate || {};
+        const conf = confidenceFromSource(ts.source || '');
+        const basicRows = {
+            'Tên file': meta.basic.name,
+            'Loại MIME': meta.basic.type || '(không có)',
+            'Đuôi file': meta.basic.extension || '(không rõ)',
+            'Dung lượng': meta.basic.sizeText,
+            'lastModified': `${meta.basic.lastModifiedLocal || ''} / ${meta.basic.lastModifiedISO || ''}`
+        };
+        const mediaRows = Object.assign({}, meta.media || {}, {
+            'Timestamp đề xuất': ts.localTime || '',
+            'Nguồn timestamp': ts.source || '',
+            'Tin cậy': ts.confidence || conf.label,
+            'Ghi chú': conf.warn ? 'Nên kiểm tra/sửa nếu file đã qua ứng dụng trung gian.' : 'Nguồn tương đối tốt nếu metadata chưa bị can thiệp.'
+        });
+        let html = `<div class="alert alert-warning small" style="font-size:10.8px;line-height:1.35;"><b>Lưu ý:</b> ${esc(meta.note)}</div>`;
+        html += `<div class="gsht-v110-summary"><div class="gsht-v110-card"><h6><i class="fa-solid fa-file me-1"></i>Thông tin file</h6>${renderFlatTable(basicRows)}</div><div class="gsht-v110-card"><h6><i class="fa-solid fa-clock me-1"></i>Media & thời gian</h6>${renderFlatTable(mediaRows)}</div></div>`;
+        html += `<details class="gsht-v110-details" open><summary>ExifReader: EXIF / XMP / IPTC / GPS / TIFF đọc được</summary><div class="inside">${renderFlatTable(meta.libraries.ExifReader?.tags || meta.libraries.ExifReader || {})}</div></details>`;
+        html += `<details class="gsht-v110-details"><summary>exifr: metadata đọc được</summary><div class="inside">${renderFlatTable(meta.libraries.exifr?.tags || meta.libraries.exifr || {})}</div></details>`;
+        html += `<details class="gsht-v110-details"><summary>MP4Box / cấu trúc MP4-MOV cơ bản</summary><div class="inside"><div class="gsht-v110-card mb-2"><h6>MP4Box</h6>${renderFlatTable(meta.libraries.MP4Box || {})}</div><div class="gsht-v110-card"><h6>Parser nội bộ</h6>${renderFlatTable(meta.internalScan.mp4Internal || {})}</div></div></details>`;
+        html += `<details class="gsht-v110-details"><summary>XMP/XML packet phát hiện được (${meta.internalScan.xmpPackets.length})</summary><div class="inside">${meta.internalScan.xmpPackets.length ? meta.internalScan.xmpPackets.map((p,i)=>`<div class="small text-info fw-bold mb-1">XMP #${i+1}</div><pre class="gsht-v110-pre">${esc(p)}</pre>`).join('') : '<div class="text-secondary small">Không phát hiện XMP packet trong phần mẫu đã quét.</div>'}</div></details>`;
+        html += `<details class="gsht-v110-details"><summary>Các cặp khóa/giá trị nghi vấn từ text scan (${meta.internalScan.textKeyValues.length})</summary><div class="inside">${renderFlatTable(meta.internalScan.textKeyValues)}</div></details>`;
+        html += `<details class="gsht-v110-details"><summary>Chuỗi metadata nghi vấn trong file (${meta.internalScan.importantStrings.length})</summary><div class="inside"><pre class="gsht-v110-pre">${esc(meta.internalScan.importantStrings.join('\n'))}</pre></div></details>`;
+        html += `<details class="gsht-v110-details"><summary>JSON đầy đủ</summary><div class="inside"><pre class="gsht-v110-pre" id="gsht-v110-json-pre">${esc(JSON.stringify(meta, null, 2))}</pre></div></details>`;
+        return html;
+    }
+    function copyText(text){
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+        const ta = document.createElement('textarea'); ta.value = text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); return Promise.resolve();
+    }
+    function downloadJson(file, meta){
+        const base = String(file.name || 'metadata').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_');
+        const blob = new Blob([JSON.stringify(meta, null, 2)], {type:'application/json;charset=utf-8'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = base + '_hidden_metadata.json'; document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+    }
+    async function showHiddenMetadataPopup(file, kind){
+        if (!file) return;
+        injectStyle();
+        kind = kind || guessKind(file);
+        const overlay = document.createElement('div');
+        overlay.className = 'gsht-v110-overlay';
+        overlay.innerHTML = `
+            <div class="gsht-v110-dialog" role="dialog" aria-modal="true">
+                <div class="gsht-v110-head">
+                    <div class="min-w-0">
+                        <div class="gsht-v110-title"><i class="fa-solid fa-magnifying-glass me-1"></i> THÔNG TIN ẨN CỦA FILE: ${esc(file.name || '(không tên)')}</div>
+                        <div class="gsht-v110-sub">Đọc offline các metadata còn tồn tại trong file ảnh/video: EXIF, XMP, IPTC, GPS, QuickTime/MP4 và chuỗi text nghi vấn.</div>
+                    </div>
+                    <div class="gsht-v110-actions">
+                        <button type="button" class="btn btn-sm btn-outline-info" id="gsht-v110-copy" disabled><i class="fa-solid fa-copy me-1"></i>SAO CHÉP JSON</button>
+                        <button type="button" class="btn btn-sm btn-outline-warning" id="gsht-v110-download" disabled><i class="fa-solid fa-file-arrow-down me-1"></i>TẢI JSON</button>
+                        <button type="button" class="btn btn-sm btn-light" id="gsht-v110-close"><i class="fa-solid fa-xmark me-1"></i>ĐÓNG</button>
+                    </div>
+                </div>
+                <div class="gsht-v110-body" id="gsht-v110-body"><div class="gsht-v110-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang đọc thông tin ẩn trong file, vui lòng chờ...</span></div></div>
+            </div>`;
+        document.body.appendChild(overlay);
+        $('gsht-v110-close')?.addEventListener('click', () => overlay.remove());
+        let meta = null;
+        try {
+            setImportStatus(`Đang soi thông tin ẩn file <b>${esc(file.name || '')}</b>...`, 'text-info');
+            meta = await readAllHiddenMetadata(file, kind);
+            const body = $('gsht-v110-body');
+            if (body) body.innerHTML = renderMetadata(meta);
+            const copyBtn = $('gsht-v110-copy'), downBtn = $('gsht-v110-download');
+            if (copyBtn) { copyBtn.disabled = false; copyBtn.onclick = async () => { await copyText(JSON.stringify(meta, null, 2)); copyBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>ĐÃ SAO CHÉP'; setTimeout(()=>copyBtn.innerHTML='<i class="fa-solid fa-copy me-1"></i>SAO CHÉP JSON',1200); }; }
+            if (downBtn) { downBtn.disabled = false; downBtn.onclick = () => downloadJson(file, meta); }
+            setImportStatus(`✅ Đã đọc thông tin ẩn file <b>${esc(file.name || '')}</b>.`, 'text-success');
+        } catch(e) {
+            const body = $('gsht-v110-body');
+            if (body) body.innerHTML = `<div class="alert alert-danger small"><b>Không đọc được metadata:</b> ${esc(e?.message || e)}</div>`;
+            setImportStatus(`❌ Lỗi đọc thông tin ẩn: ${esc(e?.message || e)}`, 'text-danger');
+        }
+    }
+    function addToolPanel(){
+        try {
+            if ($('gsht-v110-tool-panel')) return;
+            const anchor = $('gsht-native-import-status') || $('native-camera-import-panel');
+            const parent = anchor?.parentElement || $('native-camera-import-panel') || document.body;
+            const div = document.createElement('div');
+            div.id = 'gsht-v110-tool-panel';
+            div.className = 'gsht-v110-tool-panel';
+            div.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                    <div class="small text-warning"><b><i class="fa-solid fa-magnifying-glass me-1"></i>SOI THÔNG TIN ẨN ẢNH/VIDEO</b><br><span class="text-secondary">Chọn một file để xem EXIF/XMP/GPS/QuickTime/MP4 còn ẩn trong file, không đưa file vào kho ảnh.</span></div>
+                    <label class="btn btn-sm btn-outline-warning fw-bold mb-0">
+                        <i class="fa-solid fa-file-circle-question me-1"></i> CHỌN FILE SOI
+                        <input id="gsht-v110-hidden-meta-input" type="file" hidden accept="image/*,video/*,.heic,.heif,.mov,.mp4,.m4v,.webp,.avif,.tif,.tiff">
+                    </label>
+                </div>`;
+            if (anchor && anchor.parentElement) anchor.insertAdjacentElement('afterend', div); else parent.appendChild(div);
+            $('gsht-v110-hidden-meta-input')?.addEventListener('change', ev => {
+                const file = ev.target.files && ev.target.files[0];
+                if (file) showHiddenMetadataPopup(file, guessKind(file));
+                ev.target.value = '';
+            });
+        } catch(e) { console.warn(VERSION, 'addToolPanel failed', e); }
+    }
+    function addHelp(){
+        try {
+            const help = document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
+            if (help && !$('gsht-v110-help-note')) {
+                const div = document.createElement('div');
+                div.id = 'gsht-v110-help-note';
+                div.className = 'alert alert-warning small mt-2';
+                div.innerHTML = '<b>V110 - Xem thông tin ẩn ảnh/video:</b> Trong khu vực Camera gốc / Nhập ảnh ngoài có nút <b>CHỌN FILE SOI</b> để mở cửa sổ xem toàn bộ metadata còn đọc được: thông tin file, kích thước media, timestamp đề xuất, EXIF/XMP/IPTC/GPS/QuickTime, cấu trúc MP4/MOV và chuỗi metadata nghi vấn. Trong popup xác nhận thời gian V109 cũng có nút <b>Thông tin ẩn</b> để soi ngay file đang xử lý.';
+                help.appendChild(div);
+            }
+        } catch(e) {}
+    }
+    function boot(){ injectStyle(); addToolPanel(); addHelp(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 1000)); else setTimeout(boot, 1000);
+    window.addEventListener('load', () => setTimeout(boot, 1500));
+    setInterval(() => { try { addToolPanel(); } catch(e){} }, 3000);
+    window.gshtShowHiddenMetadataPopup = showHiddenMetadataPopup;
+    window.gshtReadAllHiddenMetadataV110 = readAllHiddenMetadata;
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V110 hidden metadata viewer'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
 })();
 </script>
 
