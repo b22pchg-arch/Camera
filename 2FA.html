@@ -41,13 +41,20 @@
             color: #5f6368;
             margin-bottom: 24px;
         }
-        .main-input {
+
+        /* Khung bọc ô nhập liệu để chứa nút Xóa */
+        .input-wrapper {
+            position: relative;
             width: 90%;
-            padding: 12px;
+            margin: 0 auto 16px auto;
+        }
+        .main-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 40px 12px 12px; /* Chừa không gian bên phải cho nút Xóa */
             font-size: 16px;
             border: 1px solid var(--border);
             border-radius: 8px;
-            margin-bottom: 16px;
             outline: none;
             text-align: center;
             font-family: monospace;
@@ -58,7 +65,27 @@
             box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
         }
         
-        /* Chứa mã và nút copy */
+        /* Nút Xóa dữ liệu (Dấu X) */
+        .clear-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #9aa0a6;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 6px;
+            border-radius: 50%;
+            display: none; /* Ẩn mặc định, chỉ hiện khi có text */
+            transition: all 0.2s;
+        }
+        .clear-btn:hover {
+            color: #d93025;
+            background-color: #fce8e6;
+        }
+        
         .code-wrapper {
             display: flex;
             justify-content: center;
@@ -75,7 +102,6 @@
             margin: 0;
         }
         
-        /* Nút copy icon */
         .icon-btn {
             background: none;
             border: none;
@@ -121,7 +147,6 @@
             display: none;
         }
 
-        /* Phần chi tiết mở rộng */
         .details-section {
             margin-top: 28px;
             padding-top: 20px;
@@ -151,7 +176,6 @@
             border-color: var(--primary);
         }
 
-        /* Thông báo Copy thành công */
         .toast {
             position: fixed;
             bottom: 30px;
@@ -176,7 +200,10 @@
         <h2>2FA Offline</h2>
         <p class="desc">Chạy nội bộ trên trình duyệt, không kết nối internet.</p>
         
-        <input type="text" id="secretInput" class="main-input" placeholder="Nhập mã bí mật (Secret Key)..." autocomplete="off" spellcheck="false" value="DOCIYMSFWFMDHRS6I73AQCRBBM4ZFM23">
+        <div class="input-wrapper">
+            <input type="text" id="secretInput" class="main-input" placeholder="Nhập mã bí mật (Secret Key)..." autocomplete="off" spellcheck="false" value="DOCIYMSFWFMDHRS6I73AQCRBBM4ZFM23">
+            <button class="clear-btn" id="clearBtn" title="Xóa mã bí mật">✖</button>
+        </div>
         
         <div id="errorMsg" class="error">Khóa bí mật không hợp lệ!</div>
         
@@ -207,7 +234,6 @@
     <div id="toast" class="toast">Đã copy!</div>
 
     <script>
-        // --- CÁC HÀM XỬ LÝ TẠO MÃ 2FA ---
         function base32ToUint8Array(base32) {
             const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
             let bits = "";
@@ -265,15 +291,14 @@
             }
         }
 
-        // --- CÁC HÀM GIAO DIỆN VÀ SAO CHÉP (COPY) ---
         const secretInput = document.getElementById('secretInput');
+        const clearBtn = document.getElementById('clearBtn');
         const codeDisplay = document.getElementById('codeDisplay');
         const progressBar = document.getElementById('progressBar');
         const timerText = document.getElementById('timerText');
         const errorMsg = document.getElementById('errorMsg');
         const toast = document.getElementById('toast');
 
-        // Hàm hiển thị thông báo
         let toastTimeout;
         function showToast(message) {
             toast.innerText = message;
@@ -284,7 +309,6 @@
             }, 2000);
         }
 
-        // Hàm Copy vào clipboard dùng Clipboard API
         function copyToClipboard(text) {
             if (!text) {
                 showToast("Không có dữ liệu để copy!");
@@ -297,11 +321,9 @@
             });
         }
 
-        // Sự kiện Copy mã 2FA
         document.getElementById('copyCodeBtn').addEventListener('click', () => {
             const codeRaw = codeDisplay.innerText;
             if (codeRaw !== "------") {
-                // Loại bỏ khoảng trắng ở giữa để tiện dán vào các form
                 const codeToCopy = codeRaw.replace(/\s/g, ''); 
                 copyToClipboard(codeToCopy);
             } else {
@@ -309,13 +331,26 @@
             }
         });
 
-        // Hàm Copy cho Chi tiết 1 và Chi tiết 2
         function copyDetail(inputId) {
             const inputValue = document.getElementById(inputId).value.trim();
             copyToClipboard(inputValue);
         }
 
-        // Cập nhật UI mã 2FA
+        // Sự kiện khi nhập chữ vào ô Secret Key
+        secretInput.addEventListener('input', () => {
+            // Hiện nút xóa nếu có ký tự, ẩn nếu trống
+            clearBtn.style.display = secretInput.value.length > 0 ? 'block' : 'none';
+            updateUI();
+        });
+
+        // Sự kiện khi bấm nút Xóa dữ liệu
+        clearBtn.addEventListener('click', () => {
+            secretInput.value = ''; // Xóa trắng ô nhập
+            clearBtn.style.display = 'none'; // Ẩn nút Xóa đi
+            updateUI(); // Cập nhật lại giao diện (trả về mã ------)
+            secretInput.focus(); // Tự động đưa con trỏ chuột quay lại ô nhập
+        });
+
         async function updateUI() {
             const secret = secretInput.value.trim();
             const epoch = Math.floor(Date.now() / 1000.0);
@@ -347,7 +382,6 @@
             }
         }
 
-        secretInput.addEventListener('input', updateUI);
         setInterval(updateUI, 1000);
         updateUI();
     </script>
