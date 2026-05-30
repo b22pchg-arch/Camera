@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V108)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V109)</title>
     
     <link rel="manifest" href="manifest.json">
 	<link rel="icon" type="image/png" href="icon-192.png">
@@ -13129,6 +13129,314 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     window.addEventListener('load', () => setTimeout(boot, 1200));
     setInterval(() => { try { install(); } catch(e){} }, 2500);
     try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V108 media timestamp trust manual lock + video progress'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
+})();
+</script>
+
+<script id="gsht-v109-file-review-popup">
+/* GSHT V109: xác nhận thời gian theo từng ảnh/video nhập ngoài.
+   - Thay ô tin cậy cố định bằng popup toàn màn hình, dễ nhìn trên mobile.
+   - Mỗi file được xem trước, hiển thị nguồn thời gian dự kiến, cho sửa ngay trước khi chèn chân.
+   - Ảnh hàng loạt xử lý tuần tự từng file; có nút dùng đề xuất cho toàn bộ phần còn lại. */
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V109-FILE-TIME-REVIEW-POPUP';
+    const $ = id => document.getElementById(id);
+    const STATE = { photoWrapping:false, videoWrapping:false };
+
+    function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function validMs(ms){ return Number.isFinite(ms) && ms > 315532800000 && ms < 4102444800000; }
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function fmtInput(ms){
+        const d = new Date(ms);
+        if (!validMs(d.getTime())) return '';
+        return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    }
+    function fmtVi(ms){ try { return new Date(ms).toLocaleString('vi-VN', { hour12:false }); } catch(e){ return ''; } }
+    function setStatus(html, cls='text-secondary'){
+        const el = $('gsht-native-import-status');
+        if (el) { el.className = 'small mt-2 ' + cls; el.innerHTML = html; }
+    }
+    function confidenceFromSource(source){
+        const s = String(source || '').toLowerCase();
+        if (/người dùng|thu cong|thủ công|manual|popup|xác nhận|sửa/.test(s)) return { level:'high', label:'Đã xác nhận', cls:'text-success', bg:'bg-success', warn:false };
+        if (/datetimeoriginal|offsettime|quicktime|creationdate|mvhd|mp4\/mov|gps/.test(s)) return { level:'high', label:'Cao', cls:'text-success', bg:'bg-success', warn:false };
+        if (/createdate|modifydate|xmp|filename|tên file|text metadata/.test(s)) return { level:'medium', label:'Trung bình', cls:'text-warning', bg:'bg-warning text-dark', warn:true };
+        return { level:'low', label:'Thấp', cls:'text-danger', bg:'bg-danger', warn:true };
+    }
+    function parseFilenameTime(file){
+        const name = String(file?.name || '');
+        const patterns = [
+            { re: /(?:IMG|VID|PXL|MVIMG|Screenshot|Screenrecorder|signal|telegram|zalo|camera)[_\- ]?(\d{4})(\d{2})(\d{2})[_\- ]?(\d{2})(\d{2})(\d{2})/i, src:'tên file camera/app' },
+            { re: /(\d{4})[\-_.](\d{2})[\-_.](\d{2})[ T_\-.](\d{2})[\-_.:](\d{2})[\-_.:](\d{2})/, src:'tên file ISO' },
+            { re: /(\d{4})(\d{2})(\d{2})[_\- ](\d{2})(\d{2})(\d{2})/, src:'tên file dạng YYYYMMDD_HHMMSS' },
+            { re: /(\d{2})(\d{2})(\d{2})[_\- ](\d{2})(\d{2})(\d{2})/, src:'tên file dạng YYMMDD_HHMMSS' }
+        ];
+        for (const p of patterns) {
+            const m = name.match(p.re);
+            if (!m) continue;
+            let y = Number(m[1]);
+            if (y < 100) y += 2000;
+            const mo = Number(m[2]), d = Number(m[3]), h = Number(m[4]), mi = Number(m[5]), se = Number(m[6]);
+            if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || se > 59) continue;
+            const ms = new Date(y, mo - 1, d, h, mi, se).getTime();
+            if (validMs(ms)) return { timestampMs:ms, source:p.src, parser:'filename' };
+        }
+        return null;
+    }
+    async function readCandidate(file, kind){
+        let meta = null;
+        try {
+            if (typeof window.gshtReadMediaTimestampLocked === 'function') meta = await window.gshtReadMediaTimestampLocked(file, kind);
+        } catch(e) {}
+        if (!meta || !validMs(meta.timestampMs)) {
+            const fb = validMs(file?.lastModified) ? file.lastModified : Date.now();
+            meta = { timestampMs:fb, source:'thời gian file lastModified', parser:'fallback' };
+        }
+        const conf = confidenceFromSource(meta.source);
+        const fn = parseFilenameTime(file);
+        if (fn && (conf.level === 'low' || /lastmodified|fallback|thời gian file/i.test(String(meta.source || '')))) meta = fn;
+        return meta;
+    }
+
+    function injectStyle(){
+        if ($('gsht-v109-popup-style')) return;
+        const css = document.createElement('style');
+        css.id = 'gsht-v109-popup-style';
+        css.textContent = `
+        #gsht-v108-time-panel{display:none!important;}
+        .gsht-v109-overlay{position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:10px;overscroll-behavior:contain;}
+        .gsht-v109-dialog{width:min(760px,100%);max-height:calc(100dvh - 20px);display:flex;flex-direction:column;background:#101820;border:2px solid #0dcaf0;border-radius:16px;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 18px 50px rgba(0,0,0,.65);overflow:hidden;color:#e9ecef;}
+        .gsht-v109-head{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:10px 12px;background:#061018;border-bottom:1px solid #343a40;}
+        .gsht-v109-title{font-size:13px;font-weight:800;color:#0dcaf0;line-height:1.25;min-width:0;overflow-wrap:anywhere;}
+        .gsht-v109-sub{font-size:10.5px;color:#adb5bd;line-height:1.3;margin-top:2px;}
+        .gsht-v109-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px;}
+        .gsht-v109-preview{background:#000;border:1px solid #495057;border-radius:12px;min-height:170px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:10px;}
+        .gsht-v109-preview img,.gsht-v109-preview video{max-width:100%;max-height:42dvh;object-fit:contain;background:#000;}
+        .gsht-v109-info{border:1px solid #495057;border-radius:12px;background:rgba(0,0,0,.35);padding:9px;margin-bottom:10px;}
+        .gsht-v109-info-row{display:grid;grid-template-columns:118px minmax(0,1fr);gap:6px;font-size:11px;line-height:1.35;margin-bottom:4px;}
+        .gsht-v109-info-row b{color:#adb5bd;}
+        .gsht-v109-info-row span{word-break:break-word;}
+        .gsht-v109-time-card{border:1px solid rgba(255,193,7,.65);border-radius:12px;background:rgba(255,193,7,.07);padding:9px;}
+        .gsht-v109-time-card label{font-size:11px;font-weight:800;color:#ffc107;margin-bottom:4px;}
+        .gsht-v109-time-card input{font-weight:700;color:#ffc107!important;background:#111!important;border-color:#6c757d!important;}
+        .gsht-v109-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;}
+        .gsht-v109-foot{flex:0 0 auto;padding:10px;background:#05080c;border-top:1px solid #343a40;display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+        .gsht-v109-foot .btn{font-size:11px;font-weight:800;white-space:normal;line-height:1.25;min-height:38px;}
+        .gsht-v109-warn{font-size:10.5px;line-height:1.35;margin-top:7px;}
+        @media(max-width:430px){.gsht-v109-overlay{padding:0;align-items:stretch}.gsht-v109-dialog{width:100%;max-height:100dvh;border-radius:0;border-left:0;border-right:0}.gsht-v109-preview{min-height:135px}.gsht-v109-preview img,.gsht-v109-preview video{max-height:34dvh}.gsht-v109-info-row{grid-template-columns:92px minmax(0,1fr);font-size:10.5px}.gsht-v109-tools{grid-template-columns:1fr}.gsht-v109-foot{grid-template-columns:1fr}.gsht-v109-foot .btn{font-size:11px}}
+        @supports not (height:100dvh){.gsht-v109-dialog{max-height:calc(100vh - 20px)}.gsht-v109-preview img,.gsht-v109-preview video{max-height:42vh}}
+        `;
+        document.head.appendChild(css);
+    }
+    function ensureManualFields(){
+        let input = $('gsht-import-manual-time');
+        let ck = $('gsht-import-manual-time-enable');
+        if (input && ck) return {input, ck};
+        const box = document.createElement('div');
+        box.id = 'gsht-v109-hidden-manual-fields';
+        box.style.display = 'none';
+        box.innerHTML = '<input id="gsht-import-manual-time" type="datetime-local" step="1"><input id="gsht-import-manual-time-enable" type="checkbox">';
+        document.body.appendChild(box);
+        return { input:$('gsht-import-manual-time'), ck:$('gsht-import-manual-time-enable') };
+    }
+    function applyTimestampForNextHandler(file, choice){
+        const {input, ck} = ensureManualFields();
+        const prev = { inputValue: input?.value || '', checked: !!ck?.checked };
+        const ms = validMs(choice?.timestampMs) ? choice.timestampMs : Date.now();
+        const source = choice?.source || 'người dùng xác nhận tại popup V109';
+        try { if (typeof window.gshtSetExternalTimeOverride === 'function') window.gshtSetExternalTimeOverride(file, ms, source); } catch(e) {}
+        if (input) input.value = fmtInput(ms);
+        if (ck) ck.checked = true;
+        return function restore(){
+            try { if (input) input.value = prev.inputValue; if (ck) ck.checked = prev.checked; } catch(e) {}
+        };
+    }
+    function makeObjectPreview(file, kind){
+        const url = URL.createObjectURL(file);
+        const html = kind === 'video'
+            ? `<video src="${url}" controls muted playsinline preload="metadata"></video>`
+            : `<img src="${url}" alt="preview">`;
+        return { url, html };
+    }
+    function plusSeconds(input, sec){
+        const ms = new Date(input.value || Date.now()).getTime();
+        const next = validMs(ms) ? ms + sec * 1000 : Date.now();
+        input.value = fmtInput(next);
+    }
+    function showReviewPopup({file, kind, index, total, candidate}){
+        injectStyle();
+        return new Promise(resolve => {
+            const conf = confidenceFromSource(candidate?.source);
+            const preview = makeObjectPreview(file, kind);
+            const overlay = document.createElement('div');
+            overlay.className = 'gsht-v109-overlay';
+            overlay.innerHTML = `
+                <div class="gsht-v109-dialog" role="dialog" aria-modal="true">
+                    <div class="gsht-v109-head">
+                        <div class="min-w-0">
+                            <div class="gsht-v109-title"><i class="fa-solid fa-clock me-1"></i> XÁC NHẬN THỜI GIAN ${kind === 'video' ? 'VIDEO' : 'ẢNH'} ${index}/${total}</div>
+                            <div class="gsht-v109-sub">Kiểm tra ngay trước khi app chèn chân ${kind === 'video' ? 'video' : 'ảnh'}. Có thể sửa thời gian cho riêng file này.</div>
+                        </div>
+                        <span class="badge ${conf.bg}" style="font-size:10px;white-space:nowrap;">${esc(conf.label)}</span>
+                    </div>
+                    <div class="gsht-v109-body">
+                        <div class="gsht-v109-preview">${preview.html}</div>
+                        <div class="gsht-v109-info">
+                            <div class="gsht-v109-info-row"><b>File</b><span>${esc(file.name || '(không tên)')}</span></div>
+                            <div class="gsht-v109-info-row"><b>Dung lượng</b><span>${esc((file.size/1024/1024).toFixed(2))} MB</span></div>
+                            <div class="gsht-v109-info-row"><b>Thời gian đọc</b><span class="text-info fw-bold">${esc(fmtVi(candidate.timestampMs))}</span></div>
+                            <div class="gsht-v109-info-row"><b>Nguồn</b><span class="${conf.cls}">${esc(candidate.source || 'không rõ')}</span></div>
+                        </div>
+                        <div class="gsht-v109-time-card">
+                            <label for="gsht-v109-time-input">THỜI GIAN SẼ IN VÀO CHÂN ${kind === 'video' ? 'VIDEO' : 'ẢNH'} NÀY</label>
+                            <input id="gsht-v109-time-input" type="datetime-local" step="1" class="form-control form-control-sm" value="${esc(fmtInput(candidate.timestampMs))}">
+                            <div class="gsht-v109-tools">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="gsht-v109-minus-min">- 1 phút</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="gsht-v109-plus-min">+ 1 phút</button>
+                                <button type="button" class="btn btn-sm btn-outline-warning" id="gsht-v109-now">Giờ hiện tại</button>
+                            </div>
+                            <div class="gsht-v109-warn ${conf.warn ? 'text-warning' : 'text-success'}">
+                                ${conf.warn ? '⚠️ Nguồn thời gian này có thể sai nếu file đã qua ứng dụng trung gian. Sửa trực tiếp ô trên rồi bấm ÁP DỤNG.' : '✅ Nguồn thời gian tương đối tốt, vẫn có thể sửa nếu người dùng biết thời điểm đúng hơn.'}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gsht-v109-foot">
+                        <button type="button" class="btn btn-success" id="gsht-v109-apply"><i class="fa-solid fa-check me-1"></i> ÁP DỤNG FILE NÀY</button>
+                        <button type="button" class="btn btn-info text-dark" id="gsht-v109-auto"><i class="fa-solid fa-forward me-1"></i> DÙNG ĐỀ XUẤT CHO CÁC FILE CÒN LẠI</button>
+                        <button type="button" class="btn btn-outline-warning" id="gsht-v109-skip"><i class="fa-solid fa-ban me-1"></i> BỎ QUA FILE NÀY</button>
+                        <button type="button" class="btn btn-outline-light" id="gsht-v109-cancel"><i class="fa-solid fa-xmark me-1"></i> DỪNG NHẬP</button>
+                    </div>
+                </div>`;
+            const cleanup = () => { try { URL.revokeObjectURL(preview.url); } catch(e){} overlay.remove(); };
+            const finish = (result) => { cleanup(); resolve(result); };
+            document.body.appendChild(overlay);
+            const input = $('gsht-v109-time-input');
+            $('gsht-v109-minus-min')?.addEventListener('click', () => plusSeconds(input, -60));
+            $('gsht-v109-plus-min')?.addEventListener('click', () => plusSeconds(input, 60));
+            $('gsht-v109-now')?.addEventListener('click', () => { input.value = fmtInput(Date.now()); });
+            $('gsht-v109-apply')?.addEventListener('click', () => {
+                const ms = new Date(input.value).getTime();
+                if (!validMs(ms)) { alert('Thời gian chưa hợp lệ.'); return; }
+                const same = Math.abs(ms - candidate.timestampMs) < 1000;
+                finish({ action:'apply', timestampMs:ms, source: same ? `người dùng xác nhận timestamp đề xuất tại popup V109 (${candidate.source || 'metadata'})` : 'người dùng sửa timestamp tại popup V109' });
+            });
+            $('gsht-v109-auto')?.addEventListener('click', () => {
+                const ms = new Date(input.value).getTime();
+                if (!validMs(ms)) { alert('Thời gian chưa hợp lệ.'); return; }
+                finish({ action:'apply-auto-rest', timestampMs:ms, source:`người dùng xác nhận timestamp đề xuất tại popup V109 (${candidate.source || 'metadata'})` });
+            });
+            $('gsht-v109-skip')?.addEventListener('click', () => finish({ action:'skip' }));
+            $('gsht-v109-cancel')?.addEventListener('click', () => finish({ action:'cancel' }));
+        });
+    }
+    async function processOneWithOriginal(original, ctx, file, type, choice){
+        const restore = applyTimestampForNextHandler(file, choice);
+        try {
+            window.__gshtV109InternalCall = true;
+            await original.call(ctx, { target:{ files:[file], value:'' } }, type);
+        } finally {
+            window.__gshtV109InternalCall = false;
+            restore();
+        }
+    }
+    function wrapPhotoHandler(name){
+        const original = window[name];
+        if (typeof original !== 'function' || original.__gshtV109Wrapped) return;
+        const wrapped = async function(ev, type){
+            if (window.__gshtV109InternalCall) return original.apply(this, arguments);
+            const files = Array.from(ev?.target?.files || []);
+            if (!files.length) return;
+            injectStyle();
+            let ok = 0, fail = 0, skip = 0;
+            let autoRest = false;
+            setStatus(`Đã chọn <b>${files.length}</b> ảnh. V109 sẽ hỏi/xác nhận thời gian từng ảnh trước khi chèn chân.`, 'text-info');
+            for (let i=0; i<files.length; i++) {
+                const file = files[i];
+                try {
+                    const candidate = await readCandidate(file, 'photo');
+                    let choice;
+                    if (autoRest) {
+                        choice = { action:'apply', timestampMs:candidate.timestampMs, source:`người dùng cho phép dùng đề xuất tự động V109 (${candidate.source || 'metadata'})` };
+                    } else {
+                        choice = await showReviewPopup({ file, kind:'photo', index:i+1, total:files.length, candidate });
+                    }
+                    if (choice.action === 'cancel') break;
+                    if (choice.action === 'skip') { skip++; continue; }
+                    if (choice.action === 'apply-auto-rest') autoRest = true;
+                    setStatus(`Đang chèn chân ảnh <b>${i+1}/${files.length}</b>: <b>${esc(file.name || '')}</b> — thời gian đã xác nhận <b>${esc(fmtVi(choice.timestampMs))}</b>.`, 'text-info');
+                    await processOneWithOriginal(original, this, file, type, choice);
+                    ok++;
+                } catch(e) {
+                    console.warn(VERSION, 'photo failed', file?.name, e);
+                    fail++;
+                    setStatus(`⚠️ Lỗi xử lý ảnh <b>${esc(file?.name || '')}</b>: ${esc(e?.message || e)}`, 'text-warning');
+                }
+                await new Promise(r => setTimeout(r, 30));
+            }
+            setStatus(`✅ V109 hoàn tất nhập ảnh vào kho <b>${esc(type || '')}</b>: thành công <b>${ok}</b>, bỏ qua <b>${skip}</b>, lỗi <b>${fail}</b>.`, fail ? 'text-warning' : 'text-success');
+            if (ev?.target) ev.target.value = '';
+        };
+        wrapped.__gshtV109Wrapped = true;
+        wrapped.__gshtV108Wrapped = true;
+        wrapped.__gshtV107Wrapped = true;
+        window[name] = wrapped;
+    }
+    function wrapVideoHandler(name){
+        const original = window[name];
+        if (typeof original !== 'function' || original.__gshtV109Wrapped) return;
+        const wrapped = async function(ev){
+            if (window.__gshtV109InternalCall) return original.apply(this, arguments);
+            const file = ev?.target?.files?.[0];
+            if (!file) return;
+            try {
+                injectStyle();
+                const candidate = await readCandidate(file, 'video');
+                const choice = await showReviewPopup({ file, kind:'video', index:1, total:1, candidate });
+                if (choice.action === 'cancel' || choice.action === 'skip') { if (ev?.target) ev.target.value = ''; setStatus('Đã hủy tạo video nhập ngoài.', 'text-warning'); return; }
+                const restore = applyTimestampForNextHandler(file, choice);
+                try {
+                    window.__gshtV109InternalCall = true;
+                    setStatus(`Đã xác nhận thời gian video <b>${esc(fmtVi(choice.timestampMs))}</b>. Đang chuyển sang bước tạo video có chân trang và thanh tiến độ...`, 'text-info');
+                    await original.apply(this, arguments);
+                } finally {
+                    window.__gshtV109InternalCall = false;
+                    restore();
+                }
+            } catch(e) {
+                console.warn(VERSION, 'video failed', file?.name, e);
+                setStatus(`❌ Lỗi xác nhận/tạo video: ${esc(e?.message || e)}`, 'text-danger');
+                if (ev?.target) ev.target.value = '';
+            }
+        };
+        wrapped.__gshtV109Wrapped = true;
+        wrapped.__gshtV108Wrapped = true;
+        wrapped.__gshtV107Wrapped = true;
+        window[name] = wrapped;
+    }
+    function addHelp(){
+        try {
+            const help = document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
+            if (help && !$('gsht-v109-help-note')) {
+                const div = document.createElement('div');
+                div.id = 'gsht-v109-help-note';
+                div.className = 'alert alert-info small mt-2';
+                div.innerHTML = '<b>V109 - Xác nhận thời gian từng file nhập ngoài:</b> Khi chọn ảnh/video từ máy hoặc camera gốc, app bật hộp xác nhận toàn màn hình có preview, tên file, nguồn thời gian và ô sửa giờ. Người dùng bấm <b>ÁP DỤNG FILE NÀY</b> thì timestamp được khóa riêng cho file đó trước khi chèn chân ảnh/video. Với ảnh hàng loạt có thể dùng <b>DÙNG ĐỀ XUẤT CHO CÁC FILE CÒN LẠI</b> để xử lý nhanh nhưng vẫn khóa riêng từng file.';
+                help.appendChild(div);
+            }
+        } catch(e) {}
+    }
+    function install(){
+        wrapPhotoHandler('gshtHandleExternalPhotos');
+        wrapPhotoHandler('gshtHandleNativeCameraPhoto');
+        wrapVideoHandler('gshtHandleExternalVideo');
+        wrapVideoHandler('gshtHandleNativeCameraVideo');
+        addHelp();
+    }
+    function boot(){ injectStyle(); install(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 900)); else setTimeout(boot, 900);
+    window.addEventListener('load', () => setTimeout(boot, 1400));
+    setInterval(() => { try { install(); } catch(e){} }, 3000);
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V109 per-file timestamp review popup'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
 })();
 </script>
 
