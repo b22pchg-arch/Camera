@@ -8,6 +8,7 @@ const APP_SHELL = [
   './index.html',
   './manifest.json',
   './offline.html',
+  './2FA.html',
   './bootstrap.min.css',
   './bootstrap.bundle.min.js',
   './all.min.css',
