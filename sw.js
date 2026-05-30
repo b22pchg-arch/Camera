@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v104-full-mode-main-capture';
+const GSHT_CACHE = 'gsht-pwa-v107-robust-media-metadata-lock';
 const APP_SHELL = [
   './',
   './index.html',
@@ -15,6 +15,9 @@ const APP_SHELL = [
   './qrcode.min.js',
   './jsQR.min.js',
   './fflate.min.js',
+  './exifreader.min.js',
+  './exifr.full.umd.js',
+  './mp4box.all.min.js',
   './stt/vosk/vosk.js',
   './stt/whisper/whisper-worker.js',
   './stt/whisper/gsht-whisper-worker-runner.js',
@@ -110,3 +113,5 @@ self.addEventListener('fetch', event => {
 // GSHT V88: video full-frame quality sync + photo-style video footer
 
 // GSHT V91: camera display optimization - default no crop, real aspect ratio preview.
+
+// GSHT V107 robust media metadata lock: optional local exifreader/exifr/mp4box assets are cached when present.
