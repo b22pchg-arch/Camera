@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình Tạo Mã 2FA Offline</title>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --background: #f1f3f4;
+            --surface: #ffffff;
+            --text: #202124;
+            --border: #dadce0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: var(--surface);
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 24px;
+            color: var(--text);
+        }
+        p.desc {
+            font-size: 14px;
+            color: #5f6368;
+            margin-bottom: 24px;
+        }
+        .main-input {
+            width: 90%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            outline: none;
+            text-align: center;
+            font-family: monospace;
+            text-transform: uppercase;
+        }
+        .main-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
+        
+        /* Chứa mã và nút copy */
+        .code-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin: 20px 0;
+            min-height: 58px;
+        }
+        .code-display {
+            font-size: 48px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: var(--primary);
+            margin: 0;
+        }
+        
+        /* Nút copy icon */
+        .icon-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #5f6368;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-btn:hover {
+            background: #e8eaed;
+            color: var(--primary);
+        }
+        .icon-btn:active {
+            transform: scale(0.9);
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: var(--border);
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: var(--primary);
+            width: 100%;
+            transition: width 1s linear;
+        }
+        .timer-text {
+            font-size: 14px;
+            color: #5f6368;
+        }
+        .error {
+            color: #d93025;
+            font-size: 14px;
+            display: none;
+        }
+
+        /* Phần chi tiết mở rộng */
+        .details-section {
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            text-align: left;
+        }
+        .detail-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 8px;
+        }
+        .detail-row label {
+            font-size: 14px;
+            font-weight: 500;
+            width: 70px;
+        }
+        .detail-input {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            outline: none;
+        }
+        .detail-input:focus {
+            border-color: var(--primary);
+        }
+
+        /* Thông báo Copy thành công */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #323232;
+            color: white;
+            padding: 10px 24px;
+            border-radius: 24px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>2FA Offline</h2>
+        <p class="desc">Chạy nội bộ trên trình duyệt, không kết nối internet.</p>
+        
+        <input type="text" id="secretInput" class="main-input" placeholder="Nhập mã bí mật (Secret Key)..." autocomplete="off" spellcheck="false" value="DOCIYMSFWFMDHRS6I73AQCRBBM4ZFM23">
+        
+        <div id="errorMsg" class="error">Khóa bí mật không hợp lệ!</div>
+        
+        <div class="code-wrapper">
+            <div class="code-display" id="codeDisplay">------</div>
+            <button class="icon-btn" id="copyCodeBtn" title="Copy mã 2FA">📋</button>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="timer-text">Mã mới sau: <span id="timerText">30</span>s</div>
+
+        <div class="details-section">
+            <div class="detail-row">
+                <label>Tài khoản chatgpt:</label>
+                <input type="text" id="detail1" class="detail-input" placeholder="Nhập Tài khoản..." value="mehananiedert241@hotmail.com">
+                <button class="icon-btn" onclick="copyDetail('detail1')" title="Copy Tài khoản">📋</button>
+            </div>
+            <div class="detail-row">
+                <label>Mật khẩu tài khoản chatgpt:</label>
+                <input type="text" id="detail2" class="detail-input" placeholder="Nhập Mật khẩu..." value="chatgpt@hdz123">
+                <button class="icon-btn" onclick="copyDetail('detail2')" title="Copy Mật khẩu">📋</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">Đã copy!</div>
+
+    <script>
+        // --- CÁC HÀM XỬ LÝ TẠO MÃ 2FA ---
+        function base32ToUint8Array(base32) {
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+            let bits = "";
+            let cleanedBase32 = base32.replace(/[^A-Z2-7]/ig, '').toUpperCase();
+            
+            let value = new Uint8Array(Math.floor(cleanedBase32.length * 5 / 8));
+            let index = 0;
+            
+            for (let i = 0; i < cleanedBase32.length; i++) {
+                let val = alphabet.indexOf(cleanedBase32[i]);
+                bits += val.toString(2).padStart(5, '0');
+            }
+            
+            for (let i = 0; i + 8 <= bits.length; i += 8) {
+                value[index++] = parseInt(bits.substring(i, i + 8), 2);
+            }
+            return value;
+        }
+
+        async function generateTOTP(secretBase32) {
+            try {
+                if (!secretBase32) return null;
+
+                const keyBytes = base32ToUint8Array(secretBase32);
+                if (keyBytes.length === 0) throw new Error("Invalid key");
+
+                const epoch = Math.floor(Date.now() / 1000.0);
+                const counter = Math.floor(epoch / 30);
+                
+                const counterBytes = new Uint8Array(8);
+                let tempCounter = counter;
+                for (let i = 7; i >= 0; i--) {
+                    counterBytes[i] = tempCounter & 0xff;
+                    tempCounter = Math.floor(tempCounter / 256);
+                }
+
+                const cryptoKey = await crypto.subtle.importKey(
+                    "raw", keyBytes, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
+                );
+
+                const signature = await crypto.subtle.sign("HMAC", cryptoKey, counterBytes);
+                const hmacResult = new Uint8Array(signature);
+
+                const offset = hmacResult[hmacResult.length - 1] & 0xf;
+                const binary =
+                    ((hmacResult[offset] & 0x7f) << 24) |
+                    ((hmacResult[offset + 1] & 0xff) << 16) |
+                    ((hmacResult[offset + 2] & 0xff) << 8) |
+                    (hmacResult[offset + 3] & 0xff);
+
+                const otp = binary % 1000000;
+                return otp.toString().padStart(6, '0');
+            } catch (error) {
+                return false;
+            }
+        }
+
+        // --- CÁC HÀM GIAO DIỆN VÀ SAO CHÉP (COPY) ---
+        const secretInput = document.getElementById('secretInput');
+        const codeDisplay = document.getElementById('codeDisplay');
+        const progressBar = document.getElementById('progressBar');
+        const timerText = document.getElementById('timerText');
+        const errorMsg = document.getElementById('errorMsg');
+        const toast = document.getElementById('toast');
+
+        // Hàm hiển thị thông báo
+        let toastTimeout;
+        function showToast(message) {
+            toast.innerText = message;
+            toast.style.opacity = '1';
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 2000);
+        }
+
+        // Hàm Copy vào clipboard dùng Clipboard API
+        function copyToClipboard(text) {
+            if (!text) {
+                showToast("Không có dữ liệu để copy!");
+                return;
+            }
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("Đã copy: " + text);
+            }).catch(err => {
+                showToast("Lỗi khi copy!");
+            });
+        }
+
+        // Sự kiện Copy mã 2FA
+        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+            const codeRaw = codeDisplay.innerText;
+            if (codeRaw !== "------") {
+                // Loại bỏ khoảng trắng ở giữa để tiện dán vào các form
+                const codeToCopy = codeRaw.replace(/\s/g, ''); 
+                copyToClipboard(codeToCopy);
+            } else {
+                showToast("Chưa có mã để copy!");
+            }
+        });
+
+        // Hàm Copy cho Chi tiết 1 và Chi tiết 2
+        function copyDetail(inputId) {
+            const inputValue = document.getElementById(inputId).value.trim();
+            copyToClipboard(inputValue);
+        }
+
+        // Cập nhật UI mã 2FA
+        async function updateUI() {
+            const secret = secretInput.value.trim();
+            const epoch = Math.floor(Date.now() / 1000.0);
+            const remaining = 30 - (epoch % 30);
+            
+            timerText.innerText = remaining;
+            progressBar.style.width = (remaining / 30 * 100) + "%";
+            
+            if (remaining <= 5) {
+                progressBar.style.backgroundColor = "#d93025";
+                codeDisplay.style.color = "#d93025";
+            } else {
+                progressBar.style.backgroundColor = "var(--primary)";
+                codeDisplay.style.color = "var(--primary)";
+            }
+
+            if (secret) {
+                const otp = await generateTOTP(secret);
+                if (otp === false) {
+                    errorMsg.style.display = "block";
+                    codeDisplay.innerText = "------";
+                } else {
+                    errorMsg.style.display = "none";
+                    codeDisplay.innerText = otp.substring(0, 3) + " " + otp.substring(3, 6);
+                }
+            } else {
+                errorMsg.style.display = "none";
+                codeDisplay.innerText = "------";
+            }
+        }
+
+        secretInput.addEventListener('input', updateUI);
+        setInterval(updateUI, 1000);
+        updateUI();
+    </script>
+</body>
+</html>
