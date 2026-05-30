@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v108-media-time-trust-progress';
+const GSHT_CACHE = 'gsht-pwa-v109-file-time-review-popup';
 const APP_SHELL = [
   './',
   './index.html',
@@ -114,4 +114,4 @@ self.addEventListener('fetch', event => {
 
 // GSHT V91: camera display optimization - default no crop, real aspect ratio preview.
 
-// GSHT V108 media time trust/manual lock + video progress. Optional local exifreader/exifr/mp4box assets are cached when present.
+// GSHT V109 per-file timestamp review popup + V108 video progress. Optional local exifreader/exifr/mp4box assets are cached when present.
