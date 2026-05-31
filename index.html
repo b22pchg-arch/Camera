@@ -14773,5 +14773,196 @@ try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V130 sti
 })();
 </script>
 
+
+
+<script id="gsht-v131-capture-preview-fallback-fix">
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V131-CAPTURE-PREVIEW-FALLBACK-FIX';
+    const CAPTURE_MODE_KEY = 'gsht_camera_capture_mode_v92';
+    const SPEED_KEY = 'gsht_camera_capture_speed_mode_v93';
+    const $ = (id) => document.getElementById(id);
+    function getCaptureMode(){ try { return localStorage.getItem(CAPTURE_MODE_KEY) || 'preview'; } catch(e){ return 'preview'; } }
+    function getSpeedMode(){ try { return localStorage.getItem(SPEED_KEY) || 'fast-preview'; } catch(e){ return 'fast-preview'; } }
+    function setStatus(html, cls){
+        const ids = ['gsht-camera-full-sensor-status','gsht-camera-speed-status'];
+        ids.forEach(id => { const el=$(id); if(el){ el.className='small '+(cls||'text-secondary'); el.innerHTML=html; } });
+    }
+    function validVideo(video){ return !!(video && video.videoWidth && video.videoHeight); }
+    async function takeBestSource(video){
+        const speed = getSpeedMode();
+        const mode = speed === 'quality-full' ? 'auto-still' : getCaptureMode();
+        const track = (typeof localStream !== 'undefined' && localStream && localStream.getVideoTracks) ? localStream.getVideoTracks()[0] : null;
+        const settings = track && track.getSettings ? track.getSettings() : {};
+        const useStill = mode !== 'preview' && speed !== 'fast-preview';
+        if (useStill && track && 'ImageCapture' in window) {
+            try {
+                if (typeof gshtApplyCameraAutoFocus === 'function') { try { await gshtApplyCameraAutoFocus('chụp ảnh full-frame'); } catch(e){} }
+                await new Promise(r => setTimeout(r, 120));
+                const ic = new ImageCapture(track);
+                const blob = await ic.takePhoto();
+                const bmp = await createImageBitmap(blob);
+                return { source:bmp, width:bmp.width, height:bmp.height, kind:'ImageCapture', close:()=>{ try { bmp.close && bmp.close(); } catch(e){} }, settings };
+            } catch(e) {
+                console.warn(VERSION, 'ImageCapture/full-frame lỗi, tự fallback sang preview:', e);
+                // Không báo lỗi cho 3 nút chụp chính nữa; chỉ fallback sang preview để không gián đoạn hiện trường.
+                setStatus('⚠️ Full-frame không dùng được trên lần chụp này, app đã tự chuyển sang <b>preview video</b> để vẫn chụp được ảnh.', 'text-warning');
+            }
+        }
+        if (!validVideo(video)) throw new Error('Camera chưa có khung hình video hợp lệ. Hãy đợi preview hiện đủ rồi chụp lại.');
+        return { source:video, width:video.videoWidth, height:video.videoHeight, kind:'PreviewVideo', close:()=>{}, settings };
+    }
+    function footerRows(info){
+        if (typeof gshtFooterRowsFromInfo === 'function') return gshtFooterRowsFromInfo(info);
+        return [
+            { text: `Tọa độ: ${info.gpsLine}`, max: 4, color: '#ffffff' },
+            { text: `Địa chỉ: ${info.address}`, max: 6, color: '#ffffff' },
+            { text: `Tên/Mã hiện trường: ${info.prefix}`, max: 4, color: '#ffffff' },
+            { text: `Tổ đội/Đơn vị/Người thực hiện: ${info.team}`, max: 4, color: '#ffffff' },
+            { text: `Ghi chú: ${info.note}`, max: 6, color: '#ffc107' }
+        ];
+    }
+    function safeQuality(){ try { return typeof getJpegQuality === 'function' ? getJpegQuality() : 0.92; } catch(e){ return 0.92; } }
+    function safeMapButton(photoObj){ try { return typeof mapButtonHtml === 'function' ? mapButtonHtml(photoObj) : ''; } catch(e){ return ''; } }
+    async function drawCapture(type, srcInfo){
+        if (typeof currentStoragePercent !== 'undefined' && currentStoragePercent > 95) { alert('Bộ nhớ thiết bị đầy!'); return; }
+        const now = new Date();
+        const gpsMeta = typeof getCurrentGpsMeta === 'function' ? getCurrentGpsMeta() : null;
+        const address = typeof getAddressForGps === 'function' ? await getAddressForGps(gpsMeta) : '';
+        const info = typeof getCaptureContext === 'function' ? getCaptureContext(type, now, gpsMeta, address) : {
+            gpsLine: gpsMeta && gpsMeta.gpsText ? gpsMeta.gpsText : '', address: address || '',
+            prefix: $('tab1-prefix')?.value || '', team: $('tab1-team')?.value || '', note: $('tab1-note')?.value || '',
+            type, timeText: now.toLocaleTimeString('vi-VN'), dateText: now.toLocaleDateString('vi-VN')
+        };
+        const out = typeof getCaptureOutputDimensions === 'function' ? getCaptureOutputDimensions(srcInfo.width, srcInfo.height) : { width: srcInfo.width, height: srcInfo.height };
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(0.75, out.width / 1000);
+        const enabledExtras = ['selfie','map','compass'].filter(key => { try { return typeof getExtraInsertPref === 'function' ? getExtraInsertPref(key) : true; } catch(e){ return true; } });
+        const mirrorLayout = typeof shouldMirrorFooterLayout === 'function' ? shouldMirrorFooterLayout(type) : (type === 'SAU');
+        const orderedExtras = mirrorLayout ? ['compass','map','selfie'].filter(key => enabledExtras.includes(key)) : enabledExtras;
+        const imgBoxSize = enabledExtras.length ? Math.min(240 * scale, out.width * 0.16) : 0;
+        const pad = 20 * scale;
+        const lineH = Math.max(25 * scale, 22);
+        const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + Math.max(0, enabledExtras.length - 1) * pad) : 0;
+        const textX = mirrorLayout ? (pad + extrasTotalW + (enabledExtras.length ? pad : 0)) : pad;
+        const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 3);
+        const rows = footerRows(info);
+        const measureCtx = document.createElement('canvas').getContext('2d');
+        measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        const headerH = typeof drawFooterHeaderBlock === 'function' ? drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale, mirrorLayout) : 32 * scale;
+        const textBlockH = rows.reduce((sum, row) => sum + (typeof measureWrappedTextHeight === 'function' ? measureWrappedTextHeight(measureCtx, row.text, maxTextW, lineH, row.max || 99) : lineH), 0);
+        const footerH = Math.ceil(Math.max((enabledExtras.length ? imgBoxSize + 56 * scale : 0), 18 * scale + headerH + 12 * scale + textBlockH + 34 * scale));
+        canvas.width = out.width;
+        canvas.height = out.height + footerH;
+        ctx.save();
+        try { if (typeof currentFacingMode !== 'undefined' && currentFacingMode === 'user') { ctx.translate(out.width, 0); ctx.scale(-1, 1); } } catch(e) {}
+        ctx.drawImage(srcInfo.source, 0, 0, srcInfo.width, srcInfo.height, 0, 0, out.width, out.height);
+        ctx.restore();
+        const fY = out.height;
+        ctx.fillStyle = '#090909'; ctx.fillRect(0, fY, canvas.width, footerH);
+        ctx.strokeStyle = type === 'TRƯỚC' ? '#0d6efd' : (type === 'QUÁ TRÌNH' ? '#ffc107' : '#20c997');
+        ctx.lineWidth = Math.max(2, 3 * scale); ctx.strokeRect(0, fY, canvas.width, footerH);
+        const drawExtra = (sourceDataUrl, canvasSourceId, labelText, xPos) => new Promise(resolve => {
+            if (!imgBoxSize) return resolve();
+            let sourceToDraw = sourceDataUrl;
+            if (!sourceToDraw && canvasSourceId) {
+                const c = $(canvasSourceId);
+                if (c && !c.classList.contains('d-none')) { try { sourceToDraw = c.toDataURL('image/jpeg', safeQuality()); } catch(e){} }
+            }
+            if (!sourceToDraw) return resolve();
+            const img = new Image();
+            img.onload = () => {
+                const yPos = fY + 22 * scale;
+                ctx.fillStyle = '#000'; ctx.fillRect(xPos, yPos, imgBoxSize, imgBoxSize);
+                if (typeof drawImageContain === 'function') drawImageContain(ctx, img, xPos, yPos, imgBoxSize, imgBoxSize); else ctx.drawImage(img, xPos, yPos, imgBoxSize, imgBoxSize);
+                const labelH = Math.max(20 * scale, imgBoxSize * 0.17);
+                ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(xPos, yPos + imgBoxSize - labelH, imgBoxSize, labelH);
+                ctx.fillStyle = '#0dcaf0'; ctx.font = `bold ${Math.max(10, labelH * 0.55)}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(labelText, xPos + imgBoxSize/2, yPos + imgBoxSize - labelH/2, imgBoxSize - 4);
+                resolve();
+            };
+            img.onerror = resolve; img.src = sourceToDraw;
+        });
+        let extraX = mirrorLayout ? pad : (canvas.width - pad - (orderedExtras.length * imgBoxSize + Math.max(0, orderedExtras.length - 1) * pad));
+        const tasks = [];
+        orderedExtras.forEach(key => {
+            let ge = (typeof globalExtras !== 'undefined' && globalExtras) ? globalExtras : {};
+            if (key === 'compass') tasks.push(drawExtra(ge.compass, 'canvas-compass', 'LA BÀN', extraX));
+            if (key === 'map') tasks.push(drawExtra(ge.map, 'canvas-map', 'BẢN ĐỒ', extraX));
+            if (key === 'selfie') tasks.push(drawExtra(ge.selfie, null, 'NGƯỜI CHỤP', extraX));
+            extraX += imgBoxSize + pad;
+        });
+        await Promise.all(tasks);
+        let y = fY + 18 * scale;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        if (typeof drawFooterHeaderBlock === 'function') y += drawFooterHeaderBlock(ctx, info, textX, y, maxTextW, scale, mirrorLayout);
+        y += 12 * scale;
+        ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+        rows.forEach(row => { ctx.fillStyle = row.color || '#fff'; y += (typeof drawWrappedTextBlock === 'function' ? drawWrappedTextBlock(ctx, row.text, textX, y, maxTextW, lineH, row.max || 99, 'left') : lineH); });
+        let photoObj = {
+            id: 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+            type: type,
+            dataUrl: canvas.toDataURL('image/jpeg', safeQuality()),
+            timestampMs: now.getTime(),
+            timestampStr: now.toLocaleString('vi-VN'),
+            addressText: info.address,
+            fieldName: info.prefix,
+            teamText: info.team,
+            noteText: info.note,
+            captureSource: srcInfo.kind,
+            sourceWidth: srcInfo.width,
+            sourceHeight: srcInfo.height
+        };
+        if (typeof applyGpsMeta === 'function') photoObj = applyGpsMeta(photoObj, gpsMeta);
+        try { photoObj.name = typeof buildStandardPhotoName === 'function' ? buildStandardPhotoName(photoObj, type) : (type + '_' + photoObj.id + '.jpg'); } catch(e) { photoObj.name = type + '_' + photoObj.id + '.jpg'; }
+        if (type === 'TRƯỚC') {
+            repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj;
+            const p = $('preview-before'); if (p) p.innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')">${safeMapButton(photoObj)}`;
+        } else if (type === 'SAU') {
+            repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj;
+            const p = $('preview-after'); if (p) p.innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')">${safeMapButton(photoObj)}`;
+            captureBuffer.QUÁ_TRÌNH = [];
+            const q = $('preview-process'); if (q) q.innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>';
+        } else {
+            repoProcess.unshift(photoObj); if (!captureBuffer.QUÁ_TRÌNH) captureBuffer.QUÁ_TRÌNH = []; captureBuffer.QUÁ_TRÌNH.push(photoObj);
+            const p = $('preview-process'); if (p) p.innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>${safeMapButton(photoObj)}`;
+        }
+        if (typeof saveToDB === 'function') saveToDB(photoObj);
+        if (captureBuffer.TRƯỚC && captureBuffer.SAU) {
+            $('btn-stitch-fast-ts')?.removeAttribute('disabled');
+            $('btn-stitch-ts-only')?.removeAttribute('disabled');
+            $('btn-stitch-full')?.removeAttribute('disabled');
+        }
+        if (typeof updateUIState === 'function') updateUIState();
+        setStatus(`✅ Đã chụp bằng <b>${srcInfo.kind === 'ImageCapture' ? 'full-frame' : 'preview video'}</b>: nguồn <b>${srcInfo.width}×${srcInfo.height}</b>, ảnh xuất <b>${out.width}×${out.height}</b>.`, srcInfo.kind === 'ImageCapture' ? 'text-success' : 'text-info');
+    }
+    async function robustCapturePhoto(type){
+        const video = $('video-preview');
+        if (typeof localStream === 'undefined' || !localStream || !video) return alert('Camera chưa sẵn sàng!');
+        let srcInfo = null;
+        try {
+            setStatus('Đang chụp ảnh...', 'text-info');
+            if (typeof gshtApplyCameraAutoFocus === 'function') { try { await gshtApplyCameraAutoFocus('chụp ảnh'); } catch(e){} }
+            srcInfo = await takeBestSource(video);
+            await drawCapture(type, srcInfo);
+        } catch(e) {
+            console.error(VERSION, e);
+            alert('Không chụp được ảnh: ' + (e && e.message ? e.message : e));
+        } finally {
+            try { srcInfo && srcInfo.close && srcInfo.close(); } catch(e){}
+        }
+    }
+    function install(){
+        window.capturePhoto = robustCapturePhoto;
+        try { capturePhoto = robustCapturePhoto; } catch(e) {}
+        window.__gshtV131CapturePreviewFallbackFix = true;
+        setStatus('V131: Đã sửa chụp ảnh. Nếu full-frame không dùng được, app tự fallback sang preview thay vì báo lỗi.', 'text-success');
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 2600)); else setTimeout(install, 2600);
+    window.addEventListener('load', () => setTimeout(install, 3200));
+})();
+</script>
+
 </body>
 </html>
