@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v117-hidden-metadata-editor';
+const GSHT_CACHE = 'gsht-pwa-v118-v117-plus-exiftool-standalone-link';
 const APP_SHELL = [
   './',
   './index.html',
@@ -13,13 +13,12 @@ const APP_SHELL = [
   './bootstrap.bundle.min.js',
   './all.min.css',
   './qrcode.min.js',
-  './html5-qrcode.min.js',
   './jsQR.min.js',
   './fflate.min.js',
   './exifreader.min.js',
   './exifr.full.umd.js',
   './mp4box.all.min.js',
-  './v112_hidden_metadata_editor_patch_only.js',
+  './exiftool_wasm_tool_v118.html',
   './stt/vosk/vosk.js',
   './stt/whisper/whisper-worker.js',
   './stt/whisper/gsht-whisper-worker-runner.js',
@@ -59,9 +58,38 @@ function isLargeModelRequest(url) {
   return /\.(tar\.gz|tgz|zip|bin)$/i.test(url.pathname) && /stt|model|vosk|whisper/i.test(url.pathname + url.search);
 }
 
+
+function isExifToolStandalonePage(url) {
+  return /exiftool_wasm_tool_v118\.html$/i.test(url.pathname);
+}
+
+function isLargeOptionalWasmAsset(url) {
+  return /\.(wasm|zip|data|mem)$/i.test(url.pathname) && /exiftool|zeroperl|perl|wasm/i.test(url.pathname + url.search);
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
+
+  // ExifTool WASM nặng: không ép Cache Storage trong PWA chính.
+  if (isLargeOptionalWasmAsset(url)) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request)));
+    return;
+  }
+
+  // Trang ExifTool riêng: cache theo đúng tên file, không ghi đè cache index.html.
+  if (isExifToolStandalonePage(url)) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .then(response => {
+          const copy = response.clone();
+          caches.open(GSHT_CACHE).then(cache => cache.put('./exiftool_wasm_tool_v118.html', copy)).catch(() => {});
+          return response;
+        })
+        .catch(() => caches.match('./exiftool_wasm_tool_v118.html').then(r => r || caches.match('./offline.html')))
+    );
+    return;
+  }
 
   // Model lớn: không ép Cache Storage; app tự lưu IndexedDB.
   if (isLargeModelRequest(url)) {
@@ -116,4 +144,4 @@ self.addEventListener('fetch', event => {
 
 // GSHT V91: camera display optimization - default no crop, real aspect ratio preview.
 
-// GSHT V112 hidden metadata editor + V111 viewer + V109 per-file timestamp review popup + V108 video progress. Optional local exifreader/exifr/mp4box assets are cached when present.
+// GSHT V117 stable rollback: base V112 only. No online metadata, no ExifTool WASM in main app, no extra heavy optional assets.
