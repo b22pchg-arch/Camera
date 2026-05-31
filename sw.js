@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v112-file-time-review-popup';
+const GSHT_CACHE = 'gsht-pwa-v114-exiftool-wasm-advanced';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,6 +18,19 @@ const APP_SHELL = [
   './exifreader.min.js',
   './exifr.full.umd.js',
   './mp4box.all.min.js',
+  './piexif.min.js',
+  './exiftool-wasm.esm.js',
+  './exiftool-wasm.bundle.js',
+  './exiftool-wasm.js',
+  './vendor/exiftool-wasm.esm.js',
+  './vendor/exiftool/index.js',
+  './exiftool-wasm.wasm',
+  './zeroperl.wasm',
+  './perl.wasm',
+  './exiftool_files.zip',
+  './v114_exiftool_wasm_patch_only.js',
+  './v113_online_metadata_option_patch_only.js',
+  './v112_hidden_metadata_editor_patch_only.js',
   './stt/vosk/vosk.js',
   './stt/whisper/whisper-worker.js',
   './stt/whisper/gsht-whisper-worker-runner.js',
@@ -114,4 +127,6 @@ self.addEventListener('fetch', event => {
 
 // GSHT V91: camera display optimization - default no crop, real aspect ratio preview.
 
-// GSHT V109 per-file timestamp review popup + V108 video progress. Optional local exifreader/exifr/mp4box assets are cached when present.
+// GSHT V113 hidden metadata editor + V111 viewer + V109 per-file timestamp review popup + V108 video progress. Optional local exifreader/exifr/mp4box assets are cached when present.
+
+// GSHT V114: ExifTool WASM advanced optional metadata read/write.
