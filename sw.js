@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v125-v117-plus-exiftool-fill-form-fixed-link';
+const GSHT_CACHE = 'gsht-pwa-v126-v117-plus-exiftool-note-dedupe';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,7 +18,7 @@ const APP_SHELL = [
   './exifreader.min.js',
   './exifr.full.umd.js',
   './mp4box.all.min.js',
-  './exiftool_wasm_tool_v125_fill_form_fixed.html',
+  './exiftool_wasm_tool_v126_fill_form_fixed.html',
   './stt/vosk/vosk.js',
   './stt/whisper/whisper-worker.js',
   './stt/whisper/gsht-whisper-worker-runner.js',
@@ -60,7 +60,7 @@ function isLargeModelRequest(url) {
 
 
 function isExifToolStandalonePage(url) {
-  return /exiftool_wasm_tool_v124_runtime_assets\.html$/i.test(url.pathname);
+  return /exiftool_wasm_tool_v125_fill_form_fixed\.html$/i.test(url.pathname);
 }
 
 function isLargeOptionalWasmAsset(url) {
@@ -112,10 +112,10 @@ self.addEventListener('fetch', event => {
       fetch(event.request, { cache: 'no-store' })
         .then(response => {
           const copy = response.clone();
-          caches.open(GSHT_CACHE).then(cache => cache.put('./exiftool_wasm_tool_v125_fill_form_fixed.html', copy)).catch(() => {});
+          caches.open(GSHT_CACHE).then(cache => cache.put('./exiftool_wasm_tool_v126_fill_form_fixed.html', copy)).catch(() => {});
           return response;
         })
-        .catch(() => caches.match('./exiftool_wasm_tool_v125_fill_form_fixed.html').then(r => r || caches.match('./offline.html')))
+        .catch(() => caches.match('./exiftool_wasm_tool_v126_fill_form_fixed.html').then(r => r || caches.match('./offline.html')))
     );
     return;
   }
