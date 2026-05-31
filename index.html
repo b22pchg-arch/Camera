@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V107)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V128)</title>
     
     <link rel="manifest" href="manifest.json">
 	<link rel="icon" type="image/png" href="icon-192.png">
@@ -577,6 +577,7 @@ function showUpdateNotification() {
     <script src="qrcode.min.js"></script>
 	<script src="jsQR.min.js"></script>
     <script src="fflate.min.js"></script>
+    <script src="piexif.min.js"></script>
 
 <style>
 /* GSHT V85: thu gọn tùy chọn Vosk/Whisper, ưu tiên ghi âm + công cụ sẵn có */
@@ -1269,7 +1270,7 @@ function showUpdateNotification() {
                 <div class="row g-2">
                     <div class="col-6"><button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="checkPwaDeploymentAssets()"><i class="fa-solid fa-list-check me-1"></i>KIỂM TRA FILE PWA</button></div>
                     <div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold" onclick="showPwaInstallGuide()"><i class="fa-solid fa-circle-info me-1"></i>HƯỚNG DẪN CÀI</button></div>
-					<div class="col-6"><a href="2FA.html?v=127" class="btn btn-sm btn-outline-warning fw-bold ms-1 py-1 px-2" style="font-size:11px;" title="Mở công cụ 2FA offline">2FA</a></div>
+					<div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold" onclick="window.open('2FA.html', '_blank')"><i class="fa-solid fa-circle-info me-1"></i>2FA</button></div>
                 </div>
                 <div id="pwa-deploy-status" class="small text-secondary mt-2" style="font-size:10.5px; line-height:1.4;">Nên chạy bằng HTTPS hoặc localhost để dùng được Service Worker, Camera, Micro và lưu model offline.</div>
             </div>
@@ -13923,7 +13924,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 <script id="gsht-v112-hidden-metadata-editor">
 /* GSHT V112: Sửa metadata ẩn và lưu thành file mới.
    - Bổ sung vào popup soi thông tin ẩn V111.
-   - Ghi metadata dạng XMP/GSHT vào JPEG, PNG, WebP; với MP4/MOV/HEIC/AVIF dùng top-level free box hoặc marker đính kèm an toàn nhất có thể.
+   - JPEG: nếu có piexif.min.js thì ghi EXIF chuẩn + XMP/GSHT; nếu thiếu piexif thì fallback XMP/GSHT. PNG/WebP dùng XMP/GSHT; MP4/MOV/HEIC/AVIF dùng top-level free box hoặc marker an toàn nhất có thể.
    - Trình duyệt không được tự ghi đè file gốc; app tạo file mới để tải/lưu/chia sẻ. */
 (function(){
     'use strict';
@@ -14069,8 +14070,112 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         const body = utf8(text).slice(0, 65000); const len=body.length+2;
         return concat([new Uint8Array([0xFF,0xFE,(len>>8)&255,len&255]), body]);
     }
+
+    function gshtDataUrlToBytes(dataUrl){
+        const comma = String(dataUrl || '').indexOf(',');
+        const b64 = comma >= 0 ? String(dataUrl).slice(comma+1) : String(dataUrl || '');
+        const bin = atob(b64); const out = new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i) & 255;
+        return out;
+    }
+    function gshtFileToDataUrl(file){
+        return new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result || ''));
+            r.onerror = () => reject(r.error || new Error('Không đọc được JPEG để ghi EXIF chuẩn.'));
+            r.readAsDataURL(file);
+        });
+    }
+    function gshtExifDateLocal(ms){
+        const d = validMs(ms) ? new Date(ms) : new Date();
+        return d.getFullYear()+':'+pad2(d.getMonth()+1)+':'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes())+':'+pad2(d.getSeconds());
+    }
+    function gshtLocalOffsetString(ms){
+        const d = validMs(ms) ? new Date(ms) : new Date();
+        const offMin = -d.getTimezoneOffset();
+        const sign = offMin >= 0 ? '+' : '-';
+        const abs = Math.abs(offMin);
+        return sign + pad2(Math.floor(abs/60)) + ':' + pad2(abs % 60);
+    }
+    function gshtParseDecimalCoord(v){
+        if (v == null) return null;
+        let s = String(v).trim().replace(',', '.');
+        const hemi = /([NSEWĐTBN])\s*$/i.exec(s)?.[1]?.toUpperCase();
+        s = s.replace(/[NSEWĐTBN]/ig, '').trim();
+        let n = Number(s);
+        if (!Number.isFinite(n)) {
+            const nums = s.match(/-?\d+(?:\.\d+)?/g);
+            if (nums && nums.length >= 1) {
+                const deg = Number(nums[0]), min = Number(nums[1] || 0), sec = Number(nums[2] || 0);
+                if (Number.isFinite(deg)) n = Math.sign(deg || 1) * (Math.abs(deg) + Math.abs(min)/60 + Math.abs(sec)/3600);
+            }
+        }
+        if (!Number.isFinite(n)) return null;
+        if (hemi === 'S' || hemi === 'W' || hemi === 'T') n = -Math.abs(n);
+        if (hemi === 'N' || hemi === 'E' || hemi === 'Đ' || hemi === 'B') n = Math.abs(n);
+        return n;
+    }
+    function gshtCoordToDmsRational(coord){
+        const abs = Math.abs(Number(coord));
+        const deg = Math.floor(abs);
+        const minFloat = (abs - deg) * 60;
+        const min = Math.floor(minFloat);
+        const sec = (minFloat - min) * 60;
+        return [[deg,1],[min,1],[Math.round(sec * 1000000),1000000]];
+    }
+    function gshtBuildPiexifObject(payload){
+        const v = payload?.values || {};
+        const piexif = window.piexif;
+        const zeroth = {}, exif = {}, gps = {};
+        const timestampMs = Number(v.timestampMs || Date.now());
+        const exifDate = gshtExifDateLocal(timestampMs);
+        const offset = gshtLocalOffsetString(timestampMs);
+        const set0 = (tag, val) => { if(tag != null && val != null && String(val).trim() !== '') zeroth[tag] = String(val); };
+        const setE = (tag, val) => { if(tag != null && val != null && String(val).trim() !== '') exif[tag] = String(val); };
+        set0(piexif.ImageIFD?.Make, v.make || '');
+        set0(piexif.ImageIFD?.Model, v.model || '');
+        set0(piexif.ImageIFD?.Software, v.software || 'GSHT PWA');
+        set0(piexif.ImageIFD?.Artist, v.creator || '');
+        set0(piexif.ImageIFD?.Copyright, v.copyright || '');
+        set0(piexif.ImageIFD?.ImageDescription, v.description || v.title || '');
+        set0(piexif.ImageIFD?.DateTime, exifDate);
+        setE(piexif.ExifIFD?.DateTimeOriginal, exifDate);
+        setE(piexif.ExifIFD?.DateTimeDigitized, exifDate);
+        // EXIF 2.31 offset tags; numeric tag để piexifjs vẫn ghi nếu chưa đặt hằng số.
+        setE(36880, offset); // OffsetTime
+        setE(36881, offset); // OffsetTimeOriginal
+        setE(36882, offset); // OffsetTimeDigitized
+        const lat = gshtParseDecimalCoord(v.gpsLatitude);
+        const lon = gshtParseDecimalCoord(v.gpsLongitude);
+        if (Number.isFinite(lat) && Number.isFinite(lon) && piexif.GPSIFD) {
+            gps[piexif.GPSIFD.GPSLatitudeRef] = lat < 0 ? 'S' : 'N';
+            gps[piexif.GPSIFD.GPSLatitude] = gshtCoordToDmsRational(lat);
+            gps[piexif.GPSIFD.GPSLongitudeRef] = lon < 0 ? 'W' : 'E';
+            gps[piexif.GPSIFD.GPSLongitude] = gshtCoordToDmsRational(lon);
+            const d = validMs(timestampMs) ? new Date(timestampMs) : new Date();
+            gps[piexif.GPSIFD.GPSDateStamp] = d.getUTCFullYear()+':'+pad2(d.getUTCMonth()+1)+':'+pad2(d.getUTCDate());
+            gps[piexif.GPSIFD.GPSTimeStamp] = [[d.getUTCHours(),1],[d.getUTCMinutes(),1],[d.getUTCSeconds(),1]];
+        }
+        return { '0th': zeroth, 'Exif': exif, 'GPS': gps, '1st': {}, 'thumbnail': null };
+    }
+    async function gshtTryApplyPiexifToJpeg(file, payload){
+        if (!window.piexif || typeof window.piexif.dump !== 'function' || typeof window.piexif.insert !== 'function') {
+            return { used:false, bytes:new Uint8Array(await file.arrayBuffer()), note:'piexif.min.js chưa nạp; dùng XMP/GSHT V112.' };
+        }
+        try {
+            const dataUrl = await gshtFileToDataUrl(file);
+            const exifObj = gshtBuildPiexifObject(payload);
+            const exifBytes = window.piexif.dump(exifObj);
+            const inserted = window.piexif.insert(exifBytes, dataUrl);
+            return { used:true, bytes:gshtDataUrlToBytes(inserted), note:'Đã ghi EXIF chuẩn JPEG bằng piexif.min.js.' };
+        } catch(e) {
+            console.warn(VERSION, 'piexif JPEG write failed, fallback XMP/GSHT', e);
+            return { used:false, bytes:new Uint8Array(await file.arrayBuffer()), note:'piexif lỗi; fallback XMP/GSHT: '+(e?.message || e) };
+        }
+    }
     async function writeJpeg(file, xmp, payload){
-        const orig = new Uint8Array(await file.arrayBuffer());
+        const piexifResult = await gshtTryApplyPiexifToJpeg(file, payload);
+        const orig = piexifResult.bytes;
         if (orig[0] !== 0xFF || orig[1] !== 0xD8) throw new Error('Không phải JPEG hợp lệ.');
         let insert = 2;
         while (insert + 4 < orig.length && orig[insert] === 0xFF) {
@@ -14081,8 +14186,9 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
                 insert += 2 + segLen;
             } else break;
         }
+        const auditPayload = Object.assign({}, payload, { jpegExifStandard: { piexifUsed: !!piexifResult.used, note: piexifResult.note || '' } });
         const app1 = makeJpegApp1(xmp);
-        const com = makeJpegCom('GSHT_METADATA_JSON_V112=' + JSON.stringify(payload));
+        const com = makeJpegCom('GSHT_METADATA_JSON_V128=' + JSON.stringify(auditPayload));
         return new Blob([orig.slice(0, insert), app1, com, orig.slice(insert)], {type:file.type || 'image/jpeg'});
     }
     const CRC_TABLE = (() => { const t = new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); t[n]=c>>>0; } return t; })();
@@ -14159,7 +14265,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     function formHtml(file, meta, vals){
         const ts = meta?.timestampCandidate || {};
         return `
-        <div class="alert alert-warning small" style="font-size:10.7px;line-height:1.35;"><b>Lưu ý an toàn:</b> Trình duyệt không được tự ghi đè trực tiếp file gốc đã chọn. Nút lưu sẽ tạo <b>file mới</b> có nhúng metadata V112/XMP; với JPEG/PNG/WebP ghi theo cấu trúc chuẩn hơn, với video/HEIC/AVIF ghi dạng khối metadata đính kèm để app có thể đọc lại.</div>
+        <div class="alert alert-warning small" style="font-size:10.7px;line-height:1.35;"><b>Lưu ý an toàn:</b> Trình duyệt không được tự ghi đè trực tiếp file gốc đã chọn. Nút lưu sẽ tạo <b>file mới</b>. Với JPEG, nếu có <code>piexif.min.js</code> app sẽ ghi thêm <b>EXIF chuẩn</b> như DateTimeOriginal/GPS/Make/Model/Software; nếu thiếu thư viện này vẫn nhúng XMP/GSHT V112. PNG/WebP ghi XMP/GSHT, video/HEIC/AVIF ghi dạng khối metadata đính kèm để app có thể đọc lại.</div>
         <div class="gsht-v112-grid">
             <div class="gsht-v112-card"><h6><i class="fa-solid fa-pen-to-square me-1"></i>Sửa thông tin cần lưu vào file</h6>
                 <div class="row g-2">
@@ -14359,5 +14465,32 @@ function insertPanel(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', insertPanel); else insertPanel();
 })();
 </script>
+
+
+<script id="gsht-v128-piexif-restore-note">
+(function(){
+'use strict';
+function $(id){return document.getElementById(id)}
+function addPiexifNote(){
+  try{
+    const panel = $('gsht-v112-tool-panel') || $('gsht-v111-tool-panel') || $('native-camera-import-panel');
+    if(panel && !$('gsht-v128-piexif-note')){
+      const div=document.createElement('div');
+      div.id='gsht-v128-piexif-note';
+      div.className='small mt-2 ' + (window.piexif ? 'text-success' : 'text-warning');
+      div.innerHTML= window.piexif
+        ? '<b>V128:</b> Đã nạp <code>piexif.min.js</code>. Khi sửa/lưu ảnh JPEG, app sẽ ghi thêm EXIF chuẩn ngoài XMP/GSHT.'
+        : '<b>V128:</b> Chưa thấy <code>piexif.min.js</code>. JPEG vẫn lưu XMP/GSHT; muốn ghi EXIF chuẩn hãy đặt <code>piexif.min.js</code> cạnh <code>index.html</code> và cập nhật PWA.';
+      panel.appendChild(div);
+    }
+  }catch(e){}
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(addPiexifNote,1800)); else setTimeout(addPiexifNote,1800);
+window.addEventListener('load',()=>setTimeout(addPiexifNote,2400));
+setTimeout(addPiexifNote,4200);
+try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 piexif JPEG EXIF restored'; console.log('[GSHT] GSHT-V128-PIEXIF-JPEG-EXIF loaded; piexif=', !!window.piexif); } catch(e) {}
+})();
+</script>
+
 </body>
 </html>

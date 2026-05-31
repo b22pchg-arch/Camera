@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v127-2fa-qr-fixed';
+const GSHT_CACHE = 'gsht-pwa-v128-piexif-jpeg-exif';
 const APP_SHELL = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const APP_SHELL = [
   './exifreader.min.js',
   './exifr.full.umd.js',
   './mp4box.all.min.js',
+  './piexif.min.js',
   './exiftool_wasm_tool_v126_fill_form_fixed.html',
   './stt/vosk/vosk.js',
   './stt/whisper/whisper-worker.js',
