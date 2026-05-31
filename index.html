@@ -14347,7 +14347,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     if (window.__GSHT_V120_EXIFTOOL_LINK_READY__) return;
     window.__GSHT_V120_EXIFTOOL_LINK_READY__ = true;
 
-    const TOOL_URL = 'exiftool_wasm_tool_v121_fetch_guard.html';
+    const TOOL_URL = 'exiftool_wasm_tool_v122_zeroperl_fallback.html';
 
     function gshtOpenExifToolStandaloneV120() {
         const url = TOOL_URL + '?from=v117&ts=' + Date.now();
@@ -14360,14 +14360,14 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     }
 
     function installExifToolLinkPanel() {
-        if (document.getElementById('gsht-exiftool-link-panel-v121')) return;
+        if (document.getElementById('gsht-exiftool-link-panel-v122')) return;
         const importPanel = document.getElementById('native-camera-import-panel');
         const status = document.getElementById('gsht-native-import-status');
         const host = importPanel || document.getElementById('capture-content') || document.body;
         if (!host) return;
 
         const box = document.createElement('div');
-        box.id = 'gsht-exiftool-link-panel-v121';
+        box.id = 'gsht-exiftool-link-panel-v122';
         box.className = 'border border-info rounded p-2 mt-2 mb-2 bg-black bg-opacity-25';
         box.innerHTML = `
             <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
@@ -14379,13 +14379,13 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
                         Công cụ này tách khỏi PWA chính V117. Chỉ nạp ExifTool/WASM khi anh mở trang riêng, tránh làm treo màn hình Máy Ảnh / Chờ Ghép.
                     </div>
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-info fw-bold" id="gsht-open-exiftool-standalone-v121">
+                <button type="button" class="btn btn-sm btn-outline-info fw-bold" id="gsht-open-exiftool-standalone-v122">
                     <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>MỞ EXIFTOOL RIÊNG
                 </button>
             </div>
         `;
 
-        const btn = box.querySelector('#gsht-open-exiftool-standalone-v121');
+        const btn = box.querySelector('#gsht-open-exiftool-standalone-v122');
         if (btn) btn.addEventListener('click', gshtOpenExifToolStandaloneV120);
 
         if (status && status.parentElement) {
