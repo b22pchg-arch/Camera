@@ -14340,16 +14340,16 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 </script>
 
 
-<script id="gsht-v119-exiftool-standalone-link">
-/* GSHT V119: chỉ thêm nút mở công cụ ExifTool WASM riêng, không nạp WASM trong PWA chính. */
+<script id="gsht-v120-exiftool-standalone-link">
+/* GSHT V120: chỉ thêm nút mở công cụ ExifTool WASM riêng, không nạp WASM trong PWA chính. */
 (function () {
     'use strict';
-    if (window.__GSHT_V119_EXIFTOOL_LINK_READY__) return;
-    window.__GSHT_V119_EXIFTOOL_LINK_READY__ = true;
+    if (window.__GSHT_V120_EXIFTOOL_LINK_READY__) return;
+    window.__GSHT_V120_EXIFTOOL_LINK_READY__ = true;
 
-    const TOOL_URL = 'exiftool_wasm_tool_v119_safe_loader.html';
+    const TOOL_URL = 'exiftool_wasm_tool_v120_bundle_loader.html';
 
-    function gshtOpenExifToolStandaloneV119() {
+    function gshtOpenExifToolStandaloneV120() {
         const url = TOOL_URL + '?from=v117&ts=' + Date.now();
         try {
             const win = window.open(url, '_blank', 'noopener,noreferrer');
@@ -14360,14 +14360,14 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     }
 
     function installExifToolLinkPanel() {
-        if (document.getElementById('gsht-exiftool-link-panel-v119')) return;
+        if (document.getElementById('gsht-exiftool-link-panel-v120')) return;
         const importPanel = document.getElementById('native-camera-import-panel');
         const status = document.getElementById('gsht-native-import-status');
         const host = importPanel || document.getElementById('capture-content') || document.body;
         if (!host) return;
 
         const box = document.createElement('div');
-        box.id = 'gsht-exiftool-link-panel-v119';
+        box.id = 'gsht-exiftool-link-panel-v120';
         box.className = 'border border-info rounded p-2 mt-2 mb-2 bg-black bg-opacity-25';
         box.innerHTML = `
             <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
@@ -14379,14 +14379,14 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
                         Công cụ này tách khỏi PWA chính V117. Chỉ nạp ExifTool/WASM khi anh mở trang riêng, tránh làm treo màn hình Máy Ảnh / Chờ Ghép.
                     </div>
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-info fw-bold" id="gsht-open-exiftool-standalone-v119">
+                <button type="button" class="btn btn-sm btn-outline-info fw-bold" id="gsht-open-exiftool-standalone-v120">
                     <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>MỞ EXIFTOOL RIÊNG
                 </button>
             </div>
         `;
 
-        const btn = box.querySelector('#gsht-open-exiftool-standalone-v119');
-        if (btn) btn.addEventListener('click', gshtOpenExifToolStandaloneV119);
+        const btn = box.querySelector('#gsht-open-exiftool-standalone-v120');
+        if (btn) btn.addEventListener('click', gshtOpenExifToolStandaloneV120);
 
         if (status && status.parentElement) {
             status.insertAdjacentElement('afterend', box);
@@ -14395,7 +14395,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         }
     }
 
-    window.gshtOpenExifToolStandaloneV119 = gshtOpenExifToolStandaloneV119;
+    window.gshtOpenExifToolStandaloneV120 = gshtOpenExifToolStandaloneV120;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', installExifToolLinkPanel, { once: true });
