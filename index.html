@@ -11355,7 +11355,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 // GSHT V97: xem lại/tải/chia sẻ/xóa video đã tạo + kho tạm nhiều ảnh phân loại theo mốc ảnh SAU.
 (function(){
     'use strict';
-    const VERSION = 'GSHT-V103-BULK-TEMP-CLASSIFY-FIX';
+    const VERSION = 'GSHT-V129-BULK-TEMP-SESSION-CLASSIFY';
     const $ = (id) => document.getElementById(id);
     const state = { pool: [], lastVideoObjectUrl: '', lastVideoName: '' };
 
@@ -11414,9 +11414,9 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             div.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
                     <div class="small fw-bold text-info"><i class="fa-solid fa-layer-group me-1"></i>KHO TẠM NHIỀU ẢNH - TỰ PHÂN LOẠI THEO ẢNH SAU</div>
-                    <span class="badge bg-info text-dark" style="font-size:10px;">V97</span>
+                    <span class="badge bg-info text-dark" style="font-size:10px;">V129</span>
                 </div>
-                <div class="small text-secondary mb-2" style="font-size:10.5px;line-height:1.35;">Chọn nhiều ảnh vào kho tạm, app sắp xếp theo thời gian EXIF/file. Anh tick ảnh nào là <b class="text-success">SAU</b>, app sẽ đưa ảnh tick vào kho SAU; ảnh sớm nhất trước mốc SAU đầu tiên vào kho TRƯỚC; các ảnh còn lại vào kho QUÁ TRÌNH.</div>
+                <div class="small text-secondary mb-2" style="font-size:10.5px;line-height:1.35;">Chọn nhiều ảnh vào kho tạm, app sắp xếp theo thời gian EXIF/file đến từng giây. Anh tick ảnh <b class="text-success">SAU</b> của từng phiên; mỗi mốc SAU sẽ đóng một phiên. Trong mỗi phiên, ảnh đầu tiên sau mốc SAU trước đó là <b>TRƯỚC</b>, các ảnh nằm giữa là <b>QUÁ TRÌNH</b>, ảnh được tick là <b>SAU</b>. Ảnh ngay sau SAU thứ nhất sẽ tự thành TRƯỚC của phiên 2 nếu có mốc SAU tiếp theo.</div>
                 <div class="row g-2 align-items-center mb-2">
                     <div class="col-12 col-md-4">
                         <label class="btn btn-sm btn-outline-info fw-bold w-100 mb-0"><i class="fa-solid fa-upload me-1"></i>TẢI NHIỀU ẢNH VÀO KHO TẠM<input type="file" hidden multiple accept="image/*" onchange="gshtHandleBulkTempPhotoInput(event)"></label>
@@ -11585,7 +11585,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
             </div>`;
         }).join('');
         const reading = state.pool.filter(x => x.timeStatus === 'reading').length;
-        if (st && !reading) st.innerHTML = `Đã sắp xếp theo thời gian. Tick một hoặc nhiều ảnh <b class="text-success">SAU</b> rồi bấm <b>PHÂN LOẠI</b>.`;
+        if (st && !reading) st.innerHTML = `Đã sắp xếp theo thời gian đến từng giây. Tick ảnh <b class="text-success">SAU</b> của từng phiên rồi bấm <b>PHÂN LOẠI</b>. Ảnh ngay sau mốc SAU trước sẽ mở phiên mới.`;
     }
     function gshtBulkSleep(ms){ return new Promise(r => setTimeout(r, ms)); }
     function gshtWithTimeout(promise, ms, fallback){
@@ -11617,7 +11617,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
         }
         state.pool.sort((a,b)=>a.timestampMs-b.timestampMs);
         renderTempPool();
-        if (st) st.innerHTML = `✅ Đã đọc xong thời gian ${items.length} ảnh. Tick một hoặc nhiều ảnh <b class="text-success">SAU</b> rồi bấm <b>PHÂN LOẠI</b>.`;
+        if (st) st.innerHTML = `✅ Đã đọc xong thời gian ${items.length} ảnh. Tick ảnh <b class="text-success">SAU</b> của từng phiên rồi bấm <b>PHÂN LOẠI</b>. App sẽ chia phiên theo mốc SAU, chính xác đến từng giây.`;
     }
     window.gshtHandleBulkTempPhotoInput = async function(ev){
         const files = Array.from(ev?.target?.files || []).filter(f => /^image\//i.test(f.type || '') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name || ''));
@@ -11646,32 +11646,95 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
     };
     window.gshtAutoClassifyTempPhotos = async function(){
         if (!state.pool.length) return alert('Chưa có ảnh trong kho tạm.');
+        const reading = state.pool.filter(x => x.timeStatus === 'reading').length;
+        if (reading) return alert(`Còn ${reading} ảnh đang đọc thời gian EXIF. Vui lòng đợi đọc xong để phân loại chính xác đến từng giây.`);
         const selected = new Set(Array.from(document.querySelectorAll('.gsht-temp-sau-check:checked')).map(cb=>cb.value));
         if (!selected.size) return alert('Vui lòng tick ít nhất một ảnh là SAU.');
-        const sorted = [...state.pool].sort((a,b)=>a.timestampMs-b.timestampMs);
-        const firstSauIdx = sorted.findIndex(it => selected.has(it.id));
-        let beforeAssigned = false;
+
+        const originalOrder = new Map(state.pool.map((it, idx) => [it.id, idx]));
+        const secOf = (it) => Math.floor((Number(it.timestampMs) || 0) / 1000);
+        const sorted = [...state.pool].sort((a,b)=>{
+            const ds = secOf(a) - secOf(b);
+            if (ds) return ds;
+            const dm = (Number(a.timestampMs)||0) - (Number(b.timestampMs)||0);
+            if (dm) return dm;
+            return (originalOrder.get(a.id)||0) - (originalOrder.get(b.id)||0);
+        });
+
+        const sauIndexes = sorted
+            .map((it, idx) => selected.has(it.id) ? idx : -1)
+            .filter(idx => idx >= 0)
+            .sort((a,b)=>a-b);
+
+        const plan = [];
+        const sessionSummaries = [];
+        let cursor = 0;
+        for (let s = 0; s < sauIndexes.length; s++) {
+            const sauIdx = sauIndexes[s];
+            if (sauIdx < cursor) continue;
+            const segment = sorted.slice(cursor, sauIdx + 1);
+            const sauItem = sorted[sauIdx];
+            const beforeCandidates = segment.filter(it => !selected.has(it.id));
+            let beforeId = beforeCandidates.length ? beforeCandidates[0].id : null;
+            let beforeCount = beforeId ? 1 : 0;
+            let processCount = 0;
+            for (const it of segment) {
+                let type = 'QUÁ TRÌNH';
+                if (it.id === sauItem.id) type = 'SAU';
+                else if (beforeId && it.id === beforeId) type = 'TRƯỚC';
+                else type = 'QUÁ TRÌNH';
+                if (type === 'QUÁ TRÌNH') processCount++;
+                plan.push({ item: it, type, session: s + 1, sec: secOf(it) });
+            }
+            sessionSummaries.push({
+                session: s + 1,
+                beforeCount,
+                processCount,
+                sauName: sauItem.name,
+                sauTime: sauItem.timestampMs,
+                total: segment.length
+            });
+            cursor = sauIdx + 1;
+        }
+
+        const afterTail = sorted.slice(cursor);
+        if (!plan.length) return alert('Không lập được phiên phân loại. Hãy kiểm tra lại ảnh SAU đã tick.');
+        const sessionsWithoutBefore = sessionSummaries.filter(x => !x.beforeCount).length;
+        const tailMsg = afterTail.length ? ` Còn ${afterTail.length} ảnh sau mốc SAU cuối chưa phân loại; nếu đó là phiên tiếp theo, hãy tick thêm ảnh SAU tương ứng.` : '';
+        if (sessionsWithoutBefore) {
+            const okGo = confirm(`Có ${sessionsWithoutBefore} phiên không có ảnh TRƯỚC vì không có ảnh nào nằm trước mốc SAU trong khoảng phiên đó.${tailMsg}
+
+Vẫn tiếp tục phân loại?`);
+            if (!okGo) return;
+        } else if (afterTail.length) {
+            const okGo = confirm(`${tailMsg}
+
+Tiếp tục phân loại các phiên đã có mốc SAU?`);
+            if (!okGo) return;
+        }
+
         let ok=0, fail=0;
-        setNativeStatus(`Đang phân loại ${sorted.length} ảnh theo mốc SAU...`, 'text-info');
-        for (let i=0;i<sorted.length;i++) {
-            const it = sorted[i];
-            let type = 'QUÁ TRÌNH';
-            if (selected.has(it.id)) type = 'SAU';
-            else if (i < firstSauIdx && !beforeAssigned) { type = 'TRƯỚC'; beforeAssigned = true; }
-            else type = 'QUÁ TRÌNH';
+        const total = plan.length;
+        const counts = { 'TRƯỚC':0, 'QUÁ TRÌNH':0, 'SAU':0 };
+        plan.forEach(p => { counts[p.type] = (counts[p.type] || 0) + 1; });
+        setNativeStatus(`Đang phân loại ${total} ảnh thành ${sessionSummaries.length} phiên theo mốc SAU, chính xác đến từng giây...`, 'text-info');
+        for (let i=0;i<plan.length;i++) {
+            const { item: it, type, session } = plan[i];
             try {
                 if (typeof window.gshtHandleExternalPhotos === 'function') {
-                    if (typeof window.gshtSetExternalTimeOverride === 'function') window.gshtSetExternalTimeOverride(it.file, it.timestampMs, 'thời gian đã đọc ở kho tạm');
+                    if (typeof window.gshtSetExternalTimeOverride === 'function') window.gshtSetExternalTimeOverride(it.file, it.timestampMs, `V129 kho tạm phiên ${session}: ${type}, thời gian khóa đến giây`);
                     await window.gshtHandleExternalPhotos({ target: { files: [it.file], value: '' } }, type);
                     ok++;
                 } else throw new Error('Không tìm thấy hàm nhập ảnh ngoài.');
             } catch(e) { console.warn(VERSION, 'classify failed', it.name, e); fail++; }
-            const st = $('gsht-bulk-temp-status'); if (st) st.innerHTML = `Đang phân loại: ${i+1}/${sorted.length}. Thành công ${ok}, lỗi ${fail}.`;
+            const st = $('gsht-bulk-temp-status');
+            if (st) st.innerHTML = `Đang phân loại phiên <b>${session}</b>: ${i+1}/${total}. Thành công ${ok}, lỗi ${fail}.`;
             await new Promise(r=>setTimeout(r, 50));
         }
-        setNativeStatus(`✅ Đã phân loại kho tạm: thành công <b>${ok}</b>, lỗi <b>${fail}</b>. Ảnh SAU theo lựa chọn; ảnh sớm nhất trước mốc SAU đầu tiên là TRƯỚC; ảnh còn lại là QUÁ TRÌNH.`, fail ? 'text-warning' : 'text-success');
+        const detail = sessionSummaries.map(x => `Phiên ${x.session}: ${x.beforeCount ? '1 TRƯỚC' : '0 TRƯỚC'}, ${x.processCount} Q.TRÌNH, 1 SAU`).join('; ');
+        setNativeStatus(`✅ Đã phân loại kho tạm: thành công <b>${ok}</b>, lỗi <b>${fail}</b>. <br>${esc(detail)}${tailMsg ? '<br><span class="text-warning">' + esc(tailMsg) + '</span>' : ''}`, fail || afterTail.length ? 'text-warning' : 'text-success');
         const stDone = $('gsht-bulk-temp-status');
-        if (stDone) stDone.innerHTML = `✅ Phân loại xong: <b>${ok}</b> ảnh thành công${fail ? `, <b>${fail}</b> ảnh lỗi` : ''}. Nếu ảnh đã vào đúng kho, có thể bấm <b>XÓA KHO TẠM</b>.`;
+        if (stDone) stDone.innerHTML = `✅ Phân loại xong theo phiên: <b>${ok}</b> ảnh thành công${fail ? `, <b>${fail}</b> ảnh lỗi` : ''}. ${esc(detail)}${tailMsg ? '<br><span class="text-warning">' + esc(tailMsg) + '</span>' : ''}`;
     };
 
     function appendHelp(){
@@ -11681,7 +11744,7 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
                 const div = document.createElement('div');
                 div.id = 'gsht-v97-help-note';
                 div.className = 'alert alert-info small mt-2';
-                div.innerHTML = '<b>V97 - Video xem lại và kho tạm nhiều ảnh:</b> Sau khi tạo video từ camera gốc/file máy, app hiển thị trình xem lại kèm nút tải về, chia sẻ và xóa. Khi tạo video, giờ ở dải chân được tính theo thời điểm bắt đầu file cộng với thời gian hiện tại của video nên thay đổi theo từng frame. Có thêm kho tạm nhiều ảnh: tải nhiều ảnh lên, tick ảnh SAU, app tự phân loại ảnh sớm nhất trước mốc SAU đầu tiên vào TRƯỚC, các ảnh còn lại vào QUÁ TRÌNH, ảnh tick vào SAU.';
+                div.innerHTML = '<b>V129 - phân loại kho tạm theo phiên:</b> Khi tải nhiều ảnh lên kho tạm, app đọc thời gian đến từng giây. Người dùng tick ảnh SAU của từng phiên; mỗi ảnh SAU sẽ đóng một phiên. Ảnh đầu tiên sau mốc SAU trước đó là TRƯỚC, ảnh giữa là QUÁ TRÌNH, ảnh tick là SAU. Ảnh ngay sau SAU thứ nhất sẽ thành TRƯỚC của phiên 2 nếu có mốc SAU tiếp theo.';
                 help.appendChild(div);
             }
         } catch(e) {}
@@ -14488,7 +14551,7 @@ function addPiexifNote(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(addPiexifNote,1800)); else setTimeout(addPiexifNote,1800);
 window.addEventListener('load',()=>setTimeout(addPiexifNote,2400));
 setTimeout(addPiexifNote,4200);
-try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 piexif JPEG EXIF restored'; console.log('[GSHT] GSHT-V128-PIEXIF-JPEG-EXIF loaded; piexif=', !!window.piexif); } catch(e) {}
+try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 piexif JPEG EXIF restored | V129 bulk session classify'; console.log('[GSHT] GSHT-V128-PIEXIF-JPEG-EXIF loaded; piexif=', !!window.piexif); } catch(e) {}
 })();
 </script>
 
