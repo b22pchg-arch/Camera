@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V107)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V114)</title>
     
     <link rel="manifest" href="manifest.json">
 	<link rel="icon" type="image/png" href="icon-192.png">
@@ -14339,5 +14339,629 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 
 </script>
 
+
+
+<script id="gsht-v113-online-metadata-option">
+/* GSHT V113: Tùy chọn online chủ động cho metadata.
+   - Mặc định vẫn offline hoàn toàn.
+   - Khi người dùng bật online trong phiên, app có thể nạp thư viện metadata từ CDN để đọc tốt hơn.
+   - Cho phép tải bộ thư viện về máy để copy vào thư mục app dùng offline.
+   - Bổ sung lưu JPEG EXIF chuẩn hơn bằng piexifjs khi online đã được phép. */
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V113-ONLINE-METADATA-OPTION';
+    const $ = id => document.getElementById(id);
+    const ONLINE_KEY = 'gsht-v113-online-metadata-enabled-session';
+    const LIBS = [
+        {key:'exifreader', label:'ExifReader', file:'exifreader.min.js', url:'https://cdn.jsdelivr.net/npm/exifreader@4.40.0/dist/exif-reader.js', ok:()=>!!window.ExifReader},
+        {key:'exifr', label:'exifr full', file:'exifr.full.umd.js', url:'https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js', ok:()=>!!window.exifr},
+        {key:'mp4box', label:'MP4Box', file:'mp4box.all.min.js', url:'https://cdn.jsdelivr.net/npm/mp4box@2.3.0/dist/mp4box.all.js', ok:()=>!!window.MP4Box},
+        {key:'piexif', label:'piexifjs', file:'piexif.min.js', url:'https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js', ok:()=>!!window.piexif}
+    ];
+    function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function extOf(name){ const m=String(name||'').match(/\.([^.]+)$/); return m?m[1].toLowerCase():''; }
+    function baseName(name){ return String(name || 'file').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_') || 'file'; }
+    function isJpeg(file){ return /jpe?g$/i.test(extOf(file?.name)) || /^image\/jpe?g$/i.test(file?.type || ''); }
+    function guessKind(file){ const t=String(file?.type||'').toLowerCase(), e=extOf(file?.name); if(t.startsWith('video/') || /^(mp4|mov|m4v|3gp|webm|avi|mkv)$/i.test(e)) return 'video'; if(t.startsWith('image/') || /^(jpg|jpeg|heic|heif|png|webp|avif|gif|tif|tiff)$/i.test(e)) return 'photo'; return 'file'; }
+    function setStatus(html, type='info'){
+        const el=$('gsht-v113-online-status');
+        if(el){ el.className='small mt-2 text-'+type; el.innerHTML=html; }
+        const p=$('gsht-v113-popup-status');
+        if(p) p.innerHTML=html;
+    }
+    function isOnlineAllowed(){ return sessionStorage.getItem(ONLINE_KEY) === '1'; }
+    function setOnlineAllowed(v){ sessionStorage.setItem(ONLINE_KEY, v ? '1' : '0'); updateOnlineUi(); }
+    function networkOk(){ return navigator.onLine !== false; }
+    function libStateText(){ return LIBS.map(l => (l.ok() ? '✅ ' : '⬜ ') + l.label).join(' &nbsp; '); }
+    function injectStyle(){
+        if($('gsht-v113-style')) return;
+        const css=document.createElement('style'); css.id='gsht-v113-style'; css.textContent=`
+        .gsht-v113-online-panel{border:1px solid #0d6efd;border-radius:12px;background:rgba(13,110,253,.08);padding:9px;margin-top:8px;margin-bottom:8px;}
+        .gsht-v113-online-panel .btn{font-size:10.5px;font-weight:800;}
+        .gsht-v113-switch-row{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;}
+        .gsht-v113-note{font-size:10.5px;line-height:1.35;color:#adb5bd;}
+        .gsht-v113-libline{font-size:10.5px;line-height:1.45;color:#cff4fc;word-break:break-word;}
+        .gsht-v113-popup-panel{border:1px dashed #0dcaf0;border-radius:10px;background:rgba(13,202,240,.08);padding:8px;margin-bottom:8px;}
+        @media(max-width:430px){.gsht-v113-online-panel .btn,.gsht-v113-popup-panel .btn{flex:1 1 auto}.gsht-v113-switch-row{display:block}.gsht-v113-actions{display:flex;gap:6px;flex-wrap:wrap}}
+        `; document.head.appendChild(css);
+    }
+    function askOnlinePermission(){
+        if(isOnlineAllowed()) return true;
+        const ok = confirm('Bật chế độ ONLINE trong phiên này?\n\nỨng dụng sẽ tải thư viện JavaScript từ CDN để đọc/ghi metadata tốt hơn. File ảnh/video KHÔNG được tự động tải lên server. Nếu bấm mở bản đồ/tra cứu vị trí, tọa độ có thể được gửi tới dịch vụ bản đồ.');
+        if(ok) setOnlineAllowed(true);
+        return ok;
+    }
+    function loadScriptOnce(lib){
+        return new Promise((resolve, reject)=>{
+            try{
+                if(lib.ok()) return resolve({lib, status:'already'});
+                if(!networkOk()) return reject(new Error('Thiết bị đang offline, không thể nạp '+lib.label));
+                const old=document.querySelector('script[data-gsht-v113-lib="'+lib.key+'"]');
+                if(old){ old.addEventListener('load',()=>resolve({lib,status:'loaded'}), {once:true}); old.addEventListener('error',()=>reject(new Error('Không nạp được '+lib.label)), {once:true}); return; }
+                const s=document.createElement('script'); s.src=lib.url; s.async=true; s.defer=true; s.setAttribute('data-gsht-v113-lib', lib.key);
+                let done=false;
+                const timer=setTimeout(()=>{ if(done) return; done=true; reject(new Error('Quá thời gian nạp '+lib.label)); }, 20000);
+                s.onload=()=>{ if(done) return; done=true; clearTimeout(timer); lib.ok()?resolve({lib,status:'loaded'}):reject(new Error('Đã tải nhưng chưa thấy biến '+lib.label)); };
+                s.onerror=()=>{ if(done) return; done=true; clearTimeout(timer); reject(new Error('Không tải được '+lib.label+' từ CDN')); };
+                document.head.appendChild(s);
+            }catch(e){ reject(e); }
+        });
+    }
+    async function ensureOnlineLibraries(){
+        if(!askOnlinePermission()) throw new Error('Người dùng chưa cho phép online.');
+        if(!networkOk()) throw new Error('Thiết bị đang offline.');
+        setStatus('<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Đang nạp thư viện online...', 'info');
+        const results=[];
+        for(const lib of LIBS){
+            try { const r=await loadScriptOnce(lib); results.push('✅ '+lib.label); setStatus('Đã nạp: '+results.join(', ')+'<br>'+libStateText(), 'info'); }
+            catch(e){ results.push('⚠️ '+lib.label+': '+(e?.message||e)); setStatus(results.map(esc).join('<br>'), 'warning'); }
+        }
+        updateOnlineUi();
+        return results;
+    }
+    function downloadBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000); }
+    async function downloadOnlineLibrariesForOffline(){
+        if(!askOnlinePermission()) return;
+        if(!networkOk()) return alert('Thiết bị đang offline, chưa thể tải thư viện.');
+        const ok=confirm('Tải các thư viện metadata về máy?\n\nSau khi tải xong, hãy copy các file này vào cùng thư mục index.html để lần sau dùng offline: exifreader.min.js, exifr.full.umd.js, mp4box.all.min.js, piexif.min.js');
+        if(!ok) return;
+        setStatus('<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Đang tải bộ thư viện về máy...', 'info');
+        const done=[];
+        for(const lib of LIBS){
+            try{
+                const res=await fetch(lib.url, {cache:'no-store'});
+                if(!res.ok) throw new Error('HTTP '+res.status);
+                const blob=await res.blob();
+                downloadBlob(blob, lib.file);
+                done.push('✅ '+lib.file);
+                setStatus(done.join('<br>'), 'success');
+                await new Promise(r=>setTimeout(r,450));
+            }catch(e){ done.push('⚠️ '+lib.file+': '+(e?.message||e)); setStatus(done.map(esc).join('<br>'), 'warning'); }
+        }
+        setStatus(done.join('<br>')+'<br><b>Hoàn tất.</b> Copy các file đã tải vào thư mục app để dùng offline.', 'success');
+    }
+    function readCurrentEditorValues(){
+        const val=id=>($(id)?.value || '').trim();
+        return {
+            datetime: val('gsht-v112-datetime'), title: val('gsht-v112-title'), description: val('gsht-v112-description'),
+            creator: val('gsht-v112-creator'), copyright: val('gsht-v112-copyright'), software: val('gsht-v112-software') || 'GSHT PWA',
+            make: val('gsht-v112-make'), model: val('gsht-v112-model'), lat: val('gsht-v112-lat'), lon: val('gsht-v112-lon'),
+            location: val('gsht-v112-location'), field: val('gsht-v112-field'), team: val('gsht-v112-team')
+        };
+    }
+    function exifDateFromInput(v){
+        if(!v) return '';
+        const d=new Date(v);
+        if(Number.isNaN(d.getTime())) return '';
+        const p=n=>String(n).padStart(2,'0');
+        return d.getFullYear()+':'+p(d.getMonth()+1)+':'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+    }
+    function gpsRational(absDeg){
+        const deg=Math.floor(absDeg); const minFloat=(absDeg-deg)*60; const min=Math.floor(minFloat); const sec=(minFloat-min)*60;
+        return [[deg,1],[min,1],[Math.round(sec*10000),10000]];
+    }
+    function dataUrlToBlob(dataUrl){
+        const parts=dataUrl.split(','); const mime=(parts[0].match(/:(.*?);/)||[])[1] || 'image/jpeg';
+        const bin=atob(parts[1]||''); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr], {type:mime});
+    }
+    function fileToDataURL(file){ return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=()=>reject(r.error||new Error('Không đọc được file')); r.readAsDataURL(file); }); }
+    async function saveJpegStandardExifOnline(){
+        const file=window.__gshtV113CurrentMetaFile;
+        if(!file) return alert('Chưa xác định được file đang sửa. Hãy mở file bằng nút CHỌN FILE SOI/SỬA ONLINE rồi thử lại.');
+        if(!isJpeg(file)) return alert('Ghi EXIF chuẩn bằng piexifjs chỉ áp dụng cho JPEG/JPG. Các định dạng khác vẫn dùng nút LƯU FILE MỚI của V112.');
+        await ensureOnlineLibraries();
+        if(!window.piexif) return alert('Chưa nạp được piexifjs.');
+        const v=readCurrentEditorValues();
+        const dataUrl=await fileToDataURL(file);
+        let exifObj;
+        try { exifObj=piexif.load(dataUrl); }
+        catch(e){ exifObj={'0th':{}, Exif:{}, GPS:{}, '1st':{}, thumbnail:null}; }
+        exifObj['0th'] = exifObj['0th'] || {}; exifObj.Exif = exifObj.Exif || {}; exifObj.GPS = exifObj.GPS || {};
+        const IFD=piexif.ImageIFD, E=piexif.ExifIFD, G=piexif.GPSIFD;
+        if(v.make) exifObj['0th'][IFD.Make]=v.make;
+        if(v.model) exifObj['0th'][IFD.Model]=v.model;
+        if(v.software) exifObj['0th'][IFD.Software]=v.software;
+        if(v.creator) exifObj['0th'][IFD.Artist]=v.creator;
+        if(v.copyright) exifObj['0th'][IFD.Copyright]=v.copyright;
+        const desc=[v.title, v.description, v.field?('Mã hiện trường: '+v.field):'', v.team?('Tổ đội: '+v.team):'', v.location?('Vị trí: '+v.location):''].filter(Boolean).join(' | ');
+        if(desc) exifObj['0th'][IFD.ImageDescription]=desc.slice(0, 65000);
+        const edt=exifDateFromInput(v.datetime);
+        if(edt){ exifObj.Exif[E.DateTimeOriginal]=edt; exifObj.Exif[E.DateTimeDigitized]=edt; exifObj['0th'][IFD.DateTime]=edt; }
+        const lat=parseFloat(v.lat), lon=parseFloat(v.lon);
+        if(Number.isFinite(lat) && Number.isFinite(lon)){
+            exifObj.GPS[G.GPSLatitudeRef]=lat>=0?'N':'S'; exifObj.GPS[G.GPSLatitude]=gpsRational(Math.abs(lat));
+            exifObj.GPS[G.GPSLongitudeRef]=lon>=0?'E':'W'; exifObj.GPS[G.GPSLongitude]=gpsRational(Math.abs(lon));
+        }
+        const exifBytes=piexif.dump(exifObj);
+        const outData=piexif.insert(exifBytes, dataUrl);
+        const blob=dataUrlToBlob(outData);
+        const name=baseName(file.name)+'_standard_exif.jpg';
+        if(window.showSaveFilePicker){
+            try{ const h=await window.showSaveFilePicker({suggestedName:name, types:[{description:'JPEG', accept:{'image/jpeg':['.jpg','.jpeg']}}]}); const w=await h.createWritable(); await w.write(blob); await w.close(); setStatus('✅ Đã lưu JPEG EXIF chuẩn: <b>'+esc(name)+'</b>', 'success'); return; }catch(e){ if(e?.name==='AbortError') return; }
+        }
+        downloadBlob(blob, name);
+        setStatus('✅ Đã tải JPEG EXIF chuẩn: <b>'+esc(name)+'</b>', 'success');
+    }
+    function openOnlineMapFromEditor(){
+        const lat=parseFloat($('gsht-v112-lat')?.value || ''); const lon=parseFloat($('gsht-v112-lon')?.value || '');
+        if(!Number.isFinite(lat) || !Number.isFinite(lon)) return alert('Chưa có GPS Latitude/Longitude để mở bản đồ.');
+        if(!askOnlinePermission()) return;
+        if(!confirm('Mở bản đồ online sẽ gửi tọa độ ra dịch vụ bản đồ. Tiếp tục?')) return;
+        window.open('https://www.google.com/maps?q='+encodeURIComponent(lat+','+lon), '_blank', 'noopener,noreferrer');
+    }
+    async function openEditorOnline(file){
+        if(!file) return;
+        window.__gshtV113CurrentMetaFile=file; window.__gshtV113CurrentMetaKind=guessKind(file);
+        await ensureOnlineLibraries();
+        const fn=window.gshtShowHiddenMetadataEditorV112 || window.gshtShowHiddenMetadataPopup;
+        if(typeof fn === 'function') fn(file, window.__gshtV113CurrentMetaKind);
+        else alert('Chưa thấy trình sửa metadata V112. Hãy dùng bản HTML V113 hoàn chỉnh.');
+    }
+    function installMainPanel(){
+        injectStyle();
+        if($('gsht-v113-online-panel')) { updateOnlineUi(); return; }
+        const anchor=$('gsht-v112-tool-panel') || $('gsht-v111-tool-panel') || $('gsht-native-import-status') || $('native-camera-import-panel');
+        const div=document.createElement('div'); div.id='gsht-v113-online-panel'; div.className='gsht-v113-online-panel';
+        div.innerHTML=`
+            <div class="gsht-v113-switch-row">
+                <div class="min-w-0"><div class="small text-info fw-bold"><i class="fa-solid fa-wifi me-1"></i>TÙY CHỌN ONLINE HỖ TRỢ METADATA</div>
+                <div class="gsht-v113-note">Mặc định app vẫn offline. Chỉ bật khi người dùng chủ động muốn nạp thư viện từ internet để đọc/ghi metadata tốt hơn. File không tự động upload.</div></div>
+                <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="gsht-v113-online-toggle"><label class="form-check-label small fw-bold text-info" for="gsht-v113-online-toggle">Cho phép online phiên này</label></div>
+            </div>
+            <div class="gsht-v113-libline mt-2" id="gsht-v113-lib-state"></div>
+            <div class="gsht-v113-actions d-flex gap-1 flex-wrap mt-2">
+                <button class="btn btn-sm btn-outline-info" id="gsht-v113-load-libs"><i class="fa-solid fa-cloud-arrow-down me-1"></i>NẠP THƯ VIỆN ONLINE</button>
+                <label class="btn btn-sm btn-outline-primary mb-0"><i class="fa-solid fa-file-pen me-1"></i>CHỌN FILE SOI/SỬA ONLINE<input id="gsht-v113-online-file" type="file" hidden accept="image/*,video/*,.heic,.heif,.mov,.mp4,.m4v,.webp,.avif,.tif,.tiff"></label>
+                <button class="btn btn-sm btn-outline-warning" id="gsht-v113-download-libs"><i class="fa-solid fa-download me-1"></i>TẢI THƯ VIỆN VỀ OFFLINE</button>
+            </div>
+            <div id="gsht-v113-online-status" class="small mt-2 text-secondary">Chưa bật online. App vẫn dùng bộ đọc nội bộ/local.</div>`;
+        if(anchor && anchor.parentElement) anchor.insertAdjacentElement('afterend', div); else document.body.appendChild(div);
+        $('gsht-v113-online-toggle')?.addEventListener('change', e=>setOnlineAllowed(e.target.checked));
+        $('gsht-v113-load-libs')?.addEventListener('click', ()=>ensureOnlineLibraries().catch(e=>setStatus('❌ '+esc(e?.message||e),'danger')));
+        $('gsht-v113-download-libs')?.addEventListener('click', ()=>downloadOnlineLibrariesForOffline().catch(e=>setStatus('❌ '+esc(e?.message||e),'danger')));
+        $('gsht-v113-online-file')?.addEventListener('change', async ev=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(f) { try{ await openEditorOnline(f); } catch(e){ alert('Không mở được online metadata: '+(e?.message||e)); } } });
+        updateOnlineUi();
+    }
+    function injectPopupOnlinePanel(){
+        const body=$('gsht-v112-body');
+        if(!body || $('gsht-v113-popup-panel')) return;
+        const div=document.createElement('div'); div.id='gsht-v113-popup-panel'; div.className='gsht-v113-popup-panel';
+        div.innerHTML=`<div class="small text-info fw-bold"><i class="fa-solid fa-wifi me-1"></i>HỖ TRỢ ONLINE CHO FILE ĐANG XEM/SỬA</div>
+        <div class="gsht-v113-note">Dùng khi metadata local thiếu hoặc cần ghi JPEG EXIF chuẩn hơn. Bấm nạp online sẽ tải thư viện JS, không tự động tải file của anh lên mạng.</div>
+        <div class="gsht-v113-libline mt-1" id="gsht-v113-popup-lib-state"></div>
+        <div class="d-flex gap-1 flex-wrap mt-2">
+            <button class="btn btn-sm btn-outline-info" id="gsht-v113-popup-load"><i class="fa-solid fa-cloud-arrow-down me-1"></i>NẠP ONLINE</button>
+            <button class="btn btn-sm btn-outline-primary" id="gsht-v113-popup-reopen"><i class="fa-solid fa-rotate me-1"></i>ĐỌC LẠI ONLINE</button>
+            <button class="btn btn-sm btn-outline-success" id="gsht-v113-popup-jpeg-exif"><i class="fa-solid fa-file-image me-1"></i>LƯU JPEG EXIF CHUẨN</button>
+            <button class="btn btn-sm btn-outline-warning" id="gsht-v113-popup-map"><i class="fa-solid fa-map-location-dot me-1"></i>MỞ BẢN ĐỒ ONLINE</button>
+        </div><div id="gsht-v113-popup-status" class="small mt-2 text-secondary"></div>`;
+        body.insertAdjacentElement('afterbegin', div);
+        $('gsht-v113-popup-load')?.addEventListener('click', ()=>ensureOnlineLibraries().catch(e=>setStatus('❌ '+esc(e?.message||e),'danger')));
+        $('gsht-v113-popup-reopen')?.addEventListener('click', async ()=>{
+            const f=window.__gshtV113CurrentMetaFile;
+            if(!f) return alert('Chưa xác định được file hiện tại. Hãy mở bằng nút CHỌN FILE SOI/SỬA ONLINE hoặc chọn lại file.');
+            try{ await ensureOnlineLibraries(); const old=document.querySelector('.gsht-v112-overlay'); if(old) old.remove(); const fn=window.gshtShowHiddenMetadataEditorV112 || window.gshtShowHiddenMetadataPopup; fn(f, window.__gshtV113CurrentMetaKind || guessKind(f)); }
+            catch(e){ setStatus('❌ '+esc(e?.message||e),'danger'); }
+        });
+        $('gsht-v113-popup-jpeg-exif')?.addEventListener('click', ()=>saveJpegStandardExifOnline().catch(e=>setStatus('❌ Lỗi lưu JPEG EXIF chuẩn: '+esc(e?.message||e),'danger')));
+        $('gsht-v113-popup-map')?.addEventListener('click', openOnlineMapFromEditor);
+        updateOnlineUi();
+    }
+    function updateOnlineUi(){
+        const enabled=isOnlineAllowed();
+        const chk=$('gsht-v113-online-toggle'); if(chk) chk.checked=enabled;
+        const st=$('gsht-v113-lib-state'); if(st) st.innerHTML=libStateText();
+        const pst=$('gsht-v113-popup-lib-state'); if(pst) pst.innerHTML=libStateText();
+        const msg=enabled ? 'Online đã được cho phép trong phiên này. Khi bấm nạp, app tải thư viện JS từ CDN.' : 'Chưa bật online. App vẫn dùng bộ đọc nội bộ/local.';
+        if($('gsht-v113-online-status') && !$('gsht-v113-online-status').innerHTML.includes('Đang')) $('gsht-v113-online-status').innerHTML=msg;
+    }
+    function installChangeCapture(){
+        if(window.__gshtV113CaptureInstalled) return; window.__gshtV113CaptureInstalled=true;
+        document.addEventListener('change', ev=>{
+            try{
+                const t=ev.target;
+                if(t && t.type === 'file' && t.files && t.files[0]){
+                    const f=t.files[0];
+                    if(/gsht-v111-hidden-meta-input|gsht-v112-meta-input|gsht-v113-online-file/i.test(t.id || '') || (t.closest && t.closest('#native-camera-import-panel'))){
+                        window.__gshtV113CurrentMetaFile=f; window.__gshtV113CurrentMetaKind=guessKind(f);
+                    }
+                }
+            }catch(e){}
+        }, true);
+    }
+    function addHelp(){
+        try{
+            const help=document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
+            if(help && !$('gsht-v113-help-note')){
+                const div=document.createElement('div'); div.id='gsht-v113-help-note'; div.className='alert alert-info small mt-2';
+                div.innerHTML='<b>V113 - Tùy chọn online metadata:</b> App vẫn ưu tiên offline. Khi cần, người dùng có thể bật <b>Cho phép online phiên này</b> để nạp ExifReader/exifr/MP4Box/piexifjs từ CDN, đọc lại file, tải bộ thư viện về để dùng offline, mở bản đồ online từ GPS hoặc lưu JPEG EXIF chuẩn hơn.';
+                help.appendChild(div);
+            }
+        }catch(e){}
+    }
+    function boot(){ injectStyle(); installChangeCapture(); installMainPanel(); injectPopupOnlinePanel(); addHelp(); updateOnlineUi(); }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ()=>setTimeout(boot, 1500)); else setTimeout(boot, 1500);
+    window.addEventListener('load', ()=>setTimeout(boot, 2000));
+    const mo=new MutationObserver(()=>{ try{ installMainPanel(); injectPopupOnlinePanel(); updateOnlineUi(); }catch(e){} });
+    try{ mo.observe(document.documentElement, {childList:true, subtree:true}); }catch(e){}
+    setInterval(()=>{ try{ installMainPanel(); injectPopupOnlinePanel(); updateOnlineUi(); }catch(e){} }, 3000);
+    window.gshtV113EnsureOnlineMetadataLibraries=ensureOnlineLibraries;
+    window.gshtV113OpenEditorOnline=openEditorOnline;
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V113 online metadata option'; console.log('[GSHT] '+VERSION+' loaded'); } catch(e) {}
+})();
+
+</script>
+
+<script id="gsht-v114-exiftool-wasm-advanced">
+/* GSHT V114: ExifTool WASM nâng cao tùy chọn.
+   - Không thay thế đường ổn định V112/V113.
+   - Chỉ nạp ExifTool WASM khi người dùng bấm nạp hoặc chọn file xử lý nâng cao.
+   - Hỗ trợ đọc sâu metadata và thử ghi metadata đa định dạng bằng @uswriting/exiftool khi runtime WASM sẵn sàng.
+*/
+(function(){
+    'use strict';
+    const VERSION = 'GSHT-V114-EXIFTOOL-WASM-ADVANCED';
+    const $ = id => document.getElementById(id);
+    const ONLINE_KEY = 'gsht-v113-online-metadata-enabled-session';
+    const ET_KEY = 'gsht-v114-exiftool-wasm-enabled-session';
+    const CDN_MODULES = [
+        'https://cdn.jsdelivr.net/npm/@uswriting/exiftool@1.0.9/+esm',
+        'https://cdn.jsdelivr.net/npm/@uswriting/exiftool@1/+esm',
+        'https://cdn.jsdelivr.net/npm/@vshirole/exiftool@1/+esm'
+    ];
+    const LOCAL_MODULES = [
+        './exiftool-wasm.esm.js',
+        './exiftool-wasm.bundle.js',
+        './vendor/exiftool-wasm.esm.js',
+        './vendor/exiftool/index.js'
+    ];
+    let exiftoolModule = null;
+    let lastExifToolRead = null;
+
+    function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function extOf(name){ const m=String(name||'').match(/\.([^.]+)$/); return m ? m[1].toLowerCase() : ''; }
+    function baseName(name){ return String(name || 'file').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_') || 'file'; }
+    function guessKind(file){ const t=String(file?.type||'').toLowerCase(), e=extOf(file?.name); if(t.startsWith('video/') || /^(mp4|mov|m4v|3gp|webm|avi|mkv)$/i.test(e)) return 'video'; if(t.startsWith('image/') || /^(jpg|jpeg|heic|heif|png|webp|avif|gif|tif|tiff|raw|dng|cr2|nef|arw)$/i.test(e)) return 'photo'; return 'file'; }
+    function isOnlineAllowed(){ return sessionStorage.getItem(ONLINE_KEY) === '1' || sessionStorage.getItem(ET_KEY) === '1'; }
+    function setExifToolAllowed(v){ sessionStorage.setItem(ET_KEY, v ? '1' : '0'); updateUi(); }
+    function isModuleReady(){ return !!(exiftoolModule && typeof exiftoolModule.parseMetadata === 'function' && typeof exiftoolModule.writeMetadata === 'function'); }
+    function setStatus(html, type='secondary'){
+        const a=$('gsht-v114-status'); if(a){ a.className='small mt-2 text-'+type; a.innerHTML=html; }
+        const b=$('gsht-v114-popup-status'); if(b){ b.className='small mt-2 text-'+type; b.innerHTML=html; }
+    }
+    function downloadBlob(blob, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1200); }
+    function normalizeModule(mod){
+        if(!mod) return null;
+        if(mod.parseMetadata && mod.writeMetadata) return mod;
+        if(mod.default && mod.default.parseMetadata && mod.default.writeMetadata) return mod.default;
+        if(mod.ExifTool && mod.ExifTool.parseMetadata && mod.ExifTool.writeMetadata) return mod.ExifTool;
+        return null;
+    }
+    function askExifToolPermission(){
+        if(sessionStorage.getItem(ET_KEY) === '1') return true;
+        const ok = confirm('Nạp ExifTool WASM nâng cao trong phiên này?\n\nCông cụ này nặng hơn các thư viện EXIF nhẹ, có thể khởi động chậm trên điện thoại yếu. Khi nạp từ CDN cần internet; file ảnh/video vẫn xử lý trên thiết bị, không tự upload lên server.');
+        if(ok) setExifToolAllowed(true);
+        return ok;
+    }
+    async function tryImport(spec){
+        // Dùng Function để tránh một số bộ nén/HTML cũ xử lý sai cú pháp import động.
+        return await (new Function('s', 'return import(s)'))(spec);
+    }
+    async function ensureExifToolWasm(forceOnline=false){
+        if(isModuleReady()) return exiftoolModule;
+        if(!askExifToolPermission()) throw new Error('Người dùng chưa cho phép nạp ExifTool WASM.');
+        setStatus('<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Đang tìm/nạp ExifTool WASM...', 'info');
+
+        const globals = [window.GSHT_EXIFTOOL_WASM_MODULE, window.ExifToolWasm, window.exiftoolWasm, window.exiftool];
+        for(const g of globals){
+            const m=normalizeModule(g);
+            if(m){ exiftoolModule=m; setStatus('✅ Đã nhận ExifTool WASM từ biến global.', 'success'); updateUi(); return exiftoolModule; }
+        }
+
+        const localErrors=[];
+        if(!forceOnline){
+            for(const spec of LOCAL_MODULES){
+                try{
+                    const mod=await tryImport(spec + (spec.includes('?')?'&':'?') + 'v=114');
+                    const m=normalizeModule(mod);
+                    if(m){ exiftoolModule=m; setStatus('✅ Đã nạp ExifTool WASM local: <code>'+esc(spec)+'</code>', 'success'); updateUi(); return exiftoolModule; }
+                    localErrors.push(spec+': module không có parseMetadata/writeMetadata');
+                }catch(e){ localErrors.push(spec+': '+(e?.message||e)); }
+            }
+        }
+
+        if(forceOnline || navigator.onLine !== false){
+            if(!isOnlineAllowed()){
+                const ok = confirm('Không thấy module ExifTool WASM local. Cho phép nạp từ CDN trong phiên này?');
+                if(!ok) throw new Error('Chưa có module ExifTool WASM local và người dùng chưa cho phép online.');
+                sessionStorage.setItem(ONLINE_KEY, '1');
+                sessionStorage.setItem(ET_KEY, '1');
+            }
+            const onlineErrors=[];
+            for(const spec of CDN_MODULES){
+                try{
+                    setStatus('<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Đang nạp ExifTool WASM từ CDN:<br><code>'+esc(spec)+'</code>', 'info');
+                    const mod=await tryImport(spec);
+                    const m=normalizeModule(mod);
+                    if(m){ exiftoolModule=m; setStatus('✅ Đã nạp ExifTool WASM online. Có thể đọc/ghi metadata nâng cao.', 'success'); updateUi(); return exiftoolModule; }
+                    onlineErrors.push(spec+': module không có parseMetadata/writeMetadata');
+                }catch(e){ onlineErrors.push(spec+': '+(e?.message||e)); }
+            }
+            throw new Error('Không nạp được ExifTool WASM. Local: '+localErrors.join(' | ')+' Online: '+onlineErrors.join(' | '));
+        }
+        throw new Error('Thiết bị đang offline và chưa có module ExifTool WASM local. Hãy dùng V112/V113 hoặc copy bộ exiftool-wasm.esm.js vào thư mục app. Chi tiết: '+localErrors.join(' | '));
+    }
+    function fileToBinaryFile(file){
+        return file;
+    }
+    async function readExifToolMetadata(file){
+        const mod=await ensureExifToolWasm(false);
+        setStatus('<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Đang đọc bằng ExifTool WASM...', 'info');
+        const res=await mod.parseMetadata(fileToBinaryFile(file), {
+            args:['-json','-a','-u','-G1','-n','-api','LargeFileSupport=1'],
+            transform:(data)=>{
+                try { return JSON.parse(data); } catch(e){ return data; }
+            }
+        });
+        if(!res || !res.success) throw new Error(res?.error || 'ExifTool WASM đọc metadata không thành công.');
+        lastExifToolRead = res.data;
+        setStatus('✅ Đã đọc xong bằng ExifTool WASM.', 'success');
+        return res.data;
+    }
+    function asFirstObject(data){ return Array.isArray(data) ? (data[0] || {}) : (data && typeof data === 'object' ? data : {}); }
+    function findTag(obj, names){
+        const low = Object.create(null);
+        Object.keys(obj||{}).forEach(k=>{ low[k.toLowerCase().replace(/^.*?:/,'')] = obj[k]; low[k.toLowerCase()] = obj[k]; });
+        for(const n of names){ const v=low[String(n).toLowerCase()]; if(v !== undefined && v !== null && String(v).trim() !== '') return v; }
+        return '';
+    }
+    function exifToDatetimeLocal(v){
+        if(!v) return '';
+        const s=String(v).trim();
+        let m=s.match(/(\d{4})[:\-](\d{2})[:\-](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+        if(m) return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}`;
+        const d=new Date(s);
+        if(Number.isNaN(d.getTime())) return '';
+        const p=n=>String(n).padStart(2,'0');
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+    function setIfEmptyOrAsk(id, value, force){
+        const el=$(id); if(!el || value === undefined || value === null || String(value).trim() === '') return;
+        if(force || !String(el.value||'').trim()) el.value=String(value);
+    }
+    function applyExifToolDataToEditor(data, force=false){
+        const o=asFirstObject(data);
+        const dt=findTag(o,['DateTimeOriginal','CreateDate','CreationDate','MediaCreateDate','TrackCreateDate','ModifyDate','DateCreated']);
+        const local=exifToDatetimeLocal(dt);
+        setIfEmptyOrAsk('gsht-v112-datetime', local, force);
+        setIfEmptyOrAsk('gsht-v112-title', findTag(o,['Title','ObjectName','Headline','ImageDescription','Description']), force);
+        setIfEmptyOrAsk('gsht-v112-description', findTag(o,['Description','ImageDescription','Caption-Abstract','Comment','UserComment']), force);
+        setIfEmptyOrAsk('gsht-v112-creator', findTag(o,['Artist','Creator','By-line','Author','OwnerName']), force);
+        setIfEmptyOrAsk('gsht-v112-copyright', findTag(o,['Copyright','Rights','CopyrightNotice']), force);
+        setIfEmptyOrAsk('gsht-v112-software', findTag(o,['Software','ProcessingSoftware']), force);
+        setIfEmptyOrAsk('gsht-v112-make', findTag(o,['Make','DeviceManufacturer']), force);
+        setIfEmptyOrAsk('gsht-v112-model', findTag(o,['Model','DeviceModelName','CameraModelName']), force);
+        setIfEmptyOrAsk('gsht-v112-lat', findTag(o,['GPSLatitude','Composite:GPSLatitude','LocationShownGPSLatitude']), force);
+        setIfEmptyOrAsk('gsht-v112-lon', findTag(o,['GPSLongitude','Composite:GPSLongitude','LocationShownGPSLongitude']), force);
+        setIfEmptyOrAsk('gsht-v112-location', findTag(o,['GPSPosition','Location','LocationCreatedCity','Sub-location','City','Province-State','Country-PrimaryLocationName']), force);
+        setStatus(force ? '✅ Đã điền/ghi đè form từ ExifTool WASM.' : '✅ Đã điền các ô còn trống từ ExifTool WASM.', 'success');
+    }
+    function inputVal(id){ return ($(id)?.value || '').trim(); }
+    function exifDateFromInput(v){
+        if(!v) return '';
+        const d=new Date(v);
+        if(Number.isNaN(d.getTime())) return '';
+        const p=n=>String(n).padStart(2,'0');
+        return `${d.getFullYear()}:${p(d.getMonth()+1)}:${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
+    function isoDateFromInput(v){
+        if(!v) return '';
+        const d=new Date(v);
+        if(Number.isNaN(d.getTime())) return '';
+        const p=n=>String(n).padStart(2,'0');
+        const off=-d.getTimezoneOffset(); const sign=off>=0?'+':'-'; const ah=Math.floor(Math.abs(off)/60); const am=Math.abs(off)%60;
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}${sign}${p(ah)}:${p(am)}`;
+    }
+    function buildExifToolTagsFromEditor(){
+        const dtLocal=inputVal('gsht-v112-datetime');
+        const exifDate=exifDateFromInput(dtLocal);
+        const isoDate=isoDateFromInput(dtLocal);
+        const title=inputVal('gsht-v112-title');
+        const desc=inputVal('gsht-v112-description');
+        const creator=inputVal('gsht-v112-creator');
+        const rights=inputVal('gsht-v112-copyright');
+        const software=inputVal('gsht-v112-software') || 'GSHT PWA';
+        const make=inputVal('gsht-v112-make');
+        const model=inputVal('gsht-v112-model');
+        const lat=parseFloat(inputVal('gsht-v112-lat'));
+        const lon=parseFloat(inputVal('gsht-v112-lon'));
+        const location=inputVal('gsht-v112-location');
+        const field=inputVal('gsht-v112-field');
+        const team=inputVal('gsht-v112-team');
+        const tags={};
+        if(exifDate){ tags.DateTimeOriginal=exifDate; tags.CreateDate=exifDate; tags.ModifyDate=exifDate; tags.DateCreated=exifDate; }
+        if(isoDate){ tags['XMP:CreateDate']=isoDate; tags['XMP:ModifyDate']=isoDate; tags['XMP:MetadataDate']=new Date().toISOString(); }
+        if(title){ tags.Title=title; tags['XMP-dc:Title']=title; tags.ObjectName=title; }
+        if(desc){ tags.Description=desc; tags.ImageDescription=desc; tags.UserComment=desc; tags['XMP-dc:Description']=desc; }
+        if(creator){ tags.Artist=creator; tags.Creator=creator; tags.Author=creator; tags['XMP-dc:Creator']=creator; }
+        if(rights){ tags.Copyright=rights; tags.Rights=rights; tags['XMP-dc:Rights']=rights; }
+        if(software){ tags.Software=software; tags.ProcessingSoftware=software; }
+        if(make) tags.Make=make;
+        if(model) tags.Model=model;
+        if(Number.isFinite(lat)){ tags.GPSLatitude=Math.abs(lat); tags.GPSLatitudeRef=lat>=0?'N':'S'; tags['XMP-exif:GPSLatitude']=lat; }
+        if(Number.isFinite(lon)){ tags.GPSLongitude=Math.abs(lon); tags.GPSLongitudeRef=lon>=0?'E':'W'; tags['XMP-exif:GPSLongitude']=lon; }
+        if(location){ tags.Location=location; tags['XMP-iptcExt:LocationCreatedLocationName']=location; }
+        const keywords=['GSHT']; if(field) keywords.push('Mã hiện trường: '+field); if(team) keywords.push('Tổ đội: '+team);
+        tags.Keywords=keywords.join(', ');
+        if(field) tags.Instructions='Mã hiện trường: '+field;
+        if(team) tags.Credit=team;
+        return tags;
+    }
+    async function writeExifToolMetadata(file){
+        const mod=await ensureExifToolWasm(false);
+        const tags=buildExifToolTagsFromEditor();
+        if(Object.keys(tags).length === 0) throw new Error('Chưa có trường nào để ghi. Hãy nhập thời gian/GPS/mô tả/người tạo trước.');
+        setStatus('<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Đang ghi metadata bằng ExifTool WASM. File lớn có thể mất thời gian...', 'info');
+        const res=await mod.writeMetadata(fileToBinaryFile(file), tags, { args:['-overwrite_original','-P'] });
+        if(!res || !res.success) throw new Error(res?.error || 'ExifTool WASM ghi metadata không thành công.');
+        const data=res.data;
+        const blob = data instanceof Blob ? data : new Blob([data], {type:file.type || 'application/octet-stream'});
+        const outName=baseName(file.name)+'_exiftool_wasm_edited.'+(extOf(file.name)||'bin');
+        if(window.showSaveFilePicker){
+            try{
+                const h=await window.showSaveFilePicker({suggestedName:outName});
+                const w=await h.createWritable(); await w.write(blob); await w.close();
+                setStatus('✅ Đã lưu file bằng ExifTool WASM: <b>'+esc(outName)+'</b>', 'success');
+                return {blob, name:outName, tags};
+            }catch(e){ if(e?.name === 'AbortError') return {blob, name:outName, tags, aborted:true}; }
+        }
+        downloadBlob(blob, outName);
+        setStatus('✅ Đã tải file mới bằng ExifTool WASM: <b>'+esc(outName)+'</b>', 'success');
+        return {blob, name:outName, tags};
+    }
+    function renderExifToolJson(data){
+        const box=$('gsht-v114-output');
+        if(!box) return;
+        box.innerHTML='<pre class="gsht-v114-pre">'+esc(typeof data === 'string' ? data : JSON.stringify(data, null, 2))+'</pre>';
+    }
+    function injectStyle(){
+        if($('gsht-v114-style')) return;
+        const css=document.createElement('style'); css.id='gsht-v114-style'; css.textContent=`
+        .gsht-v114-panel{border:1px solid #6f42c1;border-radius:12px;background:rgba(111,66,193,.12);padding:9px;margin-top:8px;margin-bottom:8px;}
+        .gsht-v114-title{font-size:12px;font-weight:900;color:#d6c2ff;text-transform:uppercase;}
+        .gsht-v114-note{font-size:10.5px;line-height:1.35;color:#c7c7c7;}
+        .gsht-v114-panel .btn{font-size:10.5px;font-weight:800;}
+        .gsht-v114-pre{max-height:260px;overflow:auto;background:#050505;color:#e9ecef;border:1px solid #495057;border-radius:8px;padding:8px;font-size:10.5px;line-height:1.35;white-space:pre-wrap;word-break:break-word;}
+        .gsht-v114-badge{font-size:10px;border:1px solid #6f42c1;border-radius:999px;padding:2px 7px;color:#d6c2ff;background:rgba(0,0,0,.25);}
+        @media(max-width:430px){.gsht-v114-panel .btn{flex:1 1 auto}.gsht-v114-actions{display:flex;gap:6px;flex-wrap:wrap}.gsht-v114-pre{max-height:220px}}
+        `; document.head.appendChild(css);
+    }
+    function installMainPanel(){
+        injectStyle();
+        if($('gsht-v114-panel')){ updateUi(); return; }
+        const anchor=$('gsht-v113-online-panel') || $('gsht-v112-tool-panel') || $('gsht-native-import-status') || $('native-camera-import-panel');
+        const div=document.createElement('div'); div.id='gsht-v114-panel'; div.className='gsht-v114-panel';
+        div.innerHTML=`
+            <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+                <div class="min-w-0"><div class="gsht-v114-title"><i class="fa-solid fa-microscope me-1"></i>EXIFTOOL WASM NÂNG CAO</div>
+                <div class="gsht-v114-note">Dành cho file khó: HEIC/AVIF/MP4/MOV/WebP/RAW/PDF hoặc khi cần kết quả gần ExifTool gốc. Mặc định không nạp để PWA nhẹ; chỉ chạy khi người dùng bấm.</div></div>
+                <span class="gsht-v114-badge" id="gsht-v114-ready-badge">Chưa nạp</span>
+            </div>
+            <div class="gsht-v114-actions d-flex gap-1 flex-wrap mt-2">
+                <button class="btn btn-sm btn-outline-light" id="gsht-v114-load-local"><i class="fa-solid fa-box-open me-1"></i>NẠP EXIFTOOL WASM</button>
+                <button class="btn btn-sm btn-outline-info" id="gsht-v114-load-online"><i class="fa-solid fa-cloud-arrow-down me-1"></i>NẠP ONLINE</button>
+                <label class="btn btn-sm btn-outline-primary mb-0"><i class="fa-solid fa-file-magnifying-glass me-1"></i>CHỌN FILE ĐỌC EXIFTOOL<input id="gsht-v114-read-file" type="file" hidden accept="image/*,video/*,.heic,.heif,.mov,.mp4,.m4v,.webp,.avif,.tif,.tiff,.dng,.raw,.cr2,.nef,.arw,.pdf"></label>
+                <label class="btn btn-sm btn-outline-success mb-0"><i class="fa-solid fa-file-pen me-1"></i>CHỌN FILE SỬA EXIFTOOL<input id="gsht-v114-edit-file" type="file" hidden accept="image/*,video/*,.heic,.heif,.mov,.mp4,.m4v,.webp,.avif,.tif,.tiff,.dng,.raw,.cr2,.nef,.arw,.pdf"></label>
+                <button class="btn btn-sm btn-outline-warning" id="gsht-v114-download-note"><i class="fa-solid fa-download me-1"></i>TẢI HƯỚNG DẪN OFFLINE</button>
+            </div>
+            <div id="gsht-v114-status" class="small mt-2 text-secondary">Chưa nạp ExifTool WASM. Các chức năng V112/V113 vẫn hoạt động bình thường.</div>`;
+        if(anchor && anchor.parentElement) anchor.insertAdjacentElement('afterend', div); else document.body.appendChild(div);
+        $('gsht-v114-load-local')?.addEventListener('click', ()=>ensureExifToolWasm(false).catch(e=>setStatus('❌ '+esc(e?.message||e),'danger')));
+        $('gsht-v114-load-online')?.addEventListener('click', ()=>ensureExifToolWasm(true).catch(e=>setStatus('❌ '+esc(e?.message||e),'danger')));
+        $('gsht-v114-read-file')?.addEventListener('change', async ev=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!f) return; try{ window.__gshtV114CurrentFile=f; window.__gshtV113CurrentMetaFile=f; const data=await readExifToolMetadata(f); showExifToolReadPopup(f,data); }catch(e){ alert('ExifTool WASM lỗi: '+(e?.message||e)); } });
+        $('gsht-v114-edit-file')?.addEventListener('change', async ev=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if(!f) return; try{ window.__gshtV114CurrentFile=f; window.__gshtV113CurrentMetaFile=f; await ensureExifToolWasm(false); const fn=window.gshtShowHiddenMetadataEditorV112 || window.gshtShowHiddenMetadataPopup; if(typeof fn==='function') fn(f, guessKind(f)); else showExifToolReadPopup(f, await readExifToolMetadata(f)); }catch(e){ alert('Không mở được sửa bằng ExifTool WASM: '+(e?.message||e)); } });
+        $('gsht-v114-download-note')?.addEventListener('click', downloadOfflineGuide);
+        updateUi();
+    }
+    function injectPopupPanel(){
+        const body=$('gsht-v112-body');
+        if(!body || $('gsht-v114-popup-panel')) return;
+        const f=window.__gshtV113CurrentMetaFile || window.__gshtV114CurrentFile;
+        const div=document.createElement('div'); div.id='gsht-v114-popup-panel'; div.className='gsht-v114-panel';
+        div.innerHTML=`
+            <div class="gsht-v114-title"><i class="fa-solid fa-microscope me-1"></i>EXIFTOOL WASM CHO FILE ĐANG SỬA</div>
+            <div class="gsht-v114-note">Dùng để đọc sâu hơn hoặc thử ghi metadata đa định dạng. Nếu ghi thất bại, dùng nút lưu V112 để tạo metadata GSHT an toàn.</div>
+            <div class="gsht-v114-actions d-flex gap-1 flex-wrap mt-2">
+                <button class="btn btn-sm btn-outline-light" id="gsht-v114-popup-load"><i class="fa-solid fa-box-open me-1"></i>NẠP WASM</button>
+                <button class="btn btn-sm btn-outline-info" id="gsht-v114-popup-read"><i class="fa-solid fa-magnifying-glass me-1"></i>ĐỌC EXIFTOOL</button>
+                <button class="btn btn-sm btn-outline-primary" id="gsht-v114-popup-fill"><i class="fa-solid fa-pen-to-square me-1"></i>ĐIỀN FORM</button>
+                <button class="btn btn-sm btn-outline-warning" id="gsht-v114-popup-fill-force"><i class="fa-solid fa-file-import me-1"></i>GHI ĐÈ FORM</button>
+                <button class="btn btn-sm btn-outline-success" id="gsht-v114-popup-write"><i class="fa-solid fa-floppy-disk me-1"></i>LƯU BẰNG EXIFTOOL</button>
+            </div>
+            <div id="gsht-v114-popup-status" class="small mt-2 text-secondary">${f ? 'File hiện tại: '+esc(f.name||'không tên') : 'Chưa nhận diện được file hiện tại.'}</div>
+            <div id="gsht-v114-output" class="mt-2"></div>`;
+        body.insertAdjacentElement('afterbegin', div);
+        $('gsht-v114-popup-load')?.addEventListener('click', ()=>ensureExifToolWasm(false).catch(e=>setStatus('❌ '+esc(e?.message||e),'danger')));
+        $('gsht-v114-popup-read')?.addEventListener('click', async ()=>{ try{ const file=window.__gshtV113CurrentMetaFile || window.__gshtV114CurrentFile; if(!file) throw new Error('Chưa có file hiện tại.'); const data=await readExifToolMetadata(file); renderExifToolJson(data); }catch(e){ setStatus('❌ '+esc(e?.message||e),'danger'); } });
+        $('gsht-v114-popup-fill')?.addEventListener('click', async ()=>{ try{ if(!lastExifToolRead){ const file=window.__gshtV113CurrentMetaFile || window.__gshtV114CurrentFile; if(!file) throw new Error('Chưa có file hiện tại.'); lastExifToolRead=await readExifToolMetadata(file); } applyExifToolDataToEditor(lastExifToolRead, false); }catch(e){ setStatus('❌ '+esc(e?.message||e),'danger'); } });
+        $('gsht-v114-popup-fill-force')?.addEventListener('click', async ()=>{ try{ if(!lastExifToolRead){ const file=window.__gshtV113CurrentMetaFile || window.__gshtV114CurrentFile; if(!file) throw new Error('Chưa có file hiện tại.'); lastExifToolRead=await readExifToolMetadata(file); } if(confirm('Ghi đè các ô trong form bằng dữ liệu ExifTool WASM?')) applyExifToolDataToEditor(lastExifToolRead, true); }catch(e){ setStatus('❌ '+esc(e?.message||e),'danger'); } });
+        $('gsht-v114-popup-write')?.addEventListener('click', async ()=>{ try{ const file=window.__gshtV113CurrentMetaFile || window.__gshtV114CurrentFile; if(!file) throw new Error('Chưa có file hiện tại.'); await writeExifToolMetadata(file); }catch(e){ setStatus('❌ Lỗi ghi bằng ExifTool WASM: '+esc(e?.message||e),'danger'); } });
+        updateUi();
+    }
+    function showExifToolReadPopup(file,data){
+        injectStyle();
+        const old=$('gsht-v114-read-overlay'); if(old) old.remove();
+        const div=document.createElement('div'); div.id='gsht-v114-read-overlay'; div.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.92);display:flex;flex-direction:column;color:#e9ecef;padding:env(safe-area-inset-top,8px) 8px env(safe-area-inset-bottom,8px);';
+        div.innerHTML=`<div class="d-flex align-items-start justify-content-between gap-2 p-2 border-bottom border-secondary"><div class="min-w-0"><div class="gsht-v114-title"><i class="fa-solid fa-microscope me-1"></i>KẾT QUẢ EXIFTOOL WASM</div><div class="gsht-v114-note">${esc(file?.name||'file')}</div></div><button class="btn btn-sm btn-light" id="gsht-v114-read-close"><i class="fa-solid fa-xmark me-1"></i>ĐÓNG</button></div><div class="flex-grow-1 overflow-auto p-2"><div class="d-flex gap-1 flex-wrap mb-2"><button class="btn btn-sm btn-outline-info" id="gsht-v114-read-copy">SAO CHÉP JSON</button><button class="btn btn-sm btn-outline-warning" id="gsht-v114-read-download">TẢI JSON</button><button class="btn btn-sm btn-outline-success" id="gsht-v114-read-edit">MỞ SỬA FILE NÀY</button></div><pre class="gsht-v114-pre" style="max-height:none;">${esc(typeof data==='string'?data:JSON.stringify(data,null,2))}</pre></div>`;
+        document.body.appendChild(div);
+        $('gsht-v114-read-close')?.addEventListener('click',()=>div.remove());
+        $('gsht-v114-read-copy')?.addEventListener('click',()=>navigator.clipboard?.writeText(typeof data==='string'?data:JSON.stringify(data,null,2)).catch(()=>{}));
+        $('gsht-v114-read-download')?.addEventListener('click',()=>downloadBlob(new Blob([typeof data==='string'?data:JSON.stringify(data,null,2)],{type:'application/json;charset=utf-8'}), baseName(file?.name)+'_exiftool_wasm.json'));
+        $('gsht-v114-read-edit')?.addEventListener('click',()=>{ div.remove(); const fn=window.gshtShowHiddenMetadataEditorV112 || window.gshtShowHiddenMetadataPopup; if(typeof fn==='function') fn(file, guessKind(file)); });
+    }
+    function downloadOfflineGuide(){
+        const text = `GSHT V114 - Hướng dẫn chuẩn bị ExifTool WASM offline\n\n1) Nhanh nhất khi có internet trong phiên:\n   import từ CDN: https://cdn.jsdelivr.net/npm/@uswriting/exiftool@1.0.9/+esm\n\n2) Muốn dùng offline ổn định trong PWA:\n   - Trên máy có Node.js:\n     mkdir gsht-exiftool-wasm-build\n     cd gsht-exiftool-wasm-build\n     npm init -y\n     npm install vite @uswriting/exiftool@1.0.9\n   - Tạo file src/main.js:\n     export { parseMetadata, writeMetadata } from '@uswriting/exiftool';\n   - Build ra bundle:\n     npx vite build --lib src/main.js --formats es --fileName exiftool-wasm.esm\n   - Copy file dist/exiftool-wasm.esm.js và mọi file .wasm/.data/.worker hoặc asset mà Vite sinh ra vào cùng thư mục index.html hoặc thư mục vendor/.\n   - Trong sw.js giữ các mục cache V114: ./exiftool-wasm.esm.js, ./vendor/exiftool-wasm.esm.js, ./exiftool-wasm.wasm, ./zeroperl.wasm.\n\n3) Kiểm tra trong PWA:\n   - Mở app, bấm KIỂM TRA BẢN CẬP NHẬT MỚI.\n   - Bấm NẠP EXIFTOOL WASM.\n   - Chọn file đọc ExifTool.\n\nLưu ý: ExifTool WASM nặng, nên chỉ dùng khi cần đọc/ghi sâu cho file khó. Với JPEG thông thường, piexifjs vẫn nhanh hơn.`;
+        downloadBlob(new Blob([text], {type:'text/plain;charset=utf-8'}), 'GSHT_V114_ExifTool_WASM_offline_guide.txt');
+    }
+    function updateUi(){
+        const ready=isModuleReady();
+        const b=$('gsht-v114-ready-badge'); if(b){ b.textContent=ready?'Đã nạp':'Chưa nạp'; b.style.color=ready?'#75ffb0':'#d6c2ff'; }
+    }
+    function addHelp(){
+        try{
+            const help=document.querySelector('#help-content .card .card-body') || document.querySelector('#help-content') || document.querySelector('.tab-pane#help-content');
+            if(help && !$('gsht-v114-help-note')){
+                const div=document.createElement('div'); div.id='gsht-v114-help-note'; div.className='alert alert-secondary small mt-2';
+                div.innerHTML='<b>V114 - ExifTool WASM nâng cao:</b> Thêm công cụ tùy chọn để đọc/ghi metadata bằng ExifTool chạy trong trình duyệt. Không tự nạp khi mở app để PWA nhẹ; chỉ nạp khi người dùng bấm. Nếu chưa chuẩn bị bộ local, có thể nạp online từ CDN trong phiên. Khi ghi, app luôn tạo file mới, không ghi đè âm thầm file gốc.';
+                help.appendChild(div);
+            }
+        }catch(e){}
+    }
+    function captureFileSelections(){
+        if(window.__gshtV114CaptureInstalled) return; window.__gshtV114CaptureInstalled=true;
+        document.addEventListener('change', ev=>{
+            try{
+                const t=ev.target;
+                if(t && t.type==='file' && t.files && t.files[0] && (t.closest('#native-camera-import-panel') || /gsht-v11[1-4]|meta|metadata|online|exiftool/i.test(t.id||''))){
+                    window.__gshtV114CurrentFile=t.files[0];
+                    window.__gshtV113CurrentMetaFile=t.files[0];
+                }
+            }catch(e){}
+        }, true);
+    }
+    function boot(){ injectStyle(); captureFileSelections(); installMainPanel(); injectPopupPanel(); addHelp(); updateUi(); }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ()=>setTimeout(boot, 1800)); else setTimeout(boot, 1800);
+    window.addEventListener('load', ()=>setTimeout(boot, 2300));
+    const mo=new MutationObserver(()=>{ try{ installMainPanel(); injectPopupPanel(); updateUi(); }catch(e){} });
+    try{ mo.observe(document.documentElement, {childList:true, subtree:true}); }catch(e){}
+    setInterval(()=>{ try{ installMainPanel(); injectPopupPanel(); updateUi(); }catch(e){} }, 4000);
+
+    window.gshtV114EnsureExifToolWasm=ensureExifToolWasm;
+    window.gshtV114ReadExifToolMetadata=readExifToolMetadata;
+    window.gshtV114WriteExifToolMetadata=writeExifToolMetadata;
+    try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V114 ExifTool WASM advanced'; console.log('[GSHT] '+VERSION+' loaded'); } catch(e) {}
+})();
+
+</script>
 </body>
 </html>
