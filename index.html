@@ -14339,20 +14339,20 @@ button.gsht-v94-capture-full-active .gsht-v94-type-word {
 
 </script>
 
-<script id="gsht-v123-exiftool-local-bundle-link">
+<script id="gsht-v124-exiftool-local-bundle-link">
 (function(){
 'use strict';
-const TOOL_URL='exiftool_wasm_tool_v123_local_bundle.html';
+const TOOL_URL='exiftool_wasm_tool_v124_local_bundle.html';
 function openTool(){ window.open(TOOL_URL, '_blank', 'noopener'); }
 function insertPanel(){
-  if(document.getElementById('gsht-exiftool-link-panel-v123')) return;
+  if(document.getElementById('gsht-exiftool-link-panel-v124')) return;
   const anchor=document.getElementById('gsht-native-import-status') || document.querySelector('#native-camera-import-panel .border') || document.body;
   const box=document.createElement('div');
-  box.id='gsht-exiftool-link-panel-v123';
+  box.id='gsht-exiftool-link-panel-v124';
   box.className='border border-info rounded p-2 mt-2 bg-black bg-opacity-25';
-  box.innerHTML='<div class="small text-info fw-bold mb-1"><i class="fa-solid fa-screwdriver-wrench me-1"></i> EXIFTOOL WASM NÂNG CAO - BẢN LOCAL BUNDLE V123</div><div class="small text-secondary mb-2" style="font-size:10.5px;line-height:1.35;">V123 không tải trực tiếp zeroperl.wasm từ CDN nữa. ExifTool chỉ chạy khi anh đã build/copy thư mục <b>exiftool-vendor</b> bằng Vite, tránh lỗi CDN trả HTML/404 thay cho WASM.</div><button type="button" class="btn btn-sm btn-outline-info fw-bold w-100" id="gsht-open-exiftool-standalone-v123">MỞ EXIFTOOL RIÊNG V123</button>';
+  box.innerHTML='<div class="small text-info fw-bold mb-1"><i class="fa-solid fa-screwdriver-wrench me-1"></i> EXIFTOOL WASM NÂNG CAO - BẢN LOCAL BUNDLE V124</div><div class="small text-secondary mb-2" style="font-size:10.5px;line-height:1.35;">V124 không tải trực tiếp zeroperl.wasm từ CDN nữa. ExifTool chỉ chạy khi anh đã build/copy thư mục <b>exiftool-vendor</b> bằng Vite, tránh lỗi CDN trả HTML/404 thay cho WASM.</div><button type="button" class="btn btn-sm btn-outline-info fw-bold w-100" id="gsht-open-exiftool-standalone-v124">MỞ EXIFTOOL RIÊNG V124</button>';
   if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(box, anchor.nextSibling); else document.body.appendChild(box);
-  box.querySelector('#gsht-open-exiftool-standalone-v123').addEventListener('click', openTool);
+  box.querySelector('#gsht-open-exiftool-standalone-v124').addEventListener('click', openTool);
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', insertPanel); else insertPanel();
 })();
