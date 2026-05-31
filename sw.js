@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v122-v117-plus-exiftool-zeroperl-fallback-link';
+const GSHT_CACHE = 'gsht-pwa-v123-v117-plus-exiftool-local-bundle-link';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,7 +18,7 @@ const APP_SHELL = [
   './exifreader.min.js',
   './exifr.full.umd.js',
   './mp4box.all.min.js',
-  './exiftool_wasm_tool_v122_zeroperl_fallback.html',
+  './exiftool_wasm_tool_v123_local_bundle.html',
   './stt/vosk/vosk.js',
   './stt/whisper/whisper-worker.js',
   './stt/whisper/gsht-whisper-worker-runner.js',
@@ -98,7 +98,7 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // GSHT V121: ExifTool WASM/ZIP/DATA là tài nguyên tùy chọn rất nhạy cảm.
+  // GSHT V123: ExifTool WASM/ZIP/DATA là tài nguyên tùy chọn rất nhạy cảm.
   // Không cache, không trả offline.html/index.html, và đặc biệt không trả text tiếng Việt thay cho WASM.
   // Với cross-origin CDN, service worker chỉ pass-through nguyên bản để CDN tự xử lý CORS/MIME.
   if (isLargeOptionalWasmAsset(url)) {
@@ -112,10 +112,10 @@ self.addEventListener('fetch', event => {
       fetch(event.request, { cache: 'no-store' })
         .then(response => {
           const copy = response.clone();
-          caches.open(GSHT_CACHE).then(cache => cache.put('./exiftool_wasm_tool_v122_zeroperl_fallback.html', copy)).catch(() => {});
+          caches.open(GSHT_CACHE).then(cache => cache.put('./exiftool_wasm_tool_v123_local_bundle.html', copy)).catch(() => {});
           return response;
         })
-        .catch(() => caches.match('./exiftool_wasm_tool_v122_zeroperl_fallback.html').then(r => r || caches.match('./offline.html')))
+        .catch(() => caches.match('./exiftool_wasm_tool_v123_local_bundle.html').then(r => r || caches.match('./offline.html')))
     );
     return;
   }
@@ -173,4 +173,4 @@ self.addEventListener('fetch', event => {
 
 // GSHT V91: camera display optimization - default no crop, real aspect ratio preview.
 
-// GSHT V121: standalone ExifTool fetch guard; binary assets pass-through only, never return text/html fallback.
+// GSHT V123: standalone ExifTool fetch guard; binary assets pass-through only, never return text/html fallback.
