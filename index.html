@@ -14555,5 +14555,223 @@ try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 pie
 })();
 </script>
 
+
+
+<script id="gsht-v130-stitch-strip-note-fixed">
+(function(){
+'use strict';
+const VERSION = 'GSHT-V130-STITCH-STRIP-NOTE-FIXED';
+
+function gshtV130RoundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else {
+    r = Math.max(0, Math.min(r || 0, Math.min(w, h) / 2));
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+  }
+}
+
+function gshtV130EstimateFooterTop(panelW, panelH){
+  panelW = Math.max(1, Number(panelW) || 1);
+  panelH = Math.max(1, Number(panelH) || 1);
+  const scale = Math.max(0.75, panelW / 1000);
+  const byWidth = Math.min(280 * scale, panelW * 0.18) + 40 * scale;
+  const byHeight = panelH * 0.20;
+  let footerH = Math.max(byWidth, byHeight);
+  footerH = Math.max(panelH * 0.12, Math.min(footerH, panelH * 0.38));
+  return Math.round(panelH - footerH);
+}
+
+function gshtV130DetectFooterTop(ctx, x0, y0, w, h){
+  const fallback = gshtV130EstimateFooterTop(w, h);
+  try {
+    w = Math.round(w); h = Math.round(h); x0 = Math.round(x0 || 0); y0 = Math.round(y0 || 0);
+    if (w < 80 || h < 120) return y0 + fallback;
+    const minY = Math.max(0, Math.floor(h * 0.45));
+    const stepX = Math.max(6, Math.floor(w / 80));
+    const rowStep = 2;
+    let inFooter = false;
+    let topCandidate = h - 1;
+    let gap = 0;
+    for (let yy = h - 4; yy >= minY; yy -= rowStep) {
+      const data = ctx.getImageData(x0 + 4, y0 + yy, Math.max(1, w - 8), 1).data;
+      let samples = 0, dark = 0, sum = 0;
+      for (let xx = 0; xx < w - 8; xx += stepX) {
+        const p = xx * 4;
+        const r = data[p], g = data[p+1], b = data[p+2];
+        const br = (r + g + b) / 3;
+        sum += br;
+        if (br < 78) dark++;
+        samples++;
+      }
+      const avg = samples ? sum / samples : 255;
+      const darkRatio = samples ? dark / samples : 0;
+      const footerLike = (darkRatio > 0.52 && avg < 125) || (darkRatio > 0.70 && avg < 155);
+      if (footerLike) {
+        inFooter = true;
+        topCandidate = yy;
+        gap = 0;
+      } else if (inFooter) {
+        gap += rowStep;
+        // Cho phép vài dòng chữ sáng nằm trong dải chân; chỉ kết thúc khi ra khỏi nền chân đủ lâu.
+        if (gap > Math.max(20, h * 0.025)) break;
+      }
+    }
+    // Chỉ tin kết quả nếu nó nằm trong vùng chân hợp lý. Nếu ảnh quá tối làm nhận nhầm, dùng fallback.
+    if (inFooter && topCandidate > h * 0.50 && topCandidate < h * 0.92) return y0 + Math.round(topCandidate);
+  } catch(e) {}
+  return y0 + fallback;
+}
+
+function gshtV130DrawSeamNote(ctx, noteLines, jointX, jointY, panelW){
+  const lines = (noteLines || []).filter(Boolean).map(t => String(t).trim()).filter(Boolean);
+  if (!lines.length) return;
+  const scale = Math.max(0.75, (Number(panelW) || 1000) / 1000);
+  const fontSize = Math.max(18, Math.round(42 * scale));
+  const lineGap = Math.max(6, Math.round(8 * scale));
+  ctx.save();
+  ctx.font = `bold ${fontSize}px Arial`;
+  let maxW = 0;
+  for (const line of lines) maxW = Math.max(maxW, ctx.measureText(line).width);
+  const padX = Math.max(24, Math.round(34 * scale));
+  const padY = Math.max(14, Math.round(18 * scale));
+  const boxW = maxW + padX * 2;
+  const boxH = lines.length * fontSize + Math.max(0, lines.length - 1) * lineGap + padY * 2;
+  const x = Math.round(jointX - boxW / 2);
+  const y = Math.round(jointY - boxH / 2);
+  gshtV130RoundRect(ctx, x, y, boxW, boxH, Math.max(10, Math.round(14 * scale)));
+  ctx.fillStyle = 'rgba(0,0,0,0.84)';
+  ctx.fill();
+  gshtV130RoundRect(ctx, x, y, boxW, boxH, Math.max(10, Math.round(14 * scale)));
+  ctx.strokeStyle = '#0dcaf0';
+  ctx.lineWidth = Math.max(2, Math.round(4 * scale));
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#0dcaf0';
+  const startY = jointY - ((lines.length - 1) * (fontSize + lineGap)) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, jointX, startY + i * (fontSize + lineGap)));
+  ctx.restore();
+}
+
+function gshtV130ReadNote(customNote){
+  return ((customNote !== null && customNote !== undefined) ? customNote : (document.getElementById('tab1-note')?.value || '')).trim();
+}
+
+// V130: ghép nhiều ảnh, bỏ dải thông tin tổng appendInfoStripToCanvas để QR nằm ngay dưới ảnh ghép.
+window.processMultiStitching = function processMultiStitching(imgObjs, itemTypeMarker, customNote, callback) {
+  return new Promise((resolve) => {
+    if (!imgObjs || imgObjs.length === 0) { if(callback) callback(); resolve(); return; }
+    Promise.all(imgObjs.map(obj => new Promise(res => { const i = new Image(); i.src = obj.dataUrl; i.onload = () => res({img: i, obj: obj}); i.onerror = () => res(null); }))).then(async loadedRaw => {
+      const loaded = loadedRaw.filter(Boolean);
+      if (!loaded.length) { if(callback) callback(); resolve(); return; }
+      const stitchCanvas = document.createElement('canvas'); const ctx = stitchCanvas.getContext('2d'); let N = loaded.length;
+      let useGrid = (document.getElementById('qt-stitch-mode')?.value === 'all' || itemTypeMarker === 'FULL') && N > 2;
+      let cols = useGrid ? Math.ceil(Math.sqrt(N)) : N, rows = useGrid ? Math.ceil(N / cols) : 1;
+      const q = getPhotoQualitySetting();
+      const firstDim = getScaledDimensions(loaded[0].img.width, loaded[0].img.height, q.stitchPanelLongEdge);
+      let singleW = firstDim.width, singleH = firstDim.height;
+      stitchCanvas.width = cols * singleW; stitchCanvas.height = rows * singleH;
+      loaded.forEach((item, index) => { drawImageContain(ctx, item.img, (index % cols) * singleW, Math.floor(index / cols) * singleH, singleW, singleH); });
+
+      let rawNote = gshtV130ReadNote(customNote);
+      let noteText = rawNote.toUpperCase();
+      if (noteText) {
+        let jointX = cols > 1 ? singleW : stitchCanvas.width / 2;
+        let jointY = gshtV130DetectFooterTop(ctx, 0, 0, singleW, singleH);
+        // Với lưới nhiều hàng, đặt ghi chú ở điểm giao của ô đầu tiên với vùng chân của hàng đầu; tránh đè lên dải QR.
+        gshtV130DrawSeamNote(ctx, [noteText], jointX, jointY, singleW);
+      }
+
+      // KHÔNG gọi appendInfoStripToCanvas ở đây nữa. Mỗi ảnh nguồn đã có chân thông tin riêng.
+      const stitchGpsMeta = getGpsMetaFromPhotos(imgObjs);
+      const stitchLocationPoints = await appendLocationQrStripToCanvas(stitchCanvas, imgObjs);
+      let nameParts = []; if (document.getElementById('tab1-prefix')?.value.trim()) nameParts.push(document.getElementById('tab1-prefix').value.trim()); if (document.getElementById('tab1-team')?.value.trim()) nameParts.push(document.getElementById('tab1-team').value.trim()); if (rawNote) nameParts.push(rawNote);
+      let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || 'HT';
+      if (itemTypeMarker === 'QT') filePrefix = 'QT_' + filePrefix; else if (itemTypeMarker === 'FULL') filePrefix = 'FULL_' + filePrefix;
+      let earliestTs = Date.now();
+      if (imgObjs && imgObjs.length > 0) { earliestTs = Math.min(...imgObjs.map(o => o.timestampMs || Date.now())); }
+      const newItem = applyGpsMeta({
+        id: 'stitched_' + Date.now() + Math.floor(Math.random()*100),
+        type: itemTypeMarker === 'QT' ? 'STITCHED_QT' : 'STITCHED',
+        name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, '')}_GRP_${Date.now()}.jpg`,
+        dataUrl: stitchCanvas.toDataURL('image/jpeg', getJpegQuality()),
+        timestampMs: Date.now(),
+        timestampStr: new Date().toLocaleString('vi-VN'),
+        qtTimeMs: earliestTs
+      }, stitchGpsMeta);
+      newItem.locationPoints = stitchLocationPoints || [];
+      repoStitched.unshift(newItem); saveToDB(newItem);
+      let objIds = loaded.map(l => l.obj.id);
+      if (itemTypeMarker === 'QT') repoProcess = repoProcess.filter(x => !objIds.includes(x.id));
+      else if (itemTypeMarker === 'FULL') { repoBefore = repoBefore.filter(x => !objIds.includes(x.id)); repoProcess = repoProcess.filter(x => !objIds.includes(x.id)); repoAfter = repoAfter.filter(x => !objIds.includes(x.id)); }
+      objIds.forEach(id => deleteFromDB(id)); updateUIState(); if (callback) callback(); resolve();
+    });
+  });
+};
+
+// V130: ghép TRƯỚC/SAU, bỏ dải text tổng và đặt ghi chú xanh đúng điểm giao giữa 2 ảnh + 2 dải chân từng ảnh.
+window.processStitching = function processStitching(bObj, aObj, showAlert = true, customNote = null, callback = null, isQT = false, qtCount = 0) {
+  return new Promise((resolve) => {
+    const stitchCanvas = document.createElement('canvas'); const ctx = stitchCanvas.getContext('2d');
+    const loadB = new Promise(res => { const i = new Image(); i.src = bObj.dataUrl; i.onload = () => res(i); i.onerror = () => res(null); });
+    const loadA = new Promise(res => { const i = new Image(); i.src = aObj.dataUrl; i.onload = () => res(i); i.onerror = () => res(null); });
+    Promise.all([loadB, loadA]).then(async ([loadedB, loadedA]) => {
+      if (!loadedB || !loadedA) { alert('Không đọc được ảnh để ghép.'); resolve(); return; }
+      const q = getPhotoQualitySetting();
+      const bDim = getScaledDimensions(loadedB.width, loadedB.height, q.stitchPanelLongEdge);
+      const aDim = getScaledDimensions(loadedA.width, loadedA.height, q.stitchPanelLongEdge);
+      stitchCanvas.width = bDim.width + aDim.width; stitchCanvas.height = Math.max(bDim.height, aDim.height);
+      drawImageContain(ctx, loadedB, 0, 0, bDim.width, stitchCanvas.height);
+      drawImageContain(ctx, loadedA, bDim.width, 0, aDim.width, stitchCanvas.height);
+
+      let rawNote = gshtV130ReadNote(customNote);
+      let noteText = rawNote.toUpperCase();
+      let showQTLine = (qtCount > 0 && !isQT); let qtText = showQTLine ? `QT: ${qtCount}` : '';
+      if (noteText || showQTLine) {
+        const leftY = gshtV130DetectFooterTop(ctx, 0, 0, bDim.width, stitchCanvas.height);
+        const rightY = gshtV130DetectFooterTop(ctx, bDim.width, 0, aDim.width, stitchCanvas.height);
+        const jointY = Math.round((leftY + rightY) / 2);
+        gshtV130DrawSeamNote(ctx, [noteText, qtText], bDim.width, jointY, Math.min(bDim.width, aDim.width));
+      }
+
+      // KHÔNG gọi appendInfoStripToCanvas ở đây nữa để bỏ dải text tổng giữa chân từng ảnh và dải QR.
+      const stitchGpsMeta = getGpsMetaFromPhotos([bObj, aObj]);
+      const stitchLocationPoints = await appendLocationQrStripToCanvas(stitchCanvas, [bObj, aObj]);
+      let nameParts = []; if (document.getElementById('tab1-prefix')?.value.trim()) nameParts.push(document.getElementById('tab1-prefix').value.trim()); if (document.getElementById('tab1-team')?.value.trim()) nameParts.push(document.getElementById('tab1-team').value.trim()); if (rawNote) nameParts.push(rawNote);
+      let filePrefix = nameParts.map(p => p.replace(/\s+/g, '_')).join('_').replace(/_+/g, '_') || 'HT'; if (isQT) filePrefix = 'QT_' + filePrefix;
+      const formatTime = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; };
+      let sessionStartMs = Math.min(bObj.timestampMs, aObj.timestampMs);
+      let sessionEndMs = Math.max(bObj.timestampMs, aObj.timestampMs);
+      const newItem = applyGpsMeta({
+        id: 'stitched_' + bObj.timestampMs + Math.floor(Math.random()*10),
+        type: isQT ? 'STITCHED_QT' : 'STITCHED',
+        name: `${filePrefix}_${new Date().toISOString().slice(0,10).replace(/-/g, '')}_${formatTime(bObj.timestampMs)}-${formatTime(aObj.timestampMs)}-${formatTime(Date.now())}.jpg`,
+        dataUrl: stitchCanvas.toDataURL('image/jpeg', getJpegQuality()),
+        timestampMs: Date.now(),
+        timestampStr: new Date().toLocaleString('vi-VN'),
+        sessionStartMs: sessionStartMs,
+        sessionEndMs: sessionEndMs
+      }, stitchGpsMeta);
+      newItem.locationPoints = stitchLocationPoints || [];
+      repoStitched.unshift(newItem); saveToDB(newItem);
+      if (isQT) repoProcess = repoProcess.filter(x => x.id !== bObj.id && x.id !== aObj.id); else { repoBefore = repoBefore.filter(x => x.id !== bObj.id); repoAfter = repoAfter.filter(x => x.id !== aObj.id); }
+      deleteFromDB(bObj.id); deleteFromDB(aObj.id); updateUIState(); if (callback) callback(); if (showAlert) { renderPending(); renderGallery(); alert(`Đã ghép thành công:\n${newItem.name}`); } resolve();
+    });
+  });
+};
+
+try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V130 stitch strip removed + seam note fixed'; console.log('[GSHT] ' + VERSION + ' loaded'); } catch(e) {}
+})();
+</script>
+
 </body>
 </html>
