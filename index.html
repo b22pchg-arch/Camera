@@ -595,7 +595,7 @@ function showUpdateNotification() {
         <div class="d-flex align-items-center">
             <span class="badge bg-dark text-info border border-info px-2 py-1 small">PC TQ</span>
             <span id="storage-status" class="badge bg-dark text-secondary border border-secondary px-2 py-1 small ms-1">Bộ nhớ: Đang tính...</span>
-            <a href="2FA.html?v=127" class="btn btn-sm btn-outline-warning fw-bold ms-1 py-1 px-2" style="font-size:11px;" title="Mở công cụ 2FA offline">2FA</a>
+            <button type="button" class="btn btn-sm btn-outline-warning fw-bold ms-1 py-1 px-2" style="font-size:11px;" title="Mở công cụ 2FA offline" onclick="return gshtOpen2FAStandalone(event)">2FA</button>
         </div>
     </div>
 
@@ -1270,7 +1270,7 @@ function showUpdateNotification() {
                 <div class="row g-2">
                     <div class="col-6"><button class="btn btn-sm btn-outline-info w-100 fw-bold" onclick="checkPwaDeploymentAssets()"><i class="fa-solid fa-list-check me-1"></i>KIỂM TRA FILE PWA</button></div>
                     <div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold" onclick="showPwaInstallGuide()"><i class="fa-solid fa-circle-info me-1"></i>HƯỚNG DẪN CÀI</button></div>
-					<div class="col-6"><a href="2FA.html?v=127" class="btn btn-sm btn-outline-warning fw-bold ms-1 py-1 px-2" style="font-size:11px;" title="Mở công cụ 2FA offline"><i class="fa-solid fa-circle-info me-1"></i>2FA</a></div>
+					<div class="col-6"><button class="btn btn-sm btn-outline-warning w-100 fw-bold" onclick="return gshtOpen2FAStandalone(event)"><i class="fa-solid fa-circle-info me-1"></i>2FA</button></div>
                 </div>
                 <div id="pwa-deploy-status" class="small text-secondary mt-2" style="font-size:10.5px; line-height:1.4;">Nên chạy bằng HTTPS hoặc localhost để dùng được Service Worker, Camera, Micro và lưu model offline.</div>
             </div>
@@ -1852,6 +1852,13 @@ function showUpdateNotification() {
             isCompassPermissionGranted = true; initCompassListener();
         }
         window.addEventListener('beforeunload', (e) => {
+            // V132: Khi mở các công cụ nội bộ an toàn như 2FA/ExifTool ở cửa sổ riêng,
+            // không hiện cảnh báo rời trang. Cảnh báo vẫn giữ nguyên khi người dùng thật sự
+            // đóng/refresh app khi còn ảnh chưa tải về.
+            if (window.__GSHT_OPENING_SAFE_TOOL || window.__GSHT_SKIP_BEFOREUNLOAD_ONCE) {
+                window.__GSHT_SKIP_BEFOREUNLOAD_ONCE = false;
+                return;
+            }
             if (repoStitched.length > 0 || repoBefore.length > 0 || repoAfter.length > 0) {
                 e.preventDefault(); e.returnValue = 'Dữ liệu chưa tải về!'; return e.returnValue;
             }
@@ -14961,6 +14968,46 @@ try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V130 sti
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 2600)); else setTimeout(install, 2600);
     window.addEventListener('load', () => setTimeout(install, 3200));
+})();
+</script>
+
+
+
+<script id="gsht-v132-2fa-safe-open-no-leave-prompt">
+(function(){
+'use strict';
+const TWO_FA_URL = '2FA.html?v=127';
+function openSafe(url){
+    try { window.__GSHT_OPENING_SAFE_TOOL = true; window.__GSHT_SKIP_BEFOREUNLOAD_ONCE = true; } catch(e) {}
+    let opened = null;
+    try { opened = window.open(url, '_blank', 'noopener'); } catch(e) { opened = null; }
+    setTimeout(function(){ try { window.__GSHT_OPENING_SAFE_TOOL = false; } catch(e) {} }, 1800);
+    if (!opened) {
+        // Fallback cho trình duyệt/PWA chặn popup: chuyển trang nhưng bỏ qua cảnh báo một lần.
+        try { window.location.href = url; } catch(e) {}
+    }
+    return false;
+}
+window.gshtOpen2FAStandalone = function(ev){
+    try {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    } catch(e) {}
+    return openSafe(TWO_FA_URL);
+};
+// Chặn mọi link 2FA còn sót lại nếu có patch cũ hoặc HDSD sinh link động.
+document.addEventListener('click', function(ev){
+    try {
+        const target = ev.target;
+        const a = target && target.closest ? target.closest('a[href]') : null;
+        if (!a) return;
+        const href = a.getAttribute('href') || '';
+        if (/^2FA\.html(?:$|[?#])/i.test(href) || /\/2FA\.html(?:$|[?#])/i.test(href)) {
+            ev.preventDefault(); ev.stopPropagation();
+            openSafe(TWO_FA_URL);
+        }
+    } catch(e) {}
+}, true);
+try { console.log('[GSHT] V132 2FA safe opener loaded'); } catch(e) {}
 })();
 </script>
 

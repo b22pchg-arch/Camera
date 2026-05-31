@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v131-capture-fullframe-fallback-fixed';
+const GSHT_CACHE = 'gsht-pwa-v132-2fa-open-no-leave-prompt';
 const APP_SHELL = [
   './',
   './index.html',
