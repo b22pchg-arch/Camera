@@ -1,0 +1,32 @@
+﻿[
+    {
+        "name":  "zeroperl.wasm",
+        "source":  "@6over3\\zeroperl-ts\\dist\\cjs\\zeroperl.wasm",
+        "url":  "./exiftool-vendor/assets/_6over3_zeroperl-ts_dist_cjs_zeroperl.wasm",
+        "size":  25358252
+    },
+    {
+        "name":  "zeroperl.wasm",
+        "source":  "@6over3\\zeroperl-ts\\dist\\esm\\zeroperl.wasm",
+        "url":  "./exiftool-vendor/assets/_6over3_zeroperl-ts_dist_esm_zeroperl.wasm",
+        "size":  25358252
+    },
+    {
+        "name":  "zeroperl.wasm",
+        "source":  "C:\\Users\\TK1\\Downloads\\gsht_v124_exiftool_runtime_assets_fix_package\\gsht-exiftool-build-v124\\node_modules\\@6over3\\zeroperl-ts\\dist\\cjs\\zeroperl.wasm",
+        "url":  "./exiftool-vendor/zeroperl.wasm",
+        "size":  25358252
+    },
+    {
+        "name":  "zeroperl.wasm",
+        "source":  "C:\\Users\\TK1\\Downloads\\gsht_v124_exiftool_runtime_assets_fix_package\\gsht-exiftool-build-v124\\node_modules\\@6over3\\zeroperl-ts\\dist\\cjs\\zeroperl.wasm",
+        "url":  "./exiftool-vendor/assets/zeroperl.wasm",
+        "size":  25358252
+    },
+    {
+        "name":  "zeroperl.wasm",
+        "source":  "C:\\Users\\TK1\\Downloads\\gsht_v124_exiftool_runtime_assets_fix_package\\gsht-exiftool-build-v124\\node_modules\\@6over3\\zeroperl-ts\\dist\\cjs\\zeroperl.wasm",
+        "url":  "./zeroperl.wasm",
+        "size":  25358252
+    }
+]
