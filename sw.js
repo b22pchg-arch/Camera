@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v118-v117-plus-exiftool-standalone-link';
+const GSHT_CACHE = 'gsht-pwa-v119-v117-plus-exiftool-safe-loader-link';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,7 +18,7 @@ const APP_SHELL = [
   './exifreader.min.js',
   './exifr.full.umd.js',
   './mp4box.all.min.js',
-  './exiftool_wasm_tool_v118.html',
+  './exiftool_wasm_tool_v119_safe_loader.html',
   './stt/vosk/vosk.js',
   './stt/whisper/whisper-worker.js',
   './stt/whisper/gsht-whisper-worker-runner.js',
@@ -60,20 +60,52 @@ function isLargeModelRequest(url) {
 
 
 function isExifToolStandalonePage(url) {
-  return /exiftool_wasm_tool_v118\.html$/i.test(url.pathname);
+  return /exiftool_wasm_tool_v119_safe_loader\.html$/i.test(url.pathname);
 }
 
 function isLargeOptionalWasmAsset(url) {
   return /\.(wasm|zip|data|mem)$/i.test(url.pathname) && /exiftool|zeroperl|perl|wasm/i.test(url.pathname + url.search);
 }
 
+function bytesToHex(arr) {
+  return Array.from(arr || []).map(b => b.toString(16).padStart(2, '0')).join(' ');
+}
+
+async function assertOptionalBinaryResponse(request, url) {
+  const response = await fetch(request, { cache: 'no-store' });
+  if (!response || !response.ok) {
+    throw new Error('Không tải được asset tùy chọn: HTTP ' + (response && response.status));
+  }
+  const buf = await response.clone().arrayBuffer();
+  const head = new Uint8Array(buf.slice(0, 16));
+  const textHead = new TextDecoder().decode(head).trim();
+  const isHtml = /^<!doctype|^<html/i.test(textHead);
+  if (/\.wasm$/i.test(url.pathname)) {
+    const ok = head[0] === 0x00 && head[1] === 0x61 && head[2] === 0x73 && head[3] === 0x6d;
+    if (!ok || isHtml) throw new Error('WASM sai định dạng. Header=' + bytesToHex(head.slice(0, 4)) + '. Có thể server đang trả HTML/404 thay vì file .wasm.');
+    return new Response(buf, { status: response.status, statusText: response.statusText, headers: {'Content-Type':'application/wasm','Cache-Control':'no-store'} });
+  }
+  if (/\.zip$/i.test(url.pathname)) {
+    const ok = head[0] === 0x50 && head[1] === 0x4b;
+    if (!ok || isHtml) throw new Error('ZIP sai định dạng. Có thể server đang trả HTML/404 thay vì file .zip.');
+    return new Response(buf, { status: response.status, statusText: response.statusText, headers: {'Content-Type':'application/zip','Cache-Control':'no-store'} });
+  }
+  if (isHtml) throw new Error('Asset tùy chọn trả về HTML, không phải dữ liệu nhị phân.');
+  return new Response(buf, { status: response.status, statusText: response.statusText, headers: {'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream','Cache-Control':'no-store'} });
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // ExifTool WASM nặng: không ép Cache Storage trong PWA chính.
+  // ExifTool WASM/ZIP/DATA: không cache và tuyệt đối không trả fallback HTML.
   if (isLargeOptionalWasmAsset(url)) {
-    event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request)));
+    event.respondWith(
+      assertOptionalBinaryResponse(event.request, url).catch(err => new Response(String(err && err.message || err), {
+        status: 404,
+        headers: {'Content-Type':'text/plain;charset=utf-8','Cache-Control':'no-store'}
+      }))
+    );
     return;
   }
 
@@ -83,10 +115,10 @@ self.addEventListener('fetch', event => {
       fetch(event.request, { cache: 'no-store' })
         .then(response => {
           const copy = response.clone();
-          caches.open(GSHT_CACHE).then(cache => cache.put('./exiftool_wasm_tool_v118.html', copy)).catch(() => {});
+          caches.open(GSHT_CACHE).then(cache => cache.put('./exiftool_wasm_tool_v119_safe_loader.html', copy)).catch(() => {});
           return response;
         })
-        .catch(() => caches.match('./exiftool_wasm_tool_v118.html').then(r => r || caches.match('./offline.html')))
+        .catch(() => caches.match('./exiftool_wasm_tool_v119_safe_loader.html').then(r => r || caches.match('./offline.html')))
     );
     return;
   }
@@ -144,4 +176,4 @@ self.addEventListener('fetch', event => {
 
 // GSHT V91: camera display optimization - default no crop, real aspect ratio preview.
 
-// GSHT V117 stable rollback: base V112 only. No online metadata, no ExifTool WASM in main app, no extra heavy optional assets.
+// GSHT V119: standalone ExifTool safe loader; never return HTML fallback for WASM/ZIP/DATA assets.
