@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GSHT - ExifTool WASM riêng V125 Fill Form Fixed</title>
+<style>
+:root { color-scheme: dark; }
+body { margin:0; background:#111820; color:#e9ecef; font-family:system-ui,-apple-system,Segoe UI,sans-serif; }
+.wrap { max-width:980px; margin:0 auto; padding:12px; }
+.card { border:1px solid #495057; background:#1b222b; border-radius:14px; padding:12px; margin:10px 0; box-shadow:0 3px 18px rgba(0,0,0,.25); }
+.card.info { border-color:#0dcaf0; background:#091820; }
+.card.warn { border-color:#ffc107; background:#1f1a09; }
+.card.good { border-color:#20c997; background:#071b15; }
+.card.danger { border-color:#dc3545; background:#210d12; }
+.row { display:grid; grid-template-columns:repeat(12,1fr); gap:8px; }
+.col-12 { grid-column:span 12; } .col-6 { grid-column:span 6; } .col-4 { grid-column:span 4; } .col-3 { grid-column:span 3; }
+@media (max-width:720px){ .col-6,.col-4,.col-3{ grid-column:span 12; } }
+button, input, textarea, select { font:inherit; border-radius:10px; border:1px solid #495057; background:#0b1117; color:#e9ecef; padding:9px 10px; }
+button { cursor:pointer; font-weight:700; }
+button.primary { border-color:#0dcaf0; color:#0dcaf0; }
+button.success { border-color:#20c997; color:#20c997; }
+button.warn { border-color:#ffc107; color:#ffc107; }
+button.danger { border-color:#dc3545; color:#ff8a95; }
+button:disabled { opacity:.55; cursor:not-allowed; }
+input, textarea { width:100%; box-sizing:border-box; }
+textarea { min-height:78px; resize:vertical; }
+label { display:block; font-size:12px; color:#9fb3c8; font-weight:700; margin-bottom:4px; }
+.small { font-size:12px; line-height:1.45; color:#adb5bd; }
+.badge { display:inline-block; border:1px solid #495057; border-radius:999px; padding:4px 8px; font-size:11px; color:#0dcaf0; background:#050a0f; }
+pre { white-space:pre-wrap; word-break:break-word; max-height:44vh; overflow:auto; background:#050a0f; border:1px solid #343a40; border-radius:10px; padding:10px; font-size:12px; }
+#dropZone { border:2px dashed #495057; border-radius:14px; padding:16px; text-align:center; background:#090d12; }
+#dropZone.drag { border-color:#0dcaf0; background:#071a22; }
+.muted { color:#6c757d; }
+hr { border:0; border-top:1px solid #343a40; margin:12px 0; }
+.ok { color:#20c997; } .bad { color:#ff8a95; } .yellow { color:#ffc107; }
+code { color:#0dcaf0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card info">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <div>
+        <h2 style="margin:0 0 4px;color:#0dcaf0;">ExifTool WASM riêng V125 - Sửa điền form metadata</h2>
+        <div class="small">Trang này không đăng ký Service Worker và không tự tải ExifTool từ CDN khi mở. V125 bỏ đường tải trực tiếp <code>zeroperl.wasm</code> vì package CDN không cung cấp file đó tại URL đơn giản; thay vào đó dùng bundle local đã build bằng Vite.</div>
+      </div>
+      <button class="primary" onclick="goBackMain()">← VỀ PWA CHÍNH</button>
+    </div>
+  </div>
+
+  <div class="card danger">
+    <b>Vì sao V122 còn lỗi?</b>
+    <div class="small">Log của anh báo <code>https://cdn.jsdelivr.net/npm/@6over3/zeroperl-ts@1.0.10/zeroperl.wasm</code> trả HTTP 404. Nghĩa là không thể giả định CDN có file WASM ở đường dẫn đó. Bản V125 yêu cầu build local để bundler tự resolve dependency <code>@6over3/zeroperl-ts</code> và copy WASM/asset đúng chỗ.</div>
+  </div>
+
+  <div class="card warn">
+    <h3 style="margin-top:0;">1) Chuẩn bị ExifTool local bundle</h3>
+    <div class="small">Chạy file <b>build_exiftool_v124_local.ps1</b> hoặc <b>build_exiftool_v124_local.cmd</b> trong thư mục app trên máy có internet. Sau khi build xong, thư mục app cần có:</div>
+    <pre>index.html
+exiftool_wasm_tool_v125_fill_form_fixed.html
+exiftool-vendor/
+  exiftool-browser.es.js
+  assets/...
+</pre>
+    <div class="row">
+      <div class="col-6"><button class="success" onclick="downloadTextFile('build_exiftool_v124_local.ps1', BUILD_PS1)">TẢI FILE BUILD POWERSHELL</button></div>
+      <div class="col-6"><button class="success" onclick="downloadTextFile('build_exiftool_v124_local.cmd', BUILD_CMD)">TẢI FILE BUILD CMD</button></div>
+      <div class="col-12"><button onclick="downloadTextFile('README_V125_ExifTool_Local_Bundle.txt', README_TEXT)">TẢI HƯỚNG DẪN TXT</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">2) Nạp ExifTool local</h3>
+    <div class="row" style="margin-top:8px;">
+      <div class="col-12">
+        <label>Đường dẫn module local đã build</label>
+        <input id="localModuleUrl" value="./exiftool-vendor/exiftool-browser.es.js" spellcheck="false">
+      </div>
+      <div class="col-4"><button class="primary" onclick="testModuleUrl($('localModuleUrl').value.trim())">KIỂM TRA MODULE</button></div>
+      <div class="col-4"><button class="primary" onclick="loadLocalModule()">NẠP LOCAL BUNDLE</button></div>
+      <div class="col-4"><button onclick="checkVendorFolder()">KIỂM TRA THƯ MỤC VENDOR</button></div>
+      <div class="col-12"><div id="moduleStatus" class="small">Chưa nạp ExifTool.</div></div>
+      <div class="col-12"><pre id="diagnosticOutput">Chưa kiểm tra.</pre></div>
+    </div>
+  </div>
+
+  <div class="card good">
+    <h3 style="margin-top:0;">3) Chọn file ảnh/video</h3>
+    <div id="dropZone">
+      <p style="margin:0 0 8px;"><b>Kéo thả file vào đây</b> hoặc chọn bằng nút bên dưới.</p>
+      <input id="fileInput" type="file" accept="image/*,video/*,.heic,.heif,.avif,.mov,.mp4,.m4v,.3gp,.pdf" onchange="handleFileSelect(event)">
+    </div>
+    <div id="fileInfo" class="small" style="margin-top:8px;">Chưa chọn file.</div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">4) Đọc metadata</h3>
+    <div class="row">
+      <div class="col-6"><button class="primary" onclick="readWithExifTool()">ĐỌC BẰNG EXIFTOOL</button></div>
+      <div class="col-6"><button onclick="readBasicOnly()">ĐỌC CƠ BẢN KHÔNG WASM</button></div>
+      <div class="col-6"><button onclick="fillFormFromMetadata(false)">ĐIỀN Ô TRỐNG TỪ METADATA</button></div>
+      <div class="col-6"><button onclick="fillFormFromMetadata(true)">GHI ĐÈ FORM TỪ METADATA</button></div>
+    </div>
+    <pre id="metadataOutput">Chưa có dữ liệu.</pre>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">5) Sửa metadata</h3>
+    <div class="row">
+      <div class="col-6"><label>DateTimeOriginal</label><input id="tag_DateTimeOriginal" placeholder="2026:05:31 07:30:00"></div>
+      <div class="col-6"><label>CreateDate</label><input id="tag_CreateDate" placeholder="2026:05:31 07:30:00"></div>
+      <div class="col-6"><label>ModifyDate</label><input id="tag_ModifyDate" placeholder="2026:05:31 07:30:00"></div>
+      <div class="col-6"><label>OffsetTimeOriginal</label><input id="tag_OffsetTimeOriginal" placeholder="+07:00"></div>
+      <div class="col-6"><label>Title / ObjectName</label><input id="tag_Title"></div>
+      <div class="col-6"><label>Artist / Creator</label><input id="tag_Artist"></div>
+      <div class="col-12"><label>Description / ImageDescription</label><textarea id="tag_Description"></textarea></div>
+      <div class="col-6"><label>Copyright</label><input id="tag_Copyright"></div>
+      <div class="col-6"><label>Software</label><input id="tag_Software" value="GSHT PWA V125 ExifTool"></div>
+      <div class="col-6"><label>Make</label><input id="tag_Make"></div>
+      <div class="col-6"><label>Model</label><input id="tag_Model"></div>
+      <div class="col-6"><label>GPSLatitude</label><input id="tag_GPSLatitude" placeholder="21.0285"></div>
+      <div class="col-6"><label>GPSLongitude</label><input id="tag_GPSLongitude" placeholder="105.8542"></div>
+      <div class="col-12"><label>JSON tag bổ sung</label><textarea id="extraTags" placeholder='{"Keywords":"GSHT, hiện trường"}'></textarea></div>
+    </div>
+    <hr>
+    <div class="row">
+      <div class="col-4"><button class="success" onclick="writeWithExifTool()">LƯU FILE MỚI BẰNG EXIFTOOL</button></div>
+      <div class="col-4"><button class="warn" onclick="downloadSidecarJson()">TẢI JSON ĐI KÈM</button></div>
+      <div class="col-4"><button onclick="copyMetadataJson()">SAO CHÉP JSON</button></div>
+    </div>
+    <div id="writeStatus" class="small" style="margin-top:8px;">Chưa lưu file.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+let currentFile = null;
+let currentMetadata = null;
+let exiftoolModule = null;
+let parseMetadataFn = null;
+let writeMetadataFn = null;
+
+const BUILD_PS1 = String.raw`$ErrorActionPreference = "Stop"
+Write-Host "GSHT V125 - Build ExifTool WASM local bundle" -ForegroundColor Cyan
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+  Write-Host "Khong tim thay npm. Hay cai Node.js LTS truoc." -ForegroundColor Red
+  exit 1
+}
+$AppDir = Get-Location
+$BuildDir = Join-Path $AppDir "gsht-exiftool-build-v124"
+$VendorDir = Join-Path $AppDir "exiftool-vendor"
+if (Test-Path $BuildDir) { Remove-Item $BuildDir -Recurse -Force }
+New-Item -ItemType Directory -Path $BuildDir | Out-Null
+Set-Location $BuildDir
+npm init -y | Out-Host
+npm install vite @uswriting/exiftool@1.0.9 | Out-Host
+New-Item -ItemType Directory -Path "src" -Force | Out-Null
+@'
+export { parseMetadata, writeMetadata } from '@uswriting/exiftool';
+'@ | Set-Content -Path "src\gsht-exiftool-entry.js" -Encoding UTF8
+@'
+import { defineConfig } from 'vite';
+export default defineConfig({
+  build: {
+    target: 'es2022',
+    outDir: 'dist/exiftool-vendor',
+    emptyOutDir: true,
+    assetsInlineLimit: 0,
+    lib: {
+      entry: 'src/gsht-exiftool-entry.js',
+      formats: ['es'],
+      fileName: () => 'exiftool-browser.es.js'
+    },
+    rollupOptions: {
+      output: {
+        assetFileNames: 'assets/[name][extname]',
+        chunkFileNames: 'assets/[name]-[hash].js'
+      }
+    }
+  },
+  optimizeDeps: {
+    exclude: ['@uswriting/exiftool', '@6over3/zeroperl-ts']
+  }
+});
+'@ | Set-Content -Path "vite.config.mjs" -Encoding UTF8
+npx vite build | Out-Host
+Set-Location $AppDir
+if (Test-Path $VendorDir) { Remove-Item $VendorDir -Recurse -Force }
+Copy-Item -Path (Join-Path $BuildDir "dist\exiftool-vendor") -Destination $VendorDir -Recurse
+Write-Host "DONE. Da tao thu muc exiftool-vendor." -ForegroundColor Green
+Write-Host "Hay copy ca thu muc exiftool-vendor len cung thu muc index.html." -ForegroundColor Yellow
+`;
+
+const BUILD_CMD = String.raw`@echo off
+powershell -ExecutionPolicy Bypass -File "%~dp0build_exiftool_v124_local.ps1"
+pause
+`;
+
+const README_TEXT = String.raw`GSHT V125 - ExifTool WASM Local Bundle
+
+Ly do can build local:
+- CDN @6over3/zeroperl-ts@1.0.10 khong co file /zeroperl.wasm tai URL don gian.
+- Khi browser yeu cau ./zeroperl.wasm ma server tra 404/HTML, WebAssembly se bao loi magic word.
+- Vite bundler se resolve npm dependency va copy WASM/assets dung cach.
+
+Cach lam:
+1. Cai Node.js LTS tren may co internet.
+2. Dat build_exiftool_v124_local.ps1 va build_exiftool_v124_local.cmd cung thu muc app.
+3. Bam chuot phai PowerShell, chay:
+   powershell -ExecutionPolicy Bypass -File .\build_exiftool_v124_local.ps1
+4. Sau khi chay xong, phai co thu muc:
+   exiftool-vendor\exiftool-browser.es.js
+   exiftool-vendor\assets\...
+5. Copy ca thu muc exiftool-vendor len may/PWA.
+6. Mo exiftool_wasm_tool_v125_fill_form_fixed.html va bam NAP LOCAL BUNDLE.
+`;
+
+const $ = (id) => document.getElementById(id);
+function setText(id, text) { const el = $(id); if (el) el.textContent = text; }
+function appendDiag(text) { const el = $('diagnosticOutput'); if (el) el.textContent = (el.textContent && el.textContent !== 'Chưa kiểm tra.' ? el.textContent + '\n' : '') + text; }
+function clearDiag(){ const el=$('diagnosticOutput'); if(el) el.textContent=''; }
+function pretty(obj) { try { return JSON.stringify(obj, null, 2); } catch (e) { return String(obj); } }
+function safeName(name) { return String(name || 'file').replace(/[\\/:*?"<>|]+/g, '_'); }
+function formatBytes(n) { if (!Number.isFinite(n)) return ''; const u=['B','KB','MB','GB']; let i=0,v=n; while(v>=1024&&i<u.length-1){v/=1024;i++;} return v.toFixed(i?2:0)+' '+u[i]; }
+function toExifDateFromMs(ms) { const d=new Date(ms); const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+':'+p(d.getMonth()+1)+':'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
+function getOffsetString() { const mins=-new Date().getTimezoneOffset(); const sign=mins>=0?'+':'-'; const abs=Math.abs(mins); return sign+String(Math.floor(abs/60)).padStart(2,'0')+':'+String(abs%60).padStart(2,'0'); }
+function bytesToHex(arr){ return Array.from(arr||[]).map(b=>b.toString(16).padStart(2,'0')).join(' '); }
+function firstText(bytes){ try { return new TextDecoder().decode(bytes).replace(/\s+/g,' ').slice(0,120); } catch(e){ return ''; } }
+function isWasmHead(head){ return head && head[0]===0x00 && head[1]===0x61 && head[2]===0x73 && head[3]===0x6d; }
+
+// Fetch guard V125: nếu bundle gọi ./zeroperl.wasm nhưng file nằm trong exiftool-vendor,
+// tự chuyển hướng sang các bản runtime đã copy. Nếu vẫn sai, báo URL cụ thể.
+const nativeFetch = window.fetch.bind(window);
+let wasmManifestCache = null;
+
+async function tryReadJson(url){
+  try{
+    const r = await nativeFetch(url + (url.includes('?')?'&':'?') + 'v=' + Date.now(), {cache:'no-store'});
+    if(!r.ok) return null;
+    return await r.json();
+  }catch(e){ return null; }
+}
+
+async function getWasmManifestCandidates(){
+  if (wasmManifestCache) return wasmManifestCache;
+  const m = await tryReadJson('./exiftool-vendor/wasm-manifest.json');
+  const out = [];
+  if (m && Array.isArray(m.files)) {
+    m.files.forEach(x => {
+      if (typeof x === 'string') out.push(x);
+      else if (x && typeof x.url === 'string') out.push(x.url);
+    });
+  }
+  wasmManifestCache = out;
+  return out;
+}
+
+function uniqueList(arr){ return Array.from(new Set(arr.filter(Boolean))); }
+function isZeroperlRequest(raw){
+  try { const u = new URL(raw, location.href); return /(^|\/)zeroperl[^/]*\.wasm$/i.test(u.pathname); }
+  catch(e){ return /zeroperl[^/]*\.wasm/i.test(String(raw||'')); }
+}
+
+async function fetchAndCheckBinary(url, originalRes){
+  const res = originalRes || await nativeFetch(url + (url.includes('?')?'&':'?') + 'v=' + Date.now(), {cache:'no-store'});
+  const buf = await res.clone().arrayBuffer();
+  const head = new Uint8Array(buf.slice(0,16));
+  return {url, res, buf, head, ok: !!res.ok && isWasmHead(head)};
+}
+
+async function findValidZeroperlWasm(raw, firstResponse){
+  const manifest = await getWasmManifestCandidates();
+  const candidates = uniqueList([
+    raw,
+    './exiftool-vendor/zeroperl.wasm',
+    './exiftool-vendor/assets/zeroperl.wasm',
+    './zeroperl.wasm',
+    ...manifest.filter(x => /zeroperl.*\.wasm$/i.test(x)),
+    ...manifest.filter(x => /\.wasm$/i.test(x))
+  ]);
+  let last = null;
+  for (const c of candidates) {
+    try {
+      const checked = await fetchAndCheckBinary(c, c === raw ? firstResponse : null);
+      last = checked;
+      if (checked.ok) {
+        appendDiag('✅ WASM OK: ' + c + ' | ' + formatBytes(checked.buf.byteLength) + (c !== raw ? ' | dùng thay cho ' + raw : ''));
+        return new Response(checked.buf, {status:200, statusText:'OK', headers:{'Content-Type':'application/wasm','Cache-Control':'no-store'}});
+      }
+      appendDiag('❌ WASM sai/thiếu: ' + c + ' | HTTP=' + checked.res.status + ' | type=' + (checked.res.headers.get('content-type')||'') + ' | head=' + bytesToHex(checked.head.slice(0,8)) + ' | text=' + firstText(checked.head));
+    } catch(e) {
+      appendDiag('❌ WASM lỗi khi thử ' + c + ': ' + (e && e.message ? e.message : e));
+    }
+  }
+  throw new Error('GSHT_FETCH_GUARD_V125: Không tìm được zeroperl.wasm hợp lệ. Hãy chạy lại build_exiftool_v124_local.ps1. Script V125 sẽ copy zeroperl.wasm vào exiftool-vendor/zeroperl.wasm và exiftool-vendor/assets/zeroperl.wasm. URL cuối cùng=' + (last && last.url));
+}
+
+window.fetch = async function(input, init){
+  const raw = input instanceof Request ? input.url : String(input || '');
+  if (/\.wasm($|[?#])/i.test(new URL(raw, location.href).pathname)) {
+    const res = await nativeFetch(input, init).catch(e => null);
+    if (isZeroperlRequest(raw)) {
+      if (res) return await findValidZeroperlWasm(raw, res);
+      return await findValidZeroperlWasm(raw, null);
+    }
+    if (res) {
+      const buf = await res.clone().arrayBuffer();
+      const head = new Uint8Array(buf.slice(0,16));
+      if (!res.ok || !isWasmHead(head)) appendDiag('❌ WASM sai/thiếu: ' + raw + ' | HTTP=' + res.status + ' | type=' + (res.headers.get('content-type')||'') + ' | head=' + bytesToHex(head.slice(0,8)) + ' | text=' + firstText(head));
+      else appendDiag('✅ WASM OK: ' + raw + ' | ' + formatBytes(buf.byteLength));
+      return new Response(buf, {status:res.status, statusText:res.statusText, headers:res.headers});
+    }
+  }
+  return nativeFetch(input, init);
+};
+
+async function inspectUrl(url, expectModule=false) {
+  const r = await nativeFetch(url + (url.includes('?')?'&':'?') + 'v=' + Date.now(), {cache:'no-store'});
+  const buf = await r.clone().arrayBuffer();
+  const head = new Uint8Array(buf.slice(0,16));
+  return { url, ok:r.ok, status:r.status, type:r.headers.get('content-type')||'', size:buf.byteLength, headHex:bytesToHex(head), headText:firstText(head), isHtml:/^<!doctype|^<html/i.test(firstText(head).trim()), looksModule:/\bexport\b|\bimport\b/.test(firstText(new Uint8Array(buf.slice(0,300))).trim()) };
+}
+
+async function testModuleUrl(url) {
+  clearDiag();
+  try {
+    appendDiag('Đang kiểm tra: ' + url);
+    const info = await inspectUrl(url, true);
+    appendDiag(pretty(info));
+    if (!info.ok) appendDiag('❌ Module chưa tồn tại. Hãy chạy build_exiftool_v124_local.ps1 để tạo exiftool-vendor.');
+    else appendDiag('✅ Module URL tải được. Tiếp theo bấm NẠP LOCAL BUNDLE.');
+  } catch (e) { appendDiag('❌ Kiểm tra lỗi: ' + explainError(e)); }
+}
+
+async function checkVendorFolder(){
+  clearDiag();
+  const manifest = await getWasmManifestCandidates();
+  const list = uniqueList([
+    './exiftool-vendor/exiftool-browser.es.js',
+    './exiftool-vendor/wasm-manifest.json',
+    './exiftool-vendor/zeroperl.wasm',
+    './exiftool-vendor/assets/zeroperl.wasm',
+    './zeroperl.wasm',
+    ...manifest
+  ]);
+  for (const u of list) {
+    try { appendDiag(pretty(await inspectUrl(u))); }
+    catch(e){ appendDiag('❌ ' + u + ': ' + explainError(e)); }
+  }
+  appendDiag('\nNếu zeroperl.wasm vẫn 404: bản build cũ chưa copy runtime. Hãy chạy build_exiftool_v124_local.ps1, sau đó copy nguyên thư mục exiftool-vendor và file zeroperl.wasm nếu script tạo ở thư mục gốc.');
+}
+
+function normalizeModule(mod){
+  const parse = mod.parseMetadata || mod.default?.parseMetadata || mod.exiftool?.parseMetadata;
+  const write = mod.writeMetadata || mod.default?.writeMetadata || mod.exiftool?.writeMetadata;
+  return {parse, write};
+}
+
+async function loadLocalModule(){
+  clearDiag();
+  const url = $('localModuleUrl').value.trim() || './exiftool-vendor/exiftool-browser.es.js';
+  try {
+    appendDiag('Đang import local bundle: ' + url);
+    await testModuleUrl(url);
+    exiftoolModule = await import(url + (url.includes('?')?'&':'?') + 'v=' + Date.now());
+    const f = normalizeModule(exiftoolModule);
+    parseMetadataFn = f.parse;
+    writeMetadataFn = f.write;
+    if (typeof parseMetadataFn !== 'function') throw new Error('Module đã nạp nhưng không thấy parseMetadata(). Có thể build sai entry.');
+    setText('moduleStatus', '✅ Đã nạp ExifTool local bundle. parse=' + (typeof parseMetadataFn === 'function') + ', write=' + (typeof writeMetadataFn === 'function'));
+    appendDiag('✅ Đã nạp ExifTool local bundle.');
+  } catch (e) {
+    setText('moduleStatus', '❌ Nạp local bundle lỗi: ' + explainError(e));
+    appendDiag('❌ Nạp local bundle lỗi: ' + explainError(e));
+    appendDiag('\nGợi ý: chạy lại build_exiftool_v124_local.ps1 và copy nguyên thư mục exiftool-vendor, không chỉ copy file JS.');
+  }
+}
+
+function handleFileSelect(event){
+  const f = event.target.files && event.target.files[0];
+  setCurrentFile(f);
+}
+function setCurrentFile(f){
+  currentFile = f || null;
+  currentMetadata = null;
+  if (!f) { setText('fileInfo','Chưa chọn file.'); return; }
+  setText('fileInfo', 'Đã chọn: ' + f.name + ' | ' + (f.type || 'unknown') + ' | ' + formatBytes(f.size) + ' | lastModified=' + new Date(f.lastModified).toLocaleString());
+  $('tag_DateTimeOriginal').value = toExifDateFromMs(f.lastModified || Date.now());
+  $('tag_CreateDate').value = $('tag_DateTimeOriginal').value;
+  $('tag_ModifyDate').value = $('tag_DateTimeOriginal').value;
+  $('tag_OffsetTimeOriginal').value = getOffsetString();
+}
+
+async function readWithExifTool(){
+  if (!currentFile) return alert('Chưa chọn file.');
+  if (typeof parseMetadataFn !== 'function') await loadLocalModule();
+  if (typeof parseMetadataFn !== 'function') return;
+  setText('metadataOutput', 'Đang đọc bằng ExifTool...');
+  try {
+    const result = await parseMetadataFn(currentFile);
+    currentMetadata = result && result.success && result.data !== undefined ? result.data : result;
+    setText('metadataOutput', pretty(result));
+  } catch (e) {
+    setText('metadataOutput', '❌ ExifTool đọc lỗi: ' + explainError(e));
+  }
+}
+
+function readBasicOnly(){
+  if (!currentFile) return alert('Chưa chọn file.');
+  currentMetadata = { FileName: currentFile.name, MIMEType: currentFile.type, FileSize: currentFile.size, LastModified: new Date(currentFile.lastModified).toISOString() };
+  setText('metadataOutput', pretty(currentMetadata));
+}
+
+function unwrapMetadataPayload(raw){
+  // ExifTool WASM có thể trả về nhiều dạng khác nhau:
+  // result, result.data, result.data[0], mảng metadata, hoặc object lồng nhóm EXIF/XMP/QuickTime.
+  let m = raw && raw.data !== undefined ? raw.data : raw;
+  if (Array.isArray(m)) {
+    // Ưu tiên phần tử đầu có nhiều trường nhất, vì parseMetadata thường trả mảng 1 phần tử.
+    const objects = m.filter(x => x && typeof x === 'object');
+    if (objects.length) {
+      objects.sort((a,b) => Object.keys(b).length - Object.keys(a).length);
+      return objects[0];
+    }
+    return m[0] || null;
+  }
+  return m || null;
+}
+
+function tagKeyVariants(k){
+  const raw = String(k || '');
+  const noGroup = raw.includes(':') ? raw.split(':').pop() : raw;
+  const normalize = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return [normalize(raw), normalize(noGroup)];
+}
+
+function tagValueToString(v){
+  if (v == null) return '';
+  if (v instanceof Date) return toExifDateFromMs(v.getTime());
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) {
+    const joined = v.map(tagValueToString).filter(Boolean).join(', ');
+    return joined;
+  }
+  if (typeof v === 'object') {
+    // Nhiều thư viện trả tag dưới dạng { value, description, rawValue }.
+    for (const key of ['description','Description','value','Value','rawValue','RawValue','text','Text','display','Display']) {
+      if (v[key] != null && v[key] !== '') return tagValueToString(v[key]);
+    }
+    try { return JSON.stringify(v); } catch(e) { return String(v); }
+  }
+  return String(v);
+}
+
+function flattenMetadata(obj, prefix='', out={}){
+  if (!obj || typeof obj !== 'object') return out;
+  if (Array.isArray(obj)) {
+    obj.forEach((item, idx) => flattenMetadata(item, prefix ? prefix + '[' + idx + ']' : String(idx), out));
+    return out;
+  }
+  for (const [k,v] of Object.entries(obj)) {
+    const full = prefix ? prefix + ':' + k : k;
+    if (v && typeof v === 'object' && !(v instanceof Date) && !Array.isArray(v)) {
+      const hasValueShape = ['description','Description','value','Value','rawValue','RawValue','text','Text'].some(x => Object.prototype.hasOwnProperty.call(v, x));
+      if (hasValueShape) out[full] = tagValueToString(v);
+      flattenMetadata(v, full, out);
+    } else {
+      out[full] = tagValueToString(v);
+    }
+  }
+  return out;
+}
+
+function getFirst(obj, keys){
+  const source = unwrapMetadataPayload(obj);
+  if (!source) return '';
+  const flat = flattenMetadata(source);
+  const byNorm = new Map();
+  for (const [k,v] of Object.entries(flat)) {
+    if (v == null || v === '') continue;
+    for (const norm of tagKeyVariants(k)) {
+      if (norm && !byNorm.has(norm)) byNorm.set(norm, v);
+    }
+  }
+  for (const key of keys) {
+    for (const norm of tagKeyVariants(key)) {
+      if (byNorm.has(norm)) return byNorm.get(norm);
+    }
+  }
+  return '';
+}
+
+function normalizeExifDateValue(v){
+  let s = tagValueToString(v).trim();
+  if (!s) return '';
+  // Giữ nguyên nếu đã đúng dạng EXIF: 2026:05:31 07:30:00
+  const exif = s.match(/(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (exif) return `${exif[1]}:${exif[2]}:${exif[3]} ${exif[4]}:${exif[5]}:${exif[6] || '00'}`;
+  // Dạng ISO hoặc QuickTime: 2026-05-31T07:30:00+07:00
+  const iso = s.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (iso) return `${iso[1]}:${iso[2]}:${iso[3]} ${iso[4]}:${iso[5]}:${iso[6] || '00'}`;
+  // Dạng tiếng ExifTool có timezone vẫn cố giữ phần ngày giờ đầu.
+  const loose = s.match(/(\d{4})[\/:.-](\d{1,2})[\/:.-](\d{1,2}).*?(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (loose) return `${loose[1]}:${String(loose[2]).padStart(2,'0')}:${String(loose[3]).padStart(2,'0')} ${String(loose[4]).padStart(2,'0')}:${loose[5]}:${loose[6] || '00'}`;
+  return s;
+}
+
+function normalizeOffsetValue(v){
+  const s = tagValueToString(v).trim();
+  if (!s) return '';
+  const m = s.match(/([+-])\s*(\d{1,2})(?::?(\d{2}))?/);
+  if (m) return `${m[1]}${String(m[2]).padStart(2,'0')}:${m[3] || '00'}`;
+  if (/utc|gmt/i.test(s)) return '+00:00';
+  return s;
+}
+
+function dmsToDecimal(part){
+  const s = String(part || '').trim();
+  const direct = s.match(/([+-]?\d+(?:\.\d+)?)/);
+  if (/deg|°|'|"]/i.test(s)) {
+    const nums = s.match(/\d+(?:\.\d+)?/g) || [];
+    let val = (parseFloat(nums[0] || '0') || 0) + (parseFloat(nums[1] || '0') || 0)/60 + (parseFloat(nums[2] || '0') || 0)/3600;
+    if (/\b[SW]\b/i.test(s) || /^-/.test(s)) val = -Math.abs(val);
+    return String(+val.toFixed(7));
+  }
+  return direct ? direct[1] : '';
+}
+
+function deriveGpsPair(m){
+  const pos = getFirst(m, ['GPSPosition','GPS Position','Composite:GPSPosition','Location','LocationShown','GPSCoordinates']);
+  if (!pos) return {};
+  // Hỗ trợ "21.0285, 105.8542" hoặc "21 deg ... N, 105 deg ... E"
+  const parts = String(pos).split(/[,;]/).map(x => x.trim()).filter(Boolean);
+  if (parts.length >= 2) return { lat: dmsToDecimal(parts[0]), lon: dmsToDecimal(parts[1]) };
+  return {};
+}
+
+function fillFormFromMetadata(overwrite){
+  const m = unwrapMetadataPayload(currentMetadata);
+  if (!m) return alert('Chưa có metadata. Hãy bấm ĐỌC BẰNG EXIFTOOL hoặc ĐỌC CƠ BẢN trước.');
+  const map = {
+    tag_DateTimeOriginal:['DateTimeOriginal','Date/TimeOriginal','Date/Time Original','EXIF:DateTimeOriginal','SubSecDateTimeOriginal','CreateDate','CreationDate','QuickTime:CreateDate','MediaCreateDate','TrackCreateDate'],
+    tag_CreateDate:['CreateDate','Create Date','EXIF:CreateDate','DateCreated','CreationDate','MediaCreateDate','QuickTime:CreateDate','TrackCreateDate'],
+    tag_ModifyDate:['ModifyDate','Modify Date','FileModifyDate','File Modification Date/Time','QuickTime:ModifyDate','MediaModifyDate'],
+    tag_OffsetTimeOriginal:['OffsetTimeOriginal','Offset Time Original','OffsetTime','TimeZone','Time Zone','QuickTime:TimeZone'],
+    tag_Title:['Title','ObjectName','Object Name','Headline','XMP:Title','IPTC:ObjectName'],
+    tag_Artist:['Artist','Creator','By-line','Byline','Author','XMP:Creator','IPTC:By-line'],
+    tag_Description:['Description','ImageDescription','Image Description','Caption-Abstract','Caption','Comment','UserComment','XMP:Description'],
+    tag_Copyright:['Copyright','Rights','UsageTerms','XMP:Rights','CopyrightNotice'],
+    tag_Software:['Software','ProcessingSoftware','Encoder','WritingLibrary'],
+    tag_Make:['Make','DeviceManufacturer','CameraMake','Manufacturer'],
+    tag_Model:['Model','DeviceModel','CameraModel','DeviceName'],
+    tag_GPSLatitude:['GPSLatitude','GPS Latitude','Composite:GPSLatitude','LocationLatitude'],
+    tag_GPSLongitude:['GPSLongitude','GPS Longitude','Composite:GPSLongitude','LocationLongitude']
+  };
+  const transforms = {
+    tag_DateTimeOriginal: normalizeExifDateValue,
+    tag_CreateDate: normalizeExifDateValue,
+    tag_ModifyDate: normalizeExifDateValue,
+    tag_OffsetTimeOriginal: normalizeOffsetValue,
+    tag_GPSLatitude: dmsToDecimal,
+    tag_GPSLongitude: dmsToDecimal
+  };
+  const gpsPair = deriveGpsPair(m);
+  let filled = 0;
+  const details = [];
+  Object.entries(map).forEach(([id, keys]) => {
+    const el=$(id); if(!el) return;
+    let val=getFirst(m, keys);
+    if (!val && id === 'tag_GPSLatitude' && gpsPair.lat) val = gpsPair.lat;
+    if (!val && id === 'tag_GPSLongitude' && gpsPair.lon) val = gpsPair.lon;
+    if (val !== '') {
+      val = transforms[id] ? transforms[id](val) : tagValueToString(val).trim();
+      if (val !== '' && (overwrite || !el.value)) {
+        el.value = String(val);
+        filled++;
+        details.push(id.replace('tag_','') + '=' + String(val).slice(0,120));
+      }
+    }
+  });
+  const msg = (overwrite ? 'Ghi đè form' : 'Điền ô trống') + ': đã cập nhật ' + filled + ' trường.';
+  setText('writeStatus', msg + (filled ? ' ' + details.join(' | ') : ' Không tìm thấy trường phù hợp hoặc các ô đã có dữ liệu.'));
+  appendDiag('✅ ' + msg + (details.length ? '\n' + details.join('\n') : ''));
+}
+
+function collectTags(){
+  const tags = {};
+  function add(name, value){ if(value != null && String(value).trim() !== '') tags[name] = String(value).trim(); }
+  add('DateTimeOriginal', $('tag_DateTimeOriginal').value);
+  add('CreateDate', $('tag_CreateDate').value);
+  add('ModifyDate', $('tag_ModifyDate').value);
+  add('OffsetTimeOriginal', $('tag_OffsetTimeOriginal').value);
+  add('Title', $('tag_Title').value);
+  add('Artist', $('tag_Artist').value);
+  add('Description', $('tag_Description').value);
+  add('Copyright', $('tag_Copyright').value);
+  add('Software', $('tag_Software').value);
+  add('Make', $('tag_Make').value);
+  add('Model', $('tag_Model').value);
+  add('GPSLatitude', $('tag_GPSLatitude').value);
+  add('GPSLongitude', $('tag_GPSLongitude').value);
+  const extra = $('extraTags').value.trim();
+  if (extra) {
+    try { Object.assign(tags, JSON.parse(extra)); }
+    catch(e){ throw new Error('JSON tag bổ sung không hợp lệ: ' + e.message); }
+  }
+  return tags;
+}
+
+function resultToBlob(result){
+  const data = result && result.success && result.data !== undefined ? result.data : result;
+  if (data instanceof Blob) return data;
+  if (data instanceof ArrayBuffer) return new Blob([data], {type: currentFile?.type || 'application/octet-stream'});
+  if (data instanceof Uint8Array) return new Blob([data], {type: currentFile?.type || 'application/octet-stream'});
+  if (data && data.blob instanceof Blob) return data.blob;
+  if (data && data.file instanceof Blob) return data.file;
+  if (data && data.buffer instanceof ArrayBuffer) return new Blob([data.buffer], {type: currentFile?.type || 'application/octet-stream'});
+  throw new Error('Không nhận dạng được dữ liệu file trả về từ writeMetadata. Output=' + pretty(result).slice(0,500));
+}
+
+async function writeWithExifTool(){
+  if (!currentFile) return alert('Chưa chọn file.');
+  if (typeof writeMetadataFn !== 'function') await loadLocalModule();
+  if (typeof writeMetadataFn !== 'function') return alert('Module chưa có writeMetadata().');
+  try {
+    const tags = collectTags();
+    setText('writeStatus', 'Đang ghi metadata bằng ExifTool...');
+    const result = await writeMetadataFn(currentFile, tags);
+    const blob = resultToBlob(result);
+    const outName = safeName(currentFile.name).replace(/(\.[^.]+)?$/, '_exiftool_v124$1');
+    downloadBlob(blob, outName);
+    setText('writeStatus', '✅ Đã tạo file mới: ' + outName + ' | ' + formatBytes(blob.size));
+  } catch (e) { setText('writeStatus', '❌ Ghi lỗi: ' + explainError(e)); }
+}
+
+function downloadSidecarJson(){
+  if(!currentFile) return alert('Chưa chọn file.');
+  const payload = { file:{name:currentFile.name,type:currentFile.type,size:currentFile.size,lastModified:currentFile.lastModified}, tags:collectTags(), metadata:currentMetadata, exportedAt:new Date().toISOString(), tool:'GSHT V125 ExifTool Local Bundle' };
+  downloadTextFile(safeName(currentFile.name) + '.metadata.json', pretty(payload));
+}
+function copyMetadataJson(){
+  const txt = $('metadataOutput').textContent || pretty(currentMetadata || {});
+  navigator.clipboard?.writeText(txt).then(()=>alert('Đã sao chép JSON.')).catch(()=>alert('Không sao chép được.'));
+}
+function downloadBlob(blob, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000); }
+function downloadTextFile(name, text){ downloadBlob(new Blob([text], {type:'text/plain;charset=utf-8'}), name); }
+function explainError(err){
+  const msg = err && (err.stack || err.message) ? String(err.stack || err.message) : String(err);
+  if (/expected magic word|WASM|wasm|<!DOCTYPE|404/i.test(msg)) return msg + '\n\nCHẨN ĐOÁN: vẫn thiếu asset WASM do bundle local chưa copy đủ thư mục assets, hoặc server trả HTML/404. Hãy copy nguyên thư mục exiftool-vendor sau khi build.';
+  if (/Failed to resolve module specifier|bare specifier|@6over3\/zeroperl-ts/i.test(msg)) return msg + '\n\nCHẨN ĐOÁN: module chưa được bundle. Hãy chạy build Vite, không import ESM thô từ CDN.';
+  return msg;
+}
+function goBackMain(){ try { window.location.href = './index.html'; } catch(e){ history.back(); } }
+
+const dz = $('dropZone');
+if (dz) {
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+  dz.addEventListener('drop', e => { const f=e.dataTransfer.files && e.dataTransfer.files[0]; if(f) setCurrentFile(f); });
+}
+
+Object.assign(window, { $, goBackMain, testModuleUrl, loadLocalModule, checkVendorFolder, handleFileSelect, readWithExifTool, readBasicOnly, fillFormFromMetadata, writeWithExifTool, downloadSidecarJson, copyMetadataJson, downloadTextFile, getFirst, flattenMetadata, unwrapMetadataPayload });
+})();
+</script>
+</body>
+</html>
