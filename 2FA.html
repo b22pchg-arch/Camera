@@ -2,324 +2,107 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <title>Trình Tạo Mã 2FA Offline + Quét QR</title>
     <script src="qrcode.min.js"></script>
+    <script src="jsQR.min.js"></script>
     <script src="html5-qrcode.min.js"></script>
     <style>
         :root {
-            --primary: #1a73e8;
-            --background: #f1f3f4;
-            --surface: #ffffff;
-            --text: #202124;
-            --border: #dadce0;
-            --danger: #d93025;
-            --success: #1e8e3e;
+            --primary: #1a73e8; --background: #f1f3f4; --surface: #ffffff; --text: #202124;
+            --border: #dadce0; --danger: #d93025; --success: #1e8e3e; --warning:#f9ab00;
         }
+        * { box-sizing: border-box; }
+        html, body { min-height: 100%; margin: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--background);
-            color: var(--text);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+            background-color: var(--background); color: var(--text); display: flex; justify-content: center; align-items: center;
+            min-height: 100dvh; padding: 10px; overflow-x: hidden;
         }
         .container {
-            background-color: var(--surface);
-            padding: 32px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 420px;
-            text-align: center;
-            box-sizing: border-box;
-            max-height: 95vh;
-            overflow-y: auto;
-            position: relative;
+            background-color: var(--surface); padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 100%; max-width: 440px; text-align: center; max-height: calc(100dvh - 20px); overflow-y: auto; position: relative;
         }
-        h2 {
-            margin-top: 0;
-            font-size: 24px;
-            color: var(--text);
-            margin-bottom: 8px;
-        }
-        p.desc {
-            font-size: 13px;
-            color: #5f6368;
-            margin-bottom: 24px;
-        }
-
-        .account-select {
-            width: 100%;
-            padding: 10px;
-            font-size: 15px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            margin-bottom: 16px;
-            outline: none;
-            background-color: #f8f9fa;
-            cursor: pointer;
-            color: var(--text);
-            box-sizing: border-box;
-        }
-        .account-select:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
-        }
-        optgroup { font-weight: bold; color: var(--primary); }
-        option { color: var(--text); font-weight: normal; }
-
-        .input-wrapper {
-            position: relative;
-            width: 100%;
-            margin-bottom: 16px;
-        }
-        .main-input {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 12px 40px 12px 12px;
-            font-size: 16px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            outline: none;
-            text-align: center;
-            font-family: monospace;
-            text-transform: uppercase;
-        }
-        .main-input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
-        }
-        
-        .clear-btn {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #9aa0a6;
-            cursor: pointer;
-            font-size: 14px;
-            padding: 6px;
-            border-radius: 50%;
-            display: none;
-            transition: all 0.2s;
-        }
+        h2 { margin: 0 0 8px; font-size: 24px; color: var(--text); }
+        p.desc { font-size: 13px; color: #5f6368; margin-bottom: 18px; }
+        .top-actions { display:flex; gap:8px; margin-bottom:12px; }
+        .small-link { flex:1; display:block; text-decoration:none; border:1px solid var(--border); color:#3c4043; border-radius:8px; padding:8px 10px; font-weight:700; font-size:13px; background:#f8f9fa; }
+        .account-select, .main-input, .detail-input { width: 100%; font-size: 15px; border: 1px solid var(--border); border-radius: 8px; outline: none; background-color: #f8f9fa; color: var(--text); }
+        .account-select { padding: 10px; margin-bottom: 16px; cursor: pointer; }
+        .main-input { padding: 12px 40px 12px 12px; font-size: 16px; text-align: center; font-family: monospace; text-transform: uppercase; background:#fff; }
+        .detail-input { flex: 1; padding: 8px 12px; font-size: 14px; background:#fff; min-width:0; }
+        .account-select:focus, .main-input:focus, .detail-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+        optgroup { font-weight: bold; color: var(--primary); } option { color: var(--text); font-weight: normal; }
+        .input-wrapper { position: relative; width: 100%; margin-bottom: 14px; }
+        .clear-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #9aa0a6; cursor: pointer; font-size: 14px; padding: 6px; border-radius: 50%; display: none; }
         .clear-btn:hover { color: var(--danger); background-color: #fce8e6; }
-        
-        .code-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 16px;
-            margin: 16px 0;
-            min-height: 58px;
-        }
-        .code-display {
-            font-size: 48px;
-            font-weight: bold;
-            letter-spacing: 4px;
-            color: var(--primary);
-            margin: 0;
-        }
-        
-        .icon-btn {
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            color: #5f6368;
-            padding: 8px;
-            border-radius: 50%;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        .code-wrapper { display: flex; justify-content: center; align-items: center; gap: 14px; margin: 14px 0; min-height: 58px; }
+        .code-display { font-size: 48px; font-weight: bold; letter-spacing: 4px; color: var(--primary); margin: 0; }
+        .icon-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #5f6368; padding: 8px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
         .icon-btn:hover { background: #e8eaed; color: var(--primary); }
-
-        .progress-container {
-            width: 100%;
-            background-color: var(--border);
-            border-radius: 4px;
-            height: 6px;
-            overflow: hidden;
-            margin-bottom: 8px;
-        }
-        .progress-bar {
-            height: 100%;
-            background-color: var(--primary);
-            width: 100%;
-            transition: width 1s linear;
-        }
-        .timer-text { font-size: 14px; color: #5f6368; }
-        .error { color: var(--danger); font-size: 14px; display: none; }
-
-        .details-section {
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border);
-            text-align: left;
-        }
-        .detail-row {
-            display: flex;
-            align-items: center;
-            margin-bottom: 12px;
-            gap: 8px;
-        }
-        .detail-row label {
-            font-size: 14px;
-            font-weight: 500;
-            width: 70px;
-            color: #3c4043;
-        }
-        .detail-input {
-            flex: 1;
-            padding: 8px 12px;
-            font-size: 14px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            outline: none;
-            box-sizing: border-box;
-        }
-        .detail-input:focus { border-color: var(--primary); }
-
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-        .btn {
-            flex: 1;
-            padding: 10px;
-            font-size: 14px;
-            font-weight: 600;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
-            color: white;
-            min-width: 100px;
-        }
-        .btn-save { background-color: var(--primary); }
-        .btn-save:hover { background-color: #1557b0; }
-        .btn-scan { background-color: var(--success); }
-        .btn-scan:hover { background-color: #177132; }
-        .btn-delete {
-            background-color: white;
-            color: var(--danger);
-            border: 1px solid var(--danger);
-            display: none;
-        }
-        .btn-delete:hover { background-color: #fce8e6; }
-
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #323232;
-            color: white;
-            padding: 10px 24px;
-            border-radius: 24px;
-            font-size: 14px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
-            z-index: 1000;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        /* Modal Quét QR */
+        .progress-container { width: 100%; background-color: var(--border); border-radius: 4px; height: 6px; overflow: hidden; margin-bottom: 8px; }
+        .progress-bar { height: 100%; background-color: var(--primary); width: 100%; transition: width 1s linear; }
+        .timer-text { font-size: 14px; color: #5f6368; } .error { color: var(--danger); font-size: 14px; display: none; }
+        .details-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); text-align: left; }
+        .detail-row { display: flex; align-items: center; margin-bottom: 12px; gap: 8px; }
+        .detail-row label { font-size: 13px; font-weight: 700; width: 80px; color: #3c4043; flex:0 0 80px; }
+        .action-buttons { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+        .btn { flex: 1; padding: 10px; font-size: 14px; font-weight: 700; border: none; border-radius: 8px; cursor: pointer; color: white; min-width: 105px; }
+        .btn-save { background-color: var(--primary); } .btn-scan { background-color: var(--success); }
+        .btn-delete { background-color: white; color: var(--danger); border: 1px solid var(--danger); display: none; }
+        .toast { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom,0px)); left: 50%; transform: translateX(-50%); background: #323232; color: white; padding: 10px 20px; border-radius: 24px; font-size: 14px; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; z-index: 10000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); max-width: 92vw; }
         #qrModal {
-            display: none;
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--surface);
-            border-radius: 12px;
-            z-index: 50;
-            flex-direction: column;
+            display: none; position: fixed; inset: 0; width: 100dvw; height: 100dvh; background: #050505; color: white; z-index: 9999;
+            flex-direction: column; padding: env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
         }
-        #reader { width: 100%; height: 300px; background: #000; margin-top: 20px; border-radius: 8px; overflow: hidden;}
-        .close-modal {
-            margin-top: auto;
-            padding: 15px;
-            background: var(--danger);
-            color: white;
-            border: none;
-            border-radius: 0 0 12px 12px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
+        .qr-header { flex:0 0 auto; padding: 12px; background:#111; border-bottom:1px solid #333; }
+        .qr-header h3 { margin: 0 0 5px; font-size: 16px; }
+        #qrStatus { font-size: 12px; color:#cbd5e1; line-height:1.35; min-height: 18px; }
+        #reader { flex: 1 1 auto; min-height: 0; width: 100%; background: #000; overflow: hidden; display:flex; align-items:center; justify-content:center; position:relative; }
+        #reader video { width: 100%; height: 100%; object-fit: contain; background:#000; }
+        #reader canvas { display:none; }
+        .scan-box { position:absolute; width:min(72vw,320px); aspect-ratio:1; border:3px solid #00e676; border-radius:18px; box-shadow:0 0 0 9999px rgba(0,0,0,.20); pointer-events:none; }
+        .close-modal { flex:0 0 auto; padding: 15px; background: var(--danger); color: white; border: none; font-size: 16px; font-weight: bold; cursor: pointer; }
+        @media (max-width: 430px) {
+            body { padding: 0; align-items: stretch; } .container { border-radius:0; max-height:100dvh; padding:18px 14px; }
+            .code-display { font-size: 42px; } .detail-row label { width:68px; flex-basis:68px; font-size:12px; }
         }
     </style>
 </head>
 <body>
-
     <div class="container">
-        <div id="qrModal">
-            <h3 style="margin: 20px 0 0 0;">Đưa mã QR vào khung hình</h3>
-            <div id="reader"></div>
+        <div id="qrModal" aria-hidden="true">
+            <div class="qr-header">
+                <h3>Đưa mã QR 2FA vào khung hình</h3>
+                <div id="qrStatus">Đang chuẩn bị camera...</div>
+            </div>
+            <div id="reader"><div class="scan-box"></div></div>
             <button class="close-modal" id="closeQrBtn">HỦY QUÉT</button>
         </div>
 
         <h2>2FA Offline</h2>
         <p class="desc">Bảo mật - Ngoại tuyến - Lưu trữ cục bộ</p>
-        
-        <select id="accountSelect" class="account-select">
-            </select>
-
+        <div class="top-actions"><a class="small-link" href="index.html">← Về GSHT</a><a class="small-link" href="2FA.html?v=127">Nạp lại 2FA</a></div>
+        <select id="accountSelect" class="account-select"></select>
         <div class="input-wrapper">
             <input type="text" id="secretInput" class="main-input" placeholder="Nhập mã bí mật (Secret Key)..." autocomplete="off" spellcheck="false">
             <button class="clear-btn" id="clearBtn" title="Làm mới form">✖</button>
         </div>
-        
         <div id="errorMsg" class="error">Khóa bí mật không hợp lệ!</div>
-        
-        <div class="code-wrapper">
-            <div class="code-display" id="codeDisplay">------</div>
-            <button class="icon-btn" id="copyCodeBtn" title="Copy mã 2FA">📋</button>
-        </div>
-        
-        <div class="progress-container">
-            <div class="progress-bar" id="progressBar"></div>
-        </div>
+        <div class="code-wrapper"><div class="code-display" id="codeDisplay">------</div><button class="icon-btn" id="copyCodeBtn" title="Copy mã 2FA">📋</button></div>
+        <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
         <div class="timer-text">Mã mới sau: <span id="timerText">30</span>s</div>
-
         <div class="details-section">
-            <div class="detail-row">
-                <label>Tên TK:</label>
-                <input type="text" id="accountName" class="detail-input" placeholder="Tên để hiển thị ở danh sách...">
-            </div>
-            <div class="detail-row">
-                <label>Tài khoản:</label>
-                <input type="text" id="detail1" class="detail-input" placeholder="Nhập Tài khoản...">
-                <button class="icon-btn" onclick="copyDetail('detail1')" title="Copy Tài khoản">📋</button>
-            </div>
-            <div class="detail-row">
-                <label>Mật khẩu tài khoản:</label>
-                <input type="text" id="detail2" class="detail-input" placeholder="Nhập Mật khẩu...">
-                <button class="icon-btn" onclick="copyDetail('detail2')" title="Copy Mật khẩu">📋</button>
-            </div>
+            <div class="detail-row"><label>Tên TK:</label><input type="text" id="accountName" class="detail-input" placeholder="Tên để hiển thị ở danh sách..."></div>
+            <div class="detail-row"><label>Tài khoản:</label><input type="text" id="detail1" class="detail-input" placeholder="Nhập Tài khoản..."><button class="icon-btn" onclick="copyDetail('detail1')" title="Copy Tài khoản">📋</button></div>
+            <div class="detail-row"><label>Mật khẩu:</label><input type="text" id="detail2" class="detail-input" placeholder="Nhập Mật khẩu..."><button class="icon-btn" onclick="copyDetail('detail2')" title="Copy Mật khẩu">📋</button></div>
         </div>
-
-        <div class="action-buttons">
-            <button class="btn btn-save" id="saveBtn">💾 Lưu</button>
-            <button class="btn btn-scan" id="scanBtn">📸 Quét QR</button>
-            <button class="btn btn-delete" id="deleteBtn">🗑 Xóa</button>
-        </div>
+        <div class="action-buttons"><button class="btn btn-save" id="saveBtn">💾 Lưu</button><button class="btn btn-scan" id="scanBtn">📸 Quét QR</button><button class="btn btn-delete" id="deleteBtn">🗑 Xóa</button></div>
     </div>
-
     <div id="toast" class="toast">Đã copy!</div>
 
     <script>
-        // ==========================================
-        // 1. CẤU HÌNH DANH SÁCH CỐ ĐỊNH (Không thể xóa)
-        // ==========================================
+        // GSHT V127: 2FA scanner fixed - ưu tiên html5-qrcode, fallback BarcodeDetector/jsQR.
         const FIXED_ACCOUNTS = [
             { name: "Phòng Điều độ", secret: "DOCIYMSFWFMDHRS6I73AQCRBBM4ZFM23", detail1: "mehananiedert241@hotmail.com", detail2: "chatgpt@hdz123"},
 { name: "Phòng CNTT&CĐS", secret: "N3WXWH6E6T6S53LZVQZ5O6IM2GZLHAUD", detail1: "jauslyndmitrius21@hotmail.com", detail2: "Chatgpt@2026"},
@@ -332,340 +115,180 @@
 { name: "Phòng QLĐT", secret: "TDOVQNGY6GFXIV27QLVYXGMEDGCQERZK", detail1: "guelevleftik595@hotmail.com", detail2: "chatgpt@hdz123"},
 { name: "Phòng An Toàn", secret: "HHTTB7FCVCUBECVBY2VMLK33CG6R7RRN", detail1: "valorejacalne56@hotmail.com", detail2: "chatgpt@hdz123"},
 { name: "Phòng KTGSMBĐ", secret: "SDOZL2VSRU4K4AVMX4WPHTHYFYH6G7DZ", detail1: "borzekacayobit3@hotmail.com", detail2: "chatgpt@hdz123"}
+
         ];
-
-        // ==========================================
-        // 2. KHỞI TẠO BIẾN VÀ LẤY DỮ LIỆU ĐỘNG
-        // ==========================================
         const STORAGE_KEY = 'offline2fa_custom_accounts';
-        let customAccounts = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-
-        const accountSelect = document.getElementById('accountSelect');
-        const secretInput = document.getElementById('secretInput');
-        const accountName = document.getElementById('accountName');
-        const detail1 = document.getElementById('detail1');
-        const detail2 = document.getElementById('detail2');
-        const clearBtn = document.getElementById('clearBtn');
-        const saveBtn = document.getElementById('saveBtn');
-        const deleteBtn = document.getElementById('deleteBtn');
-        const scanBtn = document.getElementById('scanBtn');
-        const codeDisplay = document.getElementById('codeDisplay');
-        const progressBar = document.getElementById('progressBar');
-        const timerText = document.getElementById('timerText');
-        const errorMsg = document.getElementById('errorMsg');
-        const toast = document.getElementById('toast');
-
-        // Hàm hiển thị Dropdown
+        let customAccounts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') || [];
+        const $ = id => document.getElementById(id);
+        const accountSelect = $('accountSelect'), secretInput = $('secretInput'), accountName = $('accountName'), detail1 = $('detail1'), detail2 = $('detail2');
+        const clearBtn = $('clearBtn'), saveBtn = $('saveBtn'), deleteBtn = $('deleteBtn'), scanBtn = $('scanBtn'), codeDisplay = $('codeDisplay');
+        const progressBar = $('progressBar'), timerText = $('timerText'), errorMsg = $('errorMsg'), toast = $('toast');
+        const qrModal = $('qrModal'), closeQrBtn = $('closeQrBtn'), reader = $('reader'), qrStatus = $('qrStatus');
+        let html5QrcodeScanner = null, scanStream = null, scanLoopId = 0, scanActive = false;
         function renderDropdown() {
             accountSelect.innerHTML = '<option value="">-- Tạo tài khoản mới --</option>';
-            if (FIXED_ACCOUNTS.length > 0) {
-                const groupFixed = document.createElement('optgroup');
-                groupFixed.label = "📌 Danh sách cố định";
-                FIXED_ACCOUNTS.forEach((acc, index) => {
-                    const opt = document.createElement('option');
-                    opt.value = 'fixed_' + index;
-                    opt.textContent = acc.name;
-                    groupFixed.appendChild(opt);
-                });
-                accountSelect.appendChild(groupFixed);
+            if (FIXED_ACCOUNTS.length) {
+                const g = document.createElement('optgroup'); g.label = '📌 Danh sách cố định';
+                FIXED_ACCOUNTS.forEach((acc,i)=>{ const o=document.createElement('option'); o.value='fixed_'+i; o.textContent=acc.name || ('TK '+(i+1)); g.appendChild(o); });
+                accountSelect.appendChild(g);
             }
-            if (customAccounts.length > 0) {
-                const groupCustom = document.createElement('optgroup');
-                groupCustom.label = "⭐ Tài khoản bạn thêm";
-                customAccounts.forEach((acc, index) => {
-                    const opt = document.createElement('option');
-                    opt.value = 'custom_' + index;
-                    opt.textContent = acc.name;
-                    groupCustom.appendChild(opt);
-                });
-                accountSelect.appendChild(groupCustom);
+            if (customAccounts.length) {
+                const g = document.createElement('optgroup'); g.label = '⭐ Tài khoản bạn thêm';
+                customAccounts.forEach((acc,i)=>{ const o=document.createElement('option'); o.value='custom_'+i; o.textContent=acc.name || ('TK '+(i+1)); g.appendChild(o); });
+                accountSelect.appendChild(g);
             }
         }
-        
-        // ==========================================
-        // 3. TÍNH NĂNG QUÉT QR BẰNG CAMERA
-        // ==========================================
-        const qrModal = document.getElementById('qrModal');
-        const closeQrBtn = document.getElementById('closeQrBtn');
-        let html5QrcodeScanner;
-
-        scanBtn.addEventListener('click', () => {
-            clearAllInputs(); // Chuẩn bị form trống
-            qrModal.style.display = 'flex';
-            
-            // Khởi tạo máy quét
-            html5QrcodeScanner = new Html5Qrcode("reader");
-            
-            // Cấu hình quét camera sau (nếu có)
-            html5QrcodeScanner.start({ facingMode: "environment" }, {
-                fps: 10,
-                qrbox: { width: 250, height: 250 }
-            },
-            (decodedText, decodedResult) => {
-                // Xử lý khi quét thành công
-                stopScanner();
-                parseOtpAuthUri(decodedText);
-            },
-            (errorMessage) => {
-                // Bỏ qua lỗi trong lúc đang dò
-            })
-            .catch((err) => {
-                stopScanner();
-                showToast("Lỗi: Không thể truy cập Camera!");
-            });
-        });
-
-        closeQrBtn.addEventListener('click', () => {
-            stopScanner();
-        });
-
-        function stopScanner() {
+        function setQrStatus(msg) { if (qrStatus) qrStatus.textContent = msg || ''; }
+        function openQrModal() { qrModal.style.display = 'flex'; qrModal.setAttribute('aria-hidden','false'); }
+        function closeQrModal() { qrModal.style.display = 'none'; qrModal.setAttribute('aria-hidden','true'); }
+        function resetReader() { reader.innerHTML = '<div class="scan-box"></div>'; }
+        function isSecureCameraContext() { return location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1'; }
+        scanBtn.addEventListener('click', startScanner);
+        closeQrBtn.addEventListener('click', stopScanner);
+        async function startScanner() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('Trình duyệt không hỗ trợ camera.'); return; }
+            if (!isSecureCameraContext()) { showToast('Camera cần HTTPS hoặc localhost.'); return; }
+            await stopScanner(false);
+            openQrModal(); resetReader(); setQrStatus('Đang xin quyền camera...'); scanActive = true;
+            if (window.Html5Qrcode) {
+                try {
+                    setQrStatus('Đang quét bằng html5-qrcode...');
+                    html5QrcodeScanner = new Html5Qrcode('reader');
+                    await html5QrcodeScanner.start({ facingMode: { ideal: 'environment' } }, { fps: 12, qrbox: (w,h)=>{ const s=Math.floor(Math.min(w,h)*0.72); return { width:s, height:s }; }, aspectRatio: 1.777 }, onQrDecoded, ()=>{});
+                    return;
+                } catch(e) {
+                    console.warn('Html5Qrcode failed, fallback scanner:', e);
+                    try { if (html5QrcodeScanner) await html5QrcodeScanner.clear(); } catch(_e){}
+                    html5QrcodeScanner = null; resetReader();
+                }
+            }
+            await startFallbackScanner();
+        }
+        async function startFallbackScanner() {
+            setQrStatus(window.BarcodeDetector ? 'Đang quét bằng BarcodeDetector...' : (window.jsQR ? 'Đang quét bằng jsQR offline...' : 'Thiếu thư viện đọc QR. Cần jsQR.min.js hoặc html5-qrcode.min.js.'));
+            if (!window.BarcodeDetector && !window.jsQR) throw new Error('Thiếu thư viện QR');
+            scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal:'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio:false });
+            const video = document.createElement('video'); video.setAttribute('playsinline',''); video.muted = true; video.autoplay = true; video.srcObject = scanStream;
+            const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d', { willReadFrequently:true });
+            resetReader(); reader.appendChild(video); reader.appendChild(canvas); reader.insertAdjacentHTML('beforeend','<div class="scan-box"></div>');
+            await video.play().catch(()=>{});
+            let detector = null;
+            if (window.BarcodeDetector) { try { detector = new BarcodeDetector({ formats:['qr_code'] }); } catch(e) { detector = null; } }
+            const loop = async () => {
+                if (!scanActive) return;
+                try {
+                    if (video.readyState >= 2) {
+                        if (detector) {
+                            const codes = await detector.detect(video);
+                            if (codes && codes.length) return onQrDecoded(codes[0].rawValue || codes[0].rawData || '');
+                        } else if (window.jsQR) {
+                            const w = video.videoWidth || 640, h = video.videoHeight || 480;
+                            canvas.width = w; canvas.height = h; ctx.drawImage(video,0,0,w,h);
+                            const img = ctx.getImageData(0,0,w,h);
+                            const code = jsQR(img.data, w, h, { inversionAttempts: 'attemptBoth' });
+                            if (code && code.data) return onQrDecoded(code.data);
+                        }
+                    }
+                } catch(e) { console.warn('QR loop error', e); }
+                scanLoopId = requestAnimationFrame(loop);
+            };
+            scanLoopId = requestAnimationFrame(loop);
+        }
+        async function stopScanner(hide=true) {
+            scanActive = false; if (scanLoopId) { cancelAnimationFrame(scanLoopId); scanLoopId = 0; }
             if (html5QrcodeScanner) {
-                html5QrcodeScanner.stop().then(() => {
-                    html5QrcodeScanner.clear();
-                }).catch(err => console.log(err));
+                try { await html5QrcodeScanner.stop(); } catch(e) {}
+                try { await html5QrcodeScanner.clear(); } catch(e) {}
+                html5QrcodeScanner = null;
             }
-            qrModal.style.display = 'none';
+            if (scanStream) { scanStream.getTracks().forEach(t=>t.stop()); scanStream = null; }
+            if (hide) closeQrModal();
         }
-
-        // Hàm phân tích URI trả về từ QR Code (VD: otpauth://totp/Facebook:test?secret=JBSW...&issuer=Facebook)
+        async function onQrDecoded(decodedText) {
+            if (!decodedText) return;
+            await stopScanner(true);
+            parseOtpAuthUri(String(decodedText).trim());
+        }
+        function normalizeSecret(s) { return String(s || '').replace(/\s+/g,'').replace(/=/g,'').toUpperCase(); }
         function parseOtpAuthUri(uri) {
             try {
-                const url = new URL(uri);
-                if (url.protocol !== 'otpauth:') {
-                    showToast("Mã QR không hợp lệ (Không phải mã 2FA)");
-                    return;
-                }
-                
-                const secret = url.searchParams.get('secret');
-                if (!secret) {
-                    showToast("Mã QR không chứa Secret Key!");
-                    return;
-                }
-
-                // Cố gắng lấy Tên tài khoản / Issuer để điền tự động
-                let name = url.pathname.replace('//totp/', '');
-                name = decodeURIComponent(name); // VD: Facebook:test@gmail.com
-                
-                const issuer = url.searchParams.get('issuer');
-                
-                let finalName = "";
-                let detail = "";
-
-                if (name.includes(':')) {
-                    const parts = name.split(':');
-                    finalName = parts[0];
-                    detail = parts[1];
+                let secret = '', finalName = '', detail = '';
+                if (/^otpauth:\/\//i.test(uri)) {
+                    const url = new URL(uri);
+                    if (url.protocol !== 'otpauth:') throw new Error('not otpauth');
+                    secret = normalizeSecret(url.searchParams.get('secret'));
+                    if (!secret) return showToast('Mã QR không chứa Secret Key!');
+                    const issuerParam = decodeURIComponent(url.searchParams.get('issuer') || '').trim();
+                    const label = decodeURIComponent((url.pathname || '').replace(/^\/+/, '')).trim();
+                    if (label.includes(':')) {
+                        const parts = label.split(':');
+                        finalName = issuerParam || parts[0].trim();
+                        detail = parts.slice(1).join(':').trim();
+                    } else {
+                        finalName = issuerParam || label || '2FA';
+                        detail = issuerParam && label && label !== issuerParam ? label : '';
+                    }
+                } else if (/^[A-Z2-7\s=]+$/i.test(uri) && uri.replace(/[^A-Z2-7]/ig,'').length >= 8) {
+                    secret = normalizeSecret(uri); finalName = '2FA mới'; detail = '';
                 } else {
-                    finalName = issuer ? issuer : name;
-                    detail = name;
+                    return showToast('Mã QR không hợp lệ hoặc không phải mã 2FA.');
                 }
-
-                // Điền vào form
-                accountName.value = finalName;
-                detail1.value = detail;
-                secretInput.value = secret;
+                accountName.value = finalName; detail1.value = detail; secretInput.value = secret;
+                accountSelect.value = ''; deleteBtn.style.display = 'none'; saveBtn.innerText = '💾 Lưu';
                 secretInput.dispatchEvent(new Event('input'));
-                
-                showToast("✅ Quét thành công! Hãy bấm Lưu.");
-
-            } catch (error) {
-                showToast("Lỗi giải mã QR!");
-            }
+                showToast('✅ Quét QR thành công! Kiểm tra rồi bấm Lưu.');
+            } catch(e) { console.error(e); showToast('Lỗi giải mã QR 2FA!'); }
         }
-
-        // ==========================================
-        // 4. CÁC HÀM XỬ LÝ GIAO DIỆN (UI)
-        // ==========================================
         accountSelect.addEventListener('change', function() {
             const val = this.value;
-            if (val.startsWith('fixed_')) {
-                const idx = parseInt(val.split('_')[1]);
-                fillInputs(FIXED_ACCOUNTS[idx]);
-                deleteBtn.style.display = 'none'; 
-                saveBtn.innerText = '💾 Lưu bản mới'; 
-            } 
-            else if (val.startsWith('custom_')) {
-                const idx = parseInt(val.split('_')[1]);
-                fillInputs(customAccounts[idx]);
-                deleteBtn.style.display = 'block'; 
-                saveBtn.innerText = '💾 Cập nhật';
-            } 
-            else { clearAllInputs(); }
+            if (val.startsWith('fixed_')) { fillInputs(FIXED_ACCOUNTS[parseInt(val.split('_')[1])]); deleteBtn.style.display='none'; saveBtn.innerText='💾 Lưu bản mới'; }
+            else if (val.startsWith('custom_')) { fillInputs(customAccounts[parseInt(val.split('_')[1])]); deleteBtn.style.display='block'; saveBtn.innerText='💾 Cập nhật'; }
+            else clearAllInputs();
             secretInput.dispatchEvent(new Event('input'));
         });
-
-        function fillInputs(acc) {
-            accountName.value = acc.name;
-            secretInput.value = acc.secret;
-            detail1.value = acc.detail1;
-            detail2.value = acc.detail2;
-        }
-
-        function clearAllInputs() {
-            accountSelect.value = "";
-            accountName.value = '';
-            secretInput.value = '';
-            detail1.value = '';
-            detail2.value = '';
-            clearBtn.style.display = 'none';
-            deleteBtn.style.display = 'none';
-            saveBtn.innerText = '💾 Lưu';
-            updateUI();
-        }
+        function fillInputs(acc) { acc=acc||{}; accountName.value=acc.name||''; secretInput.value=acc.secret||''; detail1.value=acc.detail1||''; detail2.value=acc.detail2||''; }
+        function clearAllInputs() { accountSelect.value=''; accountName.value=''; secretInput.value=''; detail1.value=''; detail2.value=''; clearBtn.style.display='none'; deleteBtn.style.display='none'; saveBtn.innerText='💾 Lưu'; updateUI(); }
         clearBtn.addEventListener('click', () => { clearAllInputs(); secretInput.focus(); });
-
         saveBtn.addEventListener('click', () => {
-            const nameVal = accountName.value.trim();
-            const secretVal = secretInput.value.trim();
-            const d1Val = detail1.value.trim();
-            const d2Val = detail2.value.trim();
-
-            if (!nameVal || !secretVal) { showToast("⚠️ Điền Tên TK và Mã bí mật!"); return; }
-
-            const currentVal = accountSelect.value;
-            
-            if (currentVal.startsWith('custom_')) {
-                const idx = parseInt(currentVal.split('_')[1]);
-                customAccounts[idx] = { name: nameVal, secret: secretVal, detail1: d1Val, detail2: d2Val };
-                showToast("✅ Đã cập nhật!");
-            } else {
-                customAccounts.push({ name: nameVal, secret: secretVal, detail1: d1Val, detail2: d2Val });
-                showToast("✅ Đã thêm tài khoản mới!");
-            }
-
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(customAccounts));
-            renderDropdown();
-            
-            if (currentVal.startsWith('custom_')) {
-                accountSelect.value = currentVal;
-            } else {
-                accountSelect.value = 'custom_' + (customAccounts.length - 1);
-                deleteBtn.style.display = 'block';
-                saveBtn.innerText = '💾 Cập nhật';
-            }
+            const nameVal=accountName.value.trim(), secretVal=normalizeSecret(secretInput.value), d1Val=detail1.value.trim(), d2Val=detail2.value.trim();
+            if (!nameVal || !secretVal) return showToast('⚠️ Điền Tên TK và Mã bí mật!');
+            const currentVal=accountSelect.value;
+            if (currentVal.startsWith('custom_')) { customAccounts[parseInt(currentVal.split('_')[1])]={name:nameVal, secret:secretVal, detail1:d1Val, detail2:d2Val}; showToast('✅ Đã cập nhật!'); }
+            else { customAccounts.push({name:nameVal, secret:secretVal, detail1:d1Val, detail2:d2Val}); showToast('✅ Đã thêm tài khoản mới!'); }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(customAccounts)); renderDropdown();
+            if (currentVal.startsWith('custom_')) accountSelect.value=currentVal; else { accountSelect.value='custom_'+(customAccounts.length-1); deleteBtn.style.display='block'; saveBtn.innerText='💾 Cập nhật'; }
         });
-
-        deleteBtn.addEventListener('click', () => {
-            const currentVal = accountSelect.value;
-            if (currentVal.startsWith('custom_')) {
-                const idx = parseInt(currentVal.split('_')[1]);
-                if (confirm(`Xóa tài khoản "${customAccounts[idx].name}"?`)) {
-                    customAccounts.splice(idx, 1);
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(customAccounts));
-                    renderDropdown();
-                    clearAllInputs();
-                    showToast("🗑 Đã xóa!");
-                }
-            }
-        });
-
-        let toastTimeout;
-        function showToast(message) {
-            toast.innerText = message;
-            toast.style.opacity = '1';
-            clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => toast.style.opacity = '0', 2500);
-        }
-
-        function copyToClipboard(text) {
-            if (!text) return showToast("Không có dữ liệu!");
-            navigator.clipboard.writeText(text).then(() => showToast("Đã copy!")).catch(() => showToast("Lỗi!"));
-        }
-
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-            const codeRaw = codeDisplay.innerText;
-            if (codeRaw !== "------") copyToClipboard(codeRaw.replace(/\s/g, '')); 
-            else showToast("Chưa có mã!");
-        });
-        function copyDetail(inputId) { copyToClipboard(document.getElementById(inputId).value.trim()); }
-
-        secretInput.addEventListener('input', () => {
-            clearBtn.style.display = secretInput.value.length > 0 ? 'block' : 'none';
-            updateUI();
-        });
-
-        // ==========================================
-        // 5. THUẬT TOÁN TẠO TOTP
-        // ==========================================
+        deleteBtn.addEventListener('click', () => { const v=accountSelect.value; if (v.startsWith('custom_')) { const idx=parseInt(v.split('_')[1]); if (confirm(`Xóa tài khoản "${customAccounts[idx].name}"?`)) { customAccounts.splice(idx,1); localStorage.setItem(STORAGE_KEY, JSON.stringify(customAccounts)); renderDropdown(); clearAllInputs(); showToast('🗑 Đã xóa!'); } } });
+        let toastTimeout; function showToast(message) { toast.innerText = message; toast.style.opacity = '1'; clearTimeout(toastTimeout); toastTimeout = setTimeout(()=>toast.style.opacity='0', 2600); }
+        function copyToClipboard(text) { if (!text) return showToast('Không có dữ liệu!'); navigator.clipboard.writeText(text).then(()=>showToast('Đã copy!')).catch(()=>showToast('Lỗi copy!')); }
+        $('copyCodeBtn').addEventListener('click', () => { const c=codeDisplay.innerText; if (c !== '------') copyToClipboard(c.replace(/\s/g,'')); else showToast('Chưa có mã!'); });
+        function copyDetail(inputId) { copyToClipboard($(inputId).value.trim()); } window.copyDetail = copyDetail;
+        secretInput.addEventListener('input', () => { clearBtn.style.display = secretInput.value.length ? 'block' : 'none'; updateUI(); });
         function base32ToUint8Array(base32) {
-            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-            let bits = "";
-            let cleanedBase32 = base32.replace(/[^A-Z2-7]/ig, '').toUpperCase();
-            let value = new Uint8Array(Math.floor(cleanedBase32.length * 5 / 8));
-            let index = 0;
-            for (let i = 0; i < cleanedBase32.length; i++) {
-                let val = alphabet.indexOf(cleanedBase32[i]);
-                bits += val.toString(2).padStart(5, '0');
-            }
-            for (let i = 0; i + 8 <= bits.length; i += 8) {
-                value[index++] = parseInt(bits.substring(i, i + 8), 2);
-            }
-            return value;
+            const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits=''; const cleaned=normalizeSecret(base32).replace(/[^A-Z2-7]/g,'');
+            const value=new Uint8Array(Math.floor(cleaned.length*5/8)); let index=0;
+            for (let i=0;i<cleaned.length;i++) { const val=alphabet.indexOf(cleaned[i]); if (val < 0) continue; bits += val.toString(2).padStart(5,'0'); }
+            for (let i=0;i+8<=bits.length;i+=8) value[index++]=parseInt(bits.substring(i,i+8),2);
+            return value.slice(0,index);
         }
-
         async function generateTOTP(secretBase32) {
-            try {
-                if (!secretBase32) return null;
-                const keyBytes = base32ToUint8Array(secretBase32);
-                if (keyBytes.length === 0) throw new Error("Invalid key");
-                const epoch = Math.floor(Date.now() / 1000.0);
-                const counter = Math.floor(epoch / 30);
-                const counterBytes = new Uint8Array(8);
-                let tempCounter = counter;
-                for (let i = 7; i >= 0; i--) {
-                    counterBytes[i] = tempCounter & 0xff;
-                    tempCounter = Math.floor(tempCounter / 256);
-                }
-                const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-                const signature = await crypto.subtle.sign("HMAC", cryptoKey, counterBytes);
-                const hmacResult = new Uint8Array(signature);
-                const offset = hmacResult[hmacResult.length - 1] & 0xf;
-                const binary = ((hmacResult[offset] & 0x7f) << 24) | ((hmacResult[offset + 1] & 0xff) << 16) | ((hmacResult[offset + 2] & 0xff) << 8) | (hmacResult[offset + 3] & 0xff);
-                const otp = binary % 1000000;
-                return otp.toString().padStart(6, '0');
-            } catch (error) { return false; }
+            try { if (!secretBase32) return null; const keyBytes=base32ToUint8Array(secretBase32); if (!keyBytes.length) throw new Error('Invalid key');
+                const counter=Math.floor(Math.floor(Date.now()/1000)/30); const counterBytes=new Uint8Array(8); let c=counter;
+                for (let i=7;i>=0;i--) { counterBytes[i]=c & 0xff; c=Math.floor(c/256); }
+                const cryptoKey=await crypto.subtle.importKey('raw', keyBytes, {name:'HMAC', hash:'SHA-1'}, false, ['sign']);
+                const sig=await crypto.subtle.sign('HMAC', cryptoKey, counterBytes); const h=new Uint8Array(sig); const offset=h[h.length-1]&0xf;
+                const binary=((h[offset]&0x7f)<<24)|((h[offset+1]&0xff)<<16)|((h[offset+2]&0xff)<<8)|(h[offset+3]&0xff);
+                return String(binary % 1000000).padStart(6,'0');
+            } catch(e) { return false; }
         }
-
         async function updateUI() {
-            const secret = secretInput.value.trim();
-            const epoch = Math.floor(Date.now() / 1000.0);
-            const remaining = 30 - (epoch % 30);
-            timerText.innerText = remaining;
-            progressBar.style.width = (remaining / 30 * 100) + "%";
-            
-            if (remaining <= 5) {
-                progressBar.style.backgroundColor = "var(--danger)";
-                codeDisplay.style.color = "var(--danger)";
-            } else {
-                progressBar.style.backgroundColor = "var(--primary)";
-                codeDisplay.style.color = "var(--primary)";
-            }
-
-            if (secret) {
-                const otp = await generateTOTP(secret);
-                if (otp === false) {
-                    errorMsg.style.display = "block";
-                    codeDisplay.innerText = "------";
-                } else {
-                    errorMsg.style.display = "none";
-                    codeDisplay.innerText = otp.substring(0, 3) + " " + otp.substring(3, 6);
-                }
-            } else {
-                errorMsg.style.display = "none";
-                codeDisplay.innerText = "------";
-            }
+            const secret=secretInput.value.trim(); const epoch=Math.floor(Date.now()/1000); const remaining=30-(epoch%30);
+            timerText.innerText=remaining; progressBar.style.width=(remaining/30*100)+'%';
+            if (remaining <= 5) { progressBar.style.backgroundColor='var(--danger)'; codeDisplay.style.color='var(--danger)'; } else { progressBar.style.backgroundColor='var(--primary)'; codeDisplay.style.color='var(--primary)'; }
+            if (secret) { const otp=await generateTOTP(secret); if (otp===false) { errorMsg.style.display='block'; codeDisplay.innerText='------'; } else { errorMsg.style.display='none'; codeDisplay.innerText=otp.substring(0,3)+' '+otp.substring(3,6); } }
+            else { errorMsg.style.display='none'; codeDisplay.innerText='------'; }
         }
-
-        // Khởi động
-        renderDropdown();
-        if (FIXED_ACCOUNTS.length > 0) {
-            accountSelect.value = 'fixed_0'; 
-            accountSelect.dispatchEvent(new Event('change')); 
-        } else if (customAccounts.length > 0) {
-            accountSelect.value = 'custom_0'; 
-            accountSelect.dispatchEvent(new Event('change'));
-        }
+        renderDropdown(); if (FIXED_ACCOUNTS.length) { accountSelect.value='fixed_0'; accountSelect.dispatchEvent(new Event('change')); } else if (customAccounts.length) { accountSelect.value='custom_0'; accountSelect.dispatchEvent(new Event('change')); }
         setInterval(updateUI, 1000);
     </script>
 </body>

@@ -2,7 +2,7 @@
 // GSHT PWA Service Worker - SAFE UPDATE BUILD
 // Bản này ưu tiên ổn định cập nhật PWA. Không ép COOP/COEP trong Service Worker
 // vì GitHub Pages/PWA mobile có thể làm Service Worker update fail hoặc Whisper abort khó kiểm soát.
-const GSHT_CACHE = 'gsht-pwa-v126-v117-plus-exiftool-note-dedupe';
+const GSHT_CACHE = 'gsht-pwa-v127-2fa-qr-fixed';
 const APP_SHELL = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const APP_SHELL = [
   './all.min.css',
   './qrcode.min.js',
   './jsQR.min.js',
+  './html5-qrcode.min.js',
   './fflate.min.js',
   './exifreader.min.js',
   './exifr.full.umd.js',
@@ -60,7 +61,7 @@ function isLargeModelRequest(url) {
 
 
 function isExifToolStandalonePage(url) {
-  return /exiftool_wasm_tool_v125_fill_form_fixed\.html$/i.test(url.pathname);
+  return /exiftool_wasm_tool_v12[56]_fill_form_fixed\.html$/i.test(url.pathname);
 }
 
 function isLargeOptionalWasmAsset(url) {
@@ -94,6 +95,11 @@ async function assertOptionalBinaryResponse(request, url) {
   return new Response(buf, { status: response.status, statusText: response.statusText, headers: {'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream','Cache-Control':'no-store'} });
 }
 
+
+function isTwoFaPage(url) {
+  return /(?:^|\/)2FA\.html$/i.test(url.pathname);
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
@@ -103,6 +109,23 @@ self.addEventListener('fetch', event => {
   // Với cross-origin CDN, service worker chỉ pass-through nguyên bản để CDN tự xử lý CORS/MIME.
   if (isLargeOptionalWasmAsset(url)) {
     event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
+
+
+
+  // GSHT V127: 2FA.html là HTML phụ, phải cache theo đúng tên file.
+  // Không để navigation handler ghi nhầm 2FA.html vào cache index.html.
+  if (isTwoFaPage(url)) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .then(response => {
+          const copy = response.clone();
+          caches.open(GSHT_CACHE).then(cache => cache.put('./2FA.html', copy)).catch(() => {});
+          return response;
+        })
+        .catch(() => caches.match('./2FA.html').then(r => r || caches.match('./offline.html')))
+    );
     return;
   }
 
