@@ -16266,5 +16266,262 @@ setTimeout(install, 13500);
 })();
 </script>
 
+
+
+<!-- GSHT V138: Sửa gom ảnh 3 kho + fallback khi Zalo/trình duyệt báo Permission denied với ZIP HD -->
+<style>
+#gsht-v138-download-panel {
+    position: fixed;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    width: min(94vw, 520px);
+    z-index: 999999;
+    background: #111820;
+    color: #e9ecef;
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.65);
+    padding: 10px;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+#gsht-v138-download-panel .gsht-v138-title { color:#ffc107; font-weight:800; font-size:13px; margin-bottom:4px; }
+#gsht-v138-download-panel .gsht-v138-text { color:#adb5bd; font-size:11px; line-height:1.35; margin-bottom:8px; }
+#gsht-v138-download-panel .gsht-v138-actions { display:flex; gap:7px; flex-wrap:wrap; }
+#gsht-v138-download-panel .gsht-v138-actions a,
+#gsht-v138-download-panel .gsht-v138-actions button {
+    flex: 1 1 140px;
+    border-radius: 8px;
+    border: 1px solid #ffc107;
+    background: #ffc107;
+    color: #111;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 8px 10px;
+    text-align: center;
+    text-decoration: none;
+}
+#gsht-v138-download-panel .gsht-v138-actions button { background:#212529; color:#e9ecef; border-color:#6c757d; }
+</style>
+<script>
+(function(){
+    const V138_ZIP_LEVEL = 0;
+    function arrFromGlobal(name){
+        try {
+            if (name === 'repoBefore' && typeof repoBefore !== 'undefined' && Array.isArray(repoBefore)) return repoBefore;
+            if (name === 'repoProcess' && typeof repoProcess !== 'undefined' && Array.isArray(repoProcess)) return repoProcess;
+            if (name === 'repoAfter' && typeof repoAfter !== 'undefined' && Array.isArray(repoAfter)) return repoAfter;
+            if (name === 'repoStitched' && typeof repoStitched !== 'undefined' && Array.isArray(repoStitched)) return repoStitched;
+        } catch(e) {}
+        try { if (Array.isArray(window[name])) return window[name]; } catch(e) {}
+        return [];
+    }
+    function uniqueItems(items){
+        const seen = new Set();
+        const out = [];
+        (items || []).forEach((item, idx) => {
+            if (!item) return;
+            const key = item.id || item.name || item.dataUrl || ('idx_' + idx);
+            if (seen.has(key)) return;
+            seen.add(key);
+            out.push(item);
+        });
+        return out;
+    }
+    function getAllPendingItemsV138(){
+        let items = [
+            ...arrFromGlobal('repoBefore'),
+            ...arrFromGlobal('repoProcess'),
+            ...arrFromGlobal('repoAfter')
+        ];
+        if (!items.length && typeof buildPendingSessions === 'function') {
+            try {
+                const sessions = buildPendingSessions() || [];
+                sessions.forEach(s => {
+                    items.push(...(s.before || []), ...(s.process || []), ...(s.after || []));
+                });
+            } catch(e) {}
+        }
+        return uniqueItems(items).sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+    }
+    function getCurrentPendingSessionV138(){
+        if (typeof buildPendingSessions !== 'function') return null;
+        const sessions = buildPendingSessions() || [];
+        if (!sessions.length) return null;
+        let session = null;
+        try { if (typeof pendingSessionFilter !== 'undefined' && pendingSessionFilter) session = sessions.find(s => s.no === pendingSessionFilter); } catch(e) {}
+        if (!session) {
+            const v = parseInt(document.getElementById('pending-session-input')?.value || '', 10);
+            if (Number.isFinite(v)) session = sessions.find(s => s.no === v);
+        }
+        return session || null;
+    }
+    function getSelectedGalleryItemsV138(){
+        const checkedBoxes = document.querySelectorAll('.gallery-item-check:checked');
+        if (!checkedBoxes.length) return [];
+        const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute('data-id'));
+        return arrFromGlobal('repoStitched').filter(item => selectedIds.includes(item.id));
+    }
+    function escName(name){
+        return String(name || 'GSHT_anh.jpg')
+            .replace(/[\\/:*?"<>|]+/g, '_')
+            .replace(/\s+/g, '_')
+            .slice(0, 180) || 'GSHT_anh.jpg';
+    }
+    function dateToken(){
+        const d = new Date();
+        return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + '_' +
+               String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0');
+    }
+    function dataUrlToU8(dataUrl){
+        if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.includes(',')) throw new Error('Ảnh không hợp lệ hoặc thiếu dataUrl.');
+        const b64 = dataUrl.split(',')[1];
+        const bin = atob(b64);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        return u8;
+    }
+    function normalizeItems(items){
+        const used = new Set();
+        return (items || []).filter(Boolean).map((item, idx) => {
+            if (!item.name && typeof buildStandardPhotoName === 'function') {
+                try { item.name = buildStandardPhotoName(item, item.type || 'ẢNH'); } catch(e) {}
+            }
+            if (typeof saveToDB === 'function') {
+                try { saveToDB(item); } catch(e) {}
+            }
+            let name = item.name || ('GSHT_anh_' + (idx+1) + '.jpg');
+            if (!/\.(jpe?g|png|webp)$/i.test(name)) name += '.jpg';
+            name = escName(name);
+            const base = name;
+            let n = 2;
+            while (used.has(name.toLowerCase())) {
+                const dot = base.lastIndexOf('.');
+                name = dot > 0 ? base.slice(0,dot) + '_' + n + base.slice(dot) : base + '_' + n;
+                n++;
+            }
+            used.add(name.toLowerCase());
+            return { item, name };
+        });
+    }
+    function makeReadme(kind, count){
+        return new TextEncoder().encode(
+`GSHT PWA - GOI ANH HD V138\n` +
+`Loai: ${kind || 'Anh hien truong'}\n` +
+`So anh: ${count}\n` +
+`Thoi gian xuat: ${new Date().toLocaleString('vi-VN')}\n\n` +
+`Huong dan gui Zalo/MXH it bi mo:\n` +
+`1) Gui file ZIP nay bang muc Tep/File, khong gui bang muc Anh.\n` +
+`2) Neu Zalo/trinh duyet bao Permission denied, ung dung se tai ZIP ve may; sau do vao Zalo > Tep/File > chon ZIP.\n` +
+`3) Nguoi nhan giai nen ZIP de lay anh JPG chat luong goc tu ung dung.\n` +
+`4) Dang len nhat ky/bang tin MXH van co the bi nen lai boi nen tang.\n`
+        );
+    }
+    function buildHdZipBlobV138(items, kind){
+        if (!window.fflate || typeof fflate.zipSync !== 'function') throw new Error('Thiếu fflate.min.js hoặc thư viện ZIP chưa sẵn sàng.');
+        const norm = normalizeItems(items);
+        if (!norm.length) throw new Error('Chưa có ảnh để đóng gói ZIP.');
+        const entries = {};
+        norm.forEach(({item, name}) => { entries[name] = dataUrlToU8(item.dataUrl); });
+        entries['HUONG_DAN_GUI_ZALO_KHONG_BI_MO.txt'] = makeReadme(kind, norm.length);
+        const zipped = fflate.zipSync(entries, { level: V138_ZIP_LEVEL });
+        return new Blob([zipped], { type: 'application/zip' });
+    }
+    function showDownloadPanel(url, fileName, reason){
+        let old = document.getElementById('gsht-v138-download-panel');
+        if (old) old.remove();
+        const panel = document.createElement('div');
+        panel.id = 'gsht-v138-download-panel';
+        panel.innerHTML = `
+            <div class="gsht-v138-title"><i class="fa-solid fa-file-zipper me-1"></i>ĐÃ TẠO FILE ZIP HD</div>
+            <div class="gsht-v138-text">
+                ${reason ? 'Trình duyệt/Zalo không cho chia sẻ trực tiếp: <b>' + String(reason).replace(/[<>&]/g, s => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[s])) + '</b><br>' : ''}
+                Nếu file chưa tự tải, bấm <b>TẢI FILE ZIP HD</b>. Khi gửi Zalo, chọn <b>Tệp/File</b>, không chọn mục Ảnh.
+            </div>
+            <div class="gsht-v138-actions">
+                <a id="gsht-v138-download-link" href="${url}" download="${fileName}"><i class="fa-solid fa-download me-1"></i>TẢI FILE ZIP HD</a>
+                <button type="button" id="gsht-v138-close-panel"><i class="fa-solid fa-xmark me-1"></i>ĐÓNG</button>
+            </div>`;
+        document.body.appendChild(panel);
+        const close = panel.querySelector('#gsht-v138-close-panel');
+        if (close) close.onclick = () => panel.remove();
+    }
+    function downloadZipBlob(blob, fileName, reason){
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        try { a.click(); } catch(e) {}
+        a.remove();
+        showDownloadPanel(url, fileName, reason || 'Thiết bị không hỗ trợ chia sẻ ZIP trực tiếp');
+        setTimeout(() => {
+            const panel = document.getElementById('gsht-v138-download-panel');
+            if (!panel) URL.revokeObjectURL(url);
+        }, 10 * 60 * 1000);
+    }
+    async function shareZipV138(items, zipName, kind){
+        let blob, safeZipName;
+        try {
+            blob = buildHdZipBlobV138(items, kind);
+            safeZipName = escName(zipName || ('GSHT_HD_' + dateToken() + '.zip'));
+            if (!/\.zip$/i.test(safeZipName)) safeZipName += '.zip';
+        } catch(err) {
+            alert('Không tạo được file ZIP HD: ' + (err?.message || err));
+            return;
+        }
+        const file = new File([blob], safeZipName, { type:'application/zip', lastModified: Date.now() });
+        const canTryShare = !!(navigator.share && (!navigator.canShare || navigator.canShare({ files:[file] })));
+        if (canTryShare) {
+            try {
+                await navigator.share({ files:[file], title: safeZipName, text:'Gói ảnh hiện trường HD dạng Tệp/ZIP.' });
+                return;
+            } catch(err) {
+                if (err && err.name === 'AbortError') return;
+                downloadZipBlob(blob, safeZipName, err?.message || err?.name || 'Permission denied');
+                return;
+            }
+        }
+        downloadZipBlob(blob, safeZipName, 'Trình duyệt không hỗ trợ Web Share cho file ZIP');
+    }
+
+    window.gshtShareAllPendingPhotosChooser = async function(){
+        const items = getAllPendingItemsV138();
+        if (!items.length) return alert('Không có ảnh nào trong 3 kho Chờ Ghép để chia sẻ/tải về. Nếu đang xem theo phiên, hãy bấm nút chia sẻ của phiên đang xem.');
+        const mode = await gshtAskShareMode('Toàn bộ ảnh trong 3 kho Chờ Ghép: ' + items.length + ' ảnh');
+        if (mode === 'zip') return shareZipV138(items, 'GSHT_CHO_GHEP_HD_' + dateToken() + '.zip', 'Toàn bộ ảnh trong 3 kho Chờ Ghép');
+        if (mode === 'photo') return (typeof shareAllPendingPhotos === 'function' ? shareAllPendingPhotos() : triggerBatchDownloads(items));
+    };
+    window.gshtShareAllPendingPhotosAsHdZip = function(){
+        const items = getAllPendingItemsV138();
+        if (!items.length) return alert('Không có ảnh nào trong 3 kho Chờ Ghép để đóng gói ZIP HD.');
+        return shareZipV138(items, 'GSHT_CHO_GHEP_HD_' + dateToken() + '.zip', 'Toàn bộ ảnh trong 3 kho Chờ Ghép');
+    };
+    window.gshtShareCurrentPendingSessionAsHdZip = function(){
+        const session = getCurrentPendingSessionV138();
+        if (!session) return alert('Vui lòng chọn hoặc nhập mã phiên cần gửi ZIP HD.');
+        const items = uniqueItems([...(session.before || []), ...(session.process || []), ...(session.after || [])])
+            .sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+        if (!items.length) return alert('Phiên này chưa có ảnh.');
+        return shareZipV138(items, 'GSHT_PHIEN_' + session.no + '_HD_' + dateToken() + '.zip', 'Ảnh phiên ' + session.no);
+    };
+    window.gshtShareSelectedPhotosAsHdZip = function(){
+        const items = getSelectedGalleryItemsV138();
+        if (!items.length) return alert('Vui lòng chọn ảnh đã ghép cần gửi HD dạng file ZIP.');
+        return shareZipV138(items, 'GSHT_DA_GHEP_HD_' + dateToken() + '.zip', 'Ảnh đã ghép');
+    };
+
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            const note = document.querySelector('#gsht-share-mode-modal .small.text-secondary.mb-3');
+            if (note && !note.dataset.v138) {
+                note.dataset.v138 = '1';
+                note.innerHTML += '<br><br><b class="text-warning">V138:</b> Nếu Zalo/trình duyệt báo Permission denied khi gửi ZIP HD, app sẽ tự tải ZIP về máy và hiện nút tải lại để gửi bằng mục Tệp/File.';
+            }
+        }, 1200);
+    });
+})();
+</script>
+
 </body>
 </html>
