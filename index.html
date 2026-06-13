@@ -1178,9 +1178,10 @@ function showUpdateNotification() {
                         <button class="btn btn-sm btn-danger w-100 fw-bold shadow border border-2 border-danger" style="height:36px; font-size:11px;" onclick="clearAllPending()"><i class="fa-solid fa-dumpster-fire me-1"></i> XÓA TẤT CẢ KHO</button>
                     </div>
                 </div>
-                <button class="btn btn-sm btn-info text-dark w-100 fw-bold mt-2 shadow" style="height:38px; font-size:11px;" onclick="shareAllPendingPhotos()">
+                <button class="btn btn-sm btn-info text-dark w-100 fw-bold mt-2 shadow" style="height:38px; font-size:11px;" onclick="gshtShareAllPendingPhotosChooser()">
                     <i class="fa-solid fa-share-nodes me-1"></i> CHIA SẺ / TẢI VỀ TOÀN BỘ ẢNH TRONG 3 KHO
                 </button>
+                <div class="small text-secondary mt-1" style="font-size:10.5px;line-height:1.3;">Khi bấm nút trên, app sẽ hỏi: <b>Gửi nhanh dạng ảnh</b> hoặc <b>Gửi HD dạng Tệp/ZIP</b> để tránh Zalo/MXH nén mờ.</div>
             </div>
 
             <div class="row g-2">
@@ -1240,7 +1241,13 @@ function showUpdateNotification() {
                         <button class="btn btn-sm btn-outline-danger w-100 fw-bold" onclick="deleteSelectedPhotos()">XÓA ĐÃ CHỌN</button>
                     </div>
                     <div class="col-6">
-                        <button class="btn btn-sm btn-info text-dark w-100 fw-bold shadow" onclick="shareSelectedPhotos()">CHIA SẺ / TẢI VỀ</button>
+                        <button class="btn btn-sm btn-info text-dark w-100 fw-bold shadow" onclick="gshtShareSelectedPhotosChooser()">CHIA SẺ / TẢI VỀ</button>
+                    </div>
+                </div>
+                <div class="border border-warning rounded p-2 mt-2 bg-black bg-opacity-25">
+                    <div class="small text-warning fw-bold mb-1"><i class="fa-solid fa-circle-info me-1"></i>GHI NHỚ KHI GỬI ZALO / MẠNG XÃ HỘI</div>
+                    <div class="small text-secondary" style="font-size:10.5px;line-height:1.35;">
+                        Không có thêm nút tải riêng. Hãy bấm <b>CHIA SẺ / TẢI VỀ</b> ở trên, rồi chọn <b>Gửi HD dạng Tệp/ZIP</b> nếu cần giữ chất lượng nghiệm thu; chọn <b>Gửi nhanh dạng ảnh</b> khi chỉ cần xem nhanh.
                     </div>
                 </div>
             </div>
@@ -1512,7 +1519,7 @@ function showUpdateNotification() {
                 <ul class="text-secondary ps-3 mb-3">
                     <li>Ảnh sau khi ghép sẽ nằm trong tab <b>Đã Ghép</b>.</li>
                     <li>Có thể bật/tắt <b>Hiển thị/Gửi kèm Ảnh Quá Trình</b> để chỉ gửi ảnh chính hoặc gửi cả ảnh QT.</li>
-                    <li>Chọn từng ảnh hoặc <b>Chọn tất cả đang hiện</b>, sau đó bấm <b>CHIA SẺ / TẢI VỀ</b>.</li>
+                    <li>Chọn từng ảnh hoặc <b>Chọn tất cả đang hiện</b>, sau đó bấm <b>CHIA SẺ / TẢI VỀ</b>. Từ V137, nút này sẽ hỏi chọn <b>Gửi nhanh dạng ảnh</b> hoặc <b>Gửi HD dạng Tệp/ZIP</b> để tránh Zalo/mạng xã hội nén mờ.</li>
                     <li>Ảnh trong tab này vẫn có nút <b>Vị trí</b> nếu ảnh/ảnh ghép có dữ liệu GPS.</li>
                     <li>Sau khi đã tải hoặc chia sẻ xong, nên xóa ảnh không cần giữ để giảm dung lượng bộ nhớ trình duyệt.</li>
                 </ul>
@@ -3467,7 +3474,8 @@ function showCameraErrorUI(err) {
                     <button class="btn btn-sm btn-outline-light fw-bold" onclick="showAllPendingSessions()"><i class="fa-solid fa-layer-group me-1"></i>HIỆN TẤT CẢ</button>
                 </div>
                 <div class="col-12">
-                    <button class="btn btn-sm btn-success w-100 fw-bold" onclick="shareCurrentPendingSession()"><i class="fa-solid fa-share-nodes me-1"></i>CHIA SẺ / TẢI VỀ ẢNH CỦA PHIÊN ĐANG XEM</button>
+                    <button class="btn btn-sm btn-success w-100 fw-bold" onclick="gshtShareCurrentPendingSessionChooser()"><i class="fa-solid fa-share-nodes me-1"></i>CHIA SẺ / TẢI VỀ ẢNH CỦA PHIÊN ĐANG XEM</button>
+                    <div class="small text-secondary mt-1" style="font-size:10.5px;line-height:1.3;">Nút này có 2 chế độ: gửi nhanh dạng ảnh hoặc gửi HD dạng Tệp/ZIP để hạn chế bị nén mờ.</div>
                 </div>
             </div>
             <div id="pending-session-caption" class="small text-secondary mt-2 text-center" style="font-size:10.5px;">Đang hiển thị toàn bộ ảnh trong kho chờ ghép.</div>`;
@@ -16032,6 +16040,229 @@ function install(){
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 10400)); else setTimeout(install, 10400);
 window.addEventListener('load', () => setTimeout(install, 11200));
 setTimeout(install, 13500);
+})();
+</script>
+
+
+
+
+<!-- GSHT V137: Tích hợp lựa chọn gửi nhanh / gửi HD ZIP vào chính nút CHIA SẺ / TẢI VỀ để tránh hiểu nhầm -->
+<script>
+(function(){
+    function ensureShareModeModal() {
+        let modal = document.getElementById('gsht-share-mode-modal');
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.id = 'gsht-share-mode-modal';
+        modal.className = 'modal fade';
+        modal.tabIndex = -1;
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = `
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark text-light border border-warning shadow">
+                    <div class="modal-header border-secondary py-2">
+                        <h6 class="modal-title text-warning fw-bold m-0"><i class="fa-solid fa-share-nodes me-1"></i>CHỌN CÁCH CHIA SẺ / TẢI VỀ</h6>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <div class="modal-body p-3">
+                        <div id="gsht-share-mode-context" class="small text-info fw-bold mb-2"></div>
+                        <div class="small text-secondary mb-3" style="line-height:1.45;">
+                            Đây vẫn là nút <b>CHIA SẺ / TẢI VỀ</b> cũ. App chỉ hỏi thêm cách gửi để tránh nhầm giữa gửi ảnh thường và gửi file nghiệm thu chất lượng cao.
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-warning text-dark fw-bold" data-mode="zip"><i class="fa-solid fa-file-zipper me-1"></i>GỬI HD DẠNG TỆP/ZIP - KHUYẾN NGHỊ ZALO KHÔNG MỜ</button>
+                            <button type="button" class="btn btn-info text-dark fw-bold" data-mode="photo"><i class="fa-solid fa-image me-1"></i>GỬI NHANH DẠNG ẢNH / TẢI ẢNH NHƯ CŨ</button>
+                            <button type="button" class="btn btn-outline-secondary fw-bold" data-mode="cancel"><i class="fa-solid fa-xmark me-1"></i>HỦY</button>
+                        </div>
+                        <div class="small text-warning mt-3" style="font-size:10.5px;line-height:1.35;">
+                            Lưu ý: để Zalo ít làm mờ, hãy chọn <b>Gửi HD dạng Tệp/ZIP</b> và gửi trong Zalo bằng mục <b>Tệp/File</b>, không gửi lại ảnh đã giải nén qua mục Ảnh.
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        return modal;
+    }
+
+    window.gshtAskShareMode = function(contextText) {
+        if (!window.bootstrap || !bootstrap.Modal) {
+            const ans = prompt((contextText || 'Chia sẻ ảnh') + '\n\nNhập 1 = Gửi HD dạng Tệp/ZIP (khuyên dùng Zalo không mờ)\nNhập 2 = Gửi nhanh dạng ảnh / tải ảnh như cũ\nBỏ trống = Hủy', '1');
+            if (ans === '1') return Promise.resolve('zip');
+            if (ans === '2') return Promise.resolve('photo');
+            return Promise.resolve('cancel');
+        }
+        const modal = ensureShareModeModal();
+        const ctx = modal.querySelector('#gsht-share-mode-context');
+        if (ctx) ctx.textContent = contextText || 'Chia sẻ ảnh hiện trường';
+        const bsModal = bootstrap.Modal.getOrCreateInstance(modal, { backdrop: 'static', keyboard: true });
+        return new Promise(resolve => {
+            let done = false;
+            const finish = (mode) => {
+                if (done) return;
+                done = true;
+                modal.querySelectorAll('[data-mode]').forEach(btn => btn.removeEventListener('click', onClick));
+                modal.removeEventListener('hidden.bs.modal', onHidden);
+                try { bsModal.hide(); } catch(e) {}
+                resolve(mode || 'cancel');
+            };
+            const onClick = (ev) => finish(ev.currentTarget.getAttribute('data-mode'));
+            const onHidden = () => finish('cancel');
+            modal.querySelectorAll('[data-mode]').forEach(btn => btn.addEventListener('click', onClick));
+            modal.addEventListener('hidden.bs.modal', onHidden, { once: true });
+            bsModal.show();
+        });
+    };
+
+    window.gshtShareSelectedPhotosChooser = async function() {
+        const checked = document.querySelectorAll('.gallery-item-check:checked');
+        if (!checked.length) return alert('Vui lòng chọn ảnh!');
+        const mode = await gshtAskShareMode('Ảnh đã ghép đang chọn: ' + checked.length + ' ảnh');
+        if (mode === 'zip') return window.gshtShareSelectedPhotosAsHdZip ? gshtShareSelectedPhotosAsHdZip() : alert('Chưa sẵn sàng chức năng ZIP HD.');
+        if (mode === 'photo') return shareSelectedPhotos();
+    };
+
+    window.gshtShareAllPendingPhotosChooser = async function() {
+        const count = (window.repoBefore?.length || 0) + (window.repoProcess?.length || 0) + (window.repoAfter?.length || 0);
+        if (!count) return alert('Không có ảnh nào trong 3 kho Chờ Ghép để chia sẻ/tải về.');
+        const mode = await gshtAskShareMode('Toàn bộ ảnh trong 3 kho Chờ Ghép: ' + count + ' ảnh');
+        if (mode === 'zip') return window.gshtShareAllPendingPhotosAsHdZip ? gshtShareAllPendingPhotosAsHdZip() : alert('Chưa sẵn sàng chức năng ZIP HD.');
+        if (mode === 'photo') return shareAllPendingPhotos();
+    };
+
+    window.gshtShareCurrentPendingSessionChooser = async function() {
+        const mode = await gshtAskShareMode('Ảnh của phiên Chờ Ghép đang xem/chọn');
+        if (mode === 'zip') return window.gshtShareCurrentPendingSessionAsHdZip ? gshtShareCurrentPendingSessionAsHdZip() : alert('Chưa sẵn sàng chức năng ZIP HD.');
+        if (mode === 'photo') return shareCurrentPendingSession();
+    };
+})();
+</script>
+
+<!-- GSHT V136: Chia sẻ HD qua Zalo/MXH bằng file ZIP để tránh nén ảnh như ảnh thường -->
+<style>
+.gsht-v136-hd-tip {
+    border: 1px solid #ffc107;
+    border-radius: 10px;
+    padding: 8px;
+    background: rgba(0,0,0,0.35);
+    color: #adb5bd;
+    font-size: 10.5px;
+    line-height: 1.35;
+}
+</style>
+<script>
+(function(){
+    const ZIP_LEVEL = 0; // level 0 = chỉ đóng gói, không nén lại dữ liệu JPG bên trong
+    function escName(name){
+        return String(name || 'GSHT_anh.jpg')
+            .replace(/[\\/:*?"<>|]+/g, '_')
+            .replace(/\s+/g, '_')
+            .slice(0, 180) || 'GSHT_anh.jpg';
+    }
+    function dateToken(){
+        const d = new Date();
+        return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + '_' +
+               String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0') + String(d.getSeconds()).padStart(2,'0');
+    }
+    function dataUrlToU8(dataUrl){
+        if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.includes(',')) throw new Error('Ảnh không hợp lệ hoặc thiếu dataUrl.');
+        const b64 = dataUrl.split(',')[1];
+        const bin = atob(b64);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        return u8;
+    }
+    function normalizeItems(items){
+        const used = new Set();
+        return (items || []).filter(Boolean).map((item, idx) => {
+            let name = item.name || (typeof buildStandardPhotoName === 'function' ? buildStandardPhotoName(item, item.type || 'ẢNH') : 'GSHT_anh_' + (idx+1) + '.jpg');
+            if (!/\.(jpe?g|png|webp)$/i.test(name)) name += '.jpg';
+            name = escName(name);
+            let base = name, n = 2;
+            while (used.has(name.toLowerCase())) {
+                const dot = base.lastIndexOf('.');
+                name = dot > 0 ? base.slice(0,dot) + '_' + n + base.slice(dot) : base + '_' + n;
+                n++;
+            }
+            used.add(name.toLowerCase());
+            return { item, name };
+        });
+    }
+    function makeReadme(kind, count){
+        return new TextEncoder().encode(
+`GSHT PWA - GOI ANH HD V137\n` +
+`Loai: ${kind || 'Anh hien truong'}\n` +
+`So anh: ${count}\n` +
+`Thoi gian xuat: ${new Date().toLocaleString('vi-VN')}\n\n` +
+`Huong dan gui Zalo/MXH khong bi mo (che do Tep/ZIP HD trong nut CHIA SE/TAI VE):\n` +
+`1) Gui file ZIP nay bang muc Tep/File, khong gui bang muc Anh.\n` +
+`2) Nguoi nhan giai nen ZIP de lay anh JPG goc tu ung dung.\n` +
+`3) Neu buoc phai gui tung anh, hay bat tuy chon HD trong Zalo.\n` +
+`4) Dang len nhat ky/bang tin MXH van co the bi nen lai boi nen tang.\n`
+        );
+    }
+    function buildHdZipBlob(items, kind){
+        if (!window.fflate || typeof fflate.zipSync !== 'function') throw new Error('Thiếu fflate.min.js hoặc thư viện ZIP chưa sẵn sàng.');
+        const norm = normalizeItems(items);
+        if (!norm.length) throw new Error('Chưa có ảnh để đóng gói ZIP.');
+        const entries = {};
+        norm.forEach(({item, name}) => { entries[name] = dataUrlToU8(item.dataUrl); });
+        entries['HUONG_DAN_GUI_ZALO_KHONG_BI_MO.txt'] = makeReadme(kind, norm.length);
+        const zipped = fflate.zipSync(entries, { level: ZIP_LEVEL });
+        return new Blob([zipped], { type: 'application/zip' });
+    }
+    async function shareZip(items, zipName, kind){
+        try {
+            const blob = buildHdZipBlob(items, kind);
+            const safeZipName = escName(zipName || ('GSHT_HD_' + dateToken() + '.zip')).replace(/\.(?!zip$)[^.]+$/i, '') + (zipName && /\.zip$/i.test(zipName) ? '' : '.zip');
+            const file = new File([blob], safeZipName, { type:'application/zip', lastModified: Date.now() });
+            if (navigator.share && (!navigator.canShare || navigator.canShare({ files:[file] }))) {
+                await navigator.share({ files:[file], title: safeZipName, text:'Gói ảnh hiện trường HD dạng FILE ZIP - tránh Zalo/MXH nén mờ ảnh.' });
+                return;
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = safeZipName; document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+            alert('Thiết bị/trình duyệt chưa hỗ trợ chia sẻ ZIP trực tiếp. App đã tải file ZIP về máy. Khi gửi Zalo, hãy chọn Tệp/File và chọn file ZIP này.');
+        } catch(err) {
+            if (err && err.name === 'AbortError') return;
+            alert('Không tạo/chia sẻ được file ZIP HD: ' + (err && err.message ? err.message : err));
+        }
+    }
+    function getSelectedGalleryItems(){
+        const checkedBoxes = document.querySelectorAll('.gallery-item-check:checked');
+        if (!checkedBoxes.length) return [];
+        const selectedIds = Array.from(checkedBoxes).map(cb => cb.getAttribute('data-id'));
+        return (window.repoStitched || repoStitched || []).filter(item => selectedIds.includes(item.id));
+    }
+    window.gshtShareSelectedPhotosAsHdZip = function(){
+        const items = getSelectedGalleryItems();
+        if (!items.length) return alert('Vui lòng chọn ảnh đã ghép cần gửi HD dạng file ZIP.');
+        shareZip(items, 'GSHT_DA_GHEP_HD_' + dateToken() + '.zip', 'Ảnh đã ghép');
+    };
+    window.gshtShareAllPendingPhotosAsHdZip = function(){
+        const items = [...(window.repoBefore || repoBefore || []), ...(window.repoProcess || repoProcess || []), ...(window.repoAfter || repoAfter || [])]
+            .sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+        if (!items.length) return alert('Không có ảnh nào trong 3 kho Chờ Ghép để đóng gói ZIP HD.');
+        items.forEach(item => { if (!item.name && typeof buildStandardPhotoName === 'function') item.name = buildStandardPhotoName(item, item.type || 'ẢNH'); if (typeof saveToDB === 'function') saveToDB(item); });
+        shareZip(items, 'GSHT_CHO_GHEP_HD_' + dateToken() + '.zip', 'Ảnh chờ ghép');
+    };
+    window.gshtShareCurrentPendingSessionAsHdZip = function(){
+        if (typeof buildPendingSessions !== 'function') return alert('Chức năng phiên chưa sẵn sàng.');
+        const sessions = buildPendingSessions();
+        if (!sessions.length) return alert('Kho chờ ghép đang trống.');
+        let session = null;
+        if (typeof pendingSessionFilter !== 'undefined' && pendingSessionFilter) session = sessions.find(s => s.no === pendingSessionFilter);
+        if (!session) {
+            const v = parseInt(document.getElementById('pending-session-input')?.value || '', 10);
+            if (Number.isFinite(v)) session = sessions.find(s => s.no === v);
+        }
+        if (!session) return alert('Vui lòng chọn hoặc nhập mã phiên cần gửi ZIP HD.');
+        const items = [...session.before, ...session.process, ...session.after].sort((a,b) => (a.timestampMs || 0) - (b.timestampMs || 0));
+        if (!items.length) return alert('Phiên này chưa có ảnh.');
+        items.forEach(item => { if (!item.name && typeof buildStandardPhotoName === 'function') item.name = buildStandardPhotoName(item, item.type || 'ẢNH'); if (typeof saveToDB === 'function') saveToDB(item); });
+        shareZip(items, 'GSHT_PHIEN_' + session.no + '_HD_' + dateToken() + '.zip', 'Ảnh phiên ' + session.no);
+    };
 })();
 </script>
 
