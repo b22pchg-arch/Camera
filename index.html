@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V133 - Photo Quality Boost)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V134 - Raw Master Photo Quality)</title>
     
     <link rel="manifest" href="manifest.json">
 	<link rel="icon" type="image/png" href="icon-192.png">
@@ -14558,7 +14558,7 @@ function addPiexifNote(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(addPiexifNote,1800)); else setTimeout(addPiexifNote,1800);
 window.addEventListener('load',()=>setTimeout(addPiexifNote,2400));
 setTimeout(addPiexifNote,4200);
-try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 piexif JPEG EXIF restored | V129 bulk session classify | V133 photo/stitch quality boost'; console.log('[GSHT] GSHT-V128-PIEXIF-JPEG-EXIF loaded; piexif=', !!window.piexif); } catch(e) {}
+try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 piexif JPEG EXIF restored | V129 bulk session classify | V133 photo/stitch quality boost | V134 raw-master stitch'; console.log('[GSHT] GSHT-V128-PIEXIF-JPEG-EXIF loaded; piexif=', !!window.piexif); } catch(e) {}
 })();
 </script>
 
@@ -15327,6 +15327,454 @@ function install(){
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 3600)); else setTimeout(install, 3600);
 window.addEventListener('load', () => setTimeout(install, 4300));
 setTimeout(install, 6500);
+})();
+</script>
+
+<style id="gsht-v134-raw-master-quality-style">
+#gsht-v134-raw-panel {
+    border: 1px solid #20c997;
+    border-radius: 10px;
+    background: rgba(32, 201, 151, 0.08);
+    padding: 8px;
+    margin-top: 8px;
+}
+#gsht-v134-raw-panel .form-check-label,
+#gsht-v134-raw-panel .small { font-size: 10.5px; line-height: 1.35; }
+#gsht-v134-raw-panel .badge { font-size: 10px; }
+</style>
+<script id="gsht-v134-raw-master-quality">
+/* GSHT V134: lưu ảnh gốc ẩn và ghép từ ảnh gốc để tránh nén JPEG vòng 2 */
+(function(){
+'use strict';
+const VERSION = 'GSHT-V134-RAW-MASTER-STITCH';
+const KEY_SAVE_RAW = 'gsht_v134_save_raw_master';
+const KEY_STITCH_RAW = 'gsht_v134_stitch_from_raw_master';
+const KEY_RAW_QUALITY = 'gsht_v134_raw_quality';
+const $ = (id) => document.getElementById(id);
+function getLS(k,d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch(e){ return d; } }
+function setLS(k,v){ try { localStorage.setItem(k, String(v)); } catch(e){} }
+function boolPref(k,d){ return getLS(k, d ? '1' : '0') !== '0'; }
+function saveRawPref(){ return boolPref(KEY_SAVE_RAW, true); }
+function stitchRawPref(){ return boolPref(KEY_STITCH_RAW, true); }
+function rawQualityPref(){ return getLS(KEY_RAW_QUALITY, 'jpeg-high'); }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function status(html, cls){
+    ['gsht-v134-raw-status','gsht-camera-full-sensor-status','gsht-v133-quality-status'].forEach(id => {
+        const el = $(id); if (el) { el.className = 'small mt-2 ' + (cls || 'text-secondary'); el.innerHTML = html; }
+    });
+}
+function qSetting(){ try { return typeof getPhotoQualitySetting === 'function' ? getPhotoQualitySetting() : {}; } catch(e){ return {}; } }
+function jpegQ(){ try { return Math.max(0.94, Math.min(0.995, (typeof getJpegQuality === 'function' ? getJpegQuality() : 0.98) || 0.98)); } catch(e){ return 0.98; } }
+function rawQ(){ return rawQualityPref() === 'jpeg-max' ? 0.995 : Math.max(0.97, jpegQ()); }
+function highSmooth(ctx){ try { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; } catch(e){} }
+function safeScale(srcW, srcH, maxLongEdge, maxPixels){
+    srcW = Math.max(1, Math.round(Number(srcW) || 1)); srcH = Math.max(1, Math.round(Number(srcH) || 1));
+    maxLongEdge = Math.max(0, Math.round(Number(maxLongEdge) || 0)); maxPixels = Math.max(0, Math.round(Number(maxPixels) || 0));
+    let r = 1;
+    if (maxLongEdge && Math.max(srcW, srcH) > maxLongEdge) r = Math.min(r, maxLongEdge / Math.max(srcW, srcH));
+    if (maxPixels && srcW * srcH * r * r > maxPixels) r = Math.min(r, Math.sqrt(maxPixels / (srcW * srcH)));
+    return { width: Math.max(1, Math.round(srcW*r)), height: Math.max(1, Math.round(srcH*r)), ratio:r };
+}
+function captureDims(w,h){
+    try { if (typeof getCaptureOutputDimensions === 'function') return getCaptureOutputDimensions(w,h); } catch(e){}
+    const q = qSetting(); return safeScale(w,h,q.maxLongEdge || 4096,q.canvasMaxPixels || 52000000);
+}
+function stitchDims(w,h){ const q = qSetting(); return safeScale(w,h,q.stitchPanelLongEdge || q.maxLongEdge || 3200,q.canvasMaxPixels || 52000000); }
+function canvasToDataURL(canvas, quality){
+    const qual = Math.max(0.90, Math.min(0.995, Number(quality) || jpegQ()));
+    return canvas.toDataURL('image/jpeg', qual);
+}
+function drawContain(ctx, img, x, y, w, h, fill){
+    highSmooth(ctx);
+    if (fill !== false) { ctx.fillStyle = fill || '#000'; ctx.fillRect(x,y,w,h); }
+    const iw = img && (img.width || img.naturalWidth || img.videoWidth) || 1;
+    const ih = img && (img.height || img.naturalHeight || img.videoHeight) || 1;
+    const sc = Math.min(w/iw, h/ih);
+    const dw = iw*sc, dh = ih*sc;
+    ctx.drawImage(img, x+(w-dw)/2, y+(h-dh)/2, dw, dh);
+}
+function roundRect(ctx, x, y, w, h, r){
+    if (ctx.roundRect) { ctx.roundRect(x,y,w,h,r); return; }
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+}
+function typeLabel(obj, fallback){
+    const t = String((obj && obj.type) || fallback || '').toUpperCase();
+    if (/TRƯỚC/.test(t)) return 'TRƯỚC';
+    if (/SAU/.test(t)) return 'SAU';
+    if (/QUÁ|QT/.test(t)) return 'Q.TRÌNH';
+    return fallback || 'ẢNH';
+}
+function timeLabel(obj){
+    const ms = Number(obj && obj.timestampMs || Date.now());
+    const d = new Date(Number.isFinite(ms) ? ms : Date.now());
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+function drawPanelBadge(ctx, obj, x, y, w, h, fallback){
+    try {
+        const base = Math.max(1, Math.min(w,h) / 1400);
+        const fs = Math.max(24, Math.round(34 * base));
+        const txt = `${typeLabel(obj, fallback)}  ${timeLabel(obj)}`;
+        ctx.save();
+        ctx.font = `bold ${fs}px Arial`;
+        const padX = Math.round(fs * 0.65), padY = Math.round(fs * 0.42);
+        const bw = Math.min(w - 20, Math.ceil(ctx.measureText(txt).width + padX * 2));
+        const bh = Math.ceil(fs + padY * 2);
+        const bx = x + Math.round(16 * base), by = y + Math.round(16 * base);
+        ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.beginPath(); roundRect(ctx,bx,by,bw,bh,Math.round(12*base)); ctx.fill();
+        ctx.strokeStyle = '#ffc107'; ctx.lineWidth = Math.max(2, Math.round(3*base)); ctx.beginPath(); roundRect(ctx,bx,by,bw,bh,Math.round(12*base)); ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(txt, bx + padX, by + bh/2, bw - padX * 2);
+        ctx.restore();
+    } catch(e) {}
+}
+function footerRows(info){
+    try { if (typeof gshtFooterRowsFromInfo === 'function') return gshtFooterRowsFromInfo(info); } catch(e){}
+    return [
+        { text:`Tọa độ: ${info.gpsLine || ''}`, max:4, color:'#fff' },
+        { text:`Địa chỉ: ${info.address || ''}`, max:6, color:'#fff' },
+        { text:`Tên/Mã hiện trường: ${info.prefix || ''}`, max:4, color:'#fff' },
+        { text:`Tổ đội/Đơn vị/Người thực hiện: ${info.team || ''}`, max:4, color:'#fff' },
+        { text:`Ghi chú: ${info.note || ''}`, max:6, color:'#ffc107' }
+    ];
+}
+async function getBestCameraSource(video){
+    const track = (typeof localStream !== 'undefined' && localStream && localStream.getVideoTracks) ? localStream.getVideoTracks()[0] : null;
+    const settings = track && track.getSettings ? track.getSettings() : {};
+    const forceFull = getLS('gsht_camera_capture_speed_mode_v93', 'quality-full') !== 'fast-preview' && getLS('gsht_camera_capture_mode_v92', 'auto-still') !== 'preview';
+    if (forceFull && track && 'ImageCapture' in window) {
+        try {
+            if (typeof gshtApplyCameraAutoFocus === 'function') { try { await gshtApplyCameraAutoFocus('V134 chụp full-frame'); } catch(e){} }
+            await new Promise(r => setTimeout(r, 130));
+            const ic = new ImageCapture(track);
+            const blob = await ic.takePhoto();
+            const bmp = await createImageBitmap(blob);
+            return { source:bmp, width:bmp.width, height:bmp.height, kind:'ImageCapture', close:()=>{ try { bmp.close && bmp.close(); } catch(e){} }, settings };
+        } catch(e) {
+            console.warn(VERSION, 'ImageCapture lỗi, fallback preview', e);
+            status('⚠️ ImageCapture không dùng được ở lần này, đã tự chuyển sang preview để vẫn chụp được.', 'text-warning');
+        }
+    }
+    if (!video || !video.videoWidth || !video.videoHeight) throw new Error('Camera chưa có khung hình hợp lệ. Đợi preview hiện đủ rồi chụp lại.');
+    return { source:video, width:video.videoWidth, height:video.videoHeight, kind:'PreviewVideo', close:()=>{}, settings };
+}
+function buildRawCanvasFromSource(srcInfo){
+    const out = captureDims(srcInfo.width, srcInfo.height);
+    const canvas = document.createElement('canvas'); canvas.width = out.width; canvas.height = out.height;
+    const ctx = canvas.getContext('2d'); highSmooth(ctx);
+    ctx.save();
+    try { if (typeof currentFacingMode !== 'undefined' && currentFacingMode === 'user') { ctx.translate(out.width,0); ctx.scale(-1,1); } } catch(e){}
+    ctx.drawImage(srcInfo.source, 0, 0, srcInfo.width, srcInfo.height, 0, 0, out.width, out.height);
+    ctx.restore();
+    return { canvas, width:out.width, height:out.height };
+}
+async function makeRawDataUrlFromFile(file){
+    let bmp = null;
+    try { bmp = await createImageBitmap(file, { imageOrientation:'from-image' }); }
+    catch(e){ bmp = await createImageBitmap(file); }
+    try {
+        const q = qSetting();
+        const out = safeScale(bmp.width, bmp.height, q.maxLongEdge || 4096, q.canvasMaxPixels || 52000000);
+        const c = document.createElement('canvas'); c.width = out.width; c.height = out.height;
+        const ctx = c.getContext('2d'); highSmooth(ctx); ctx.drawImage(bmp, 0,0,bmp.width,bmp.height,0,0,out.width,out.height);
+        return { rawDataUrl: canvasToDataURL(c, rawQ()), rawWidth:out.width, rawHeight:out.height, rawSource:'ImportedFileRawV134' };
+    } finally { try { bmp && bmp.close && bmp.close(); } catch(e){} }
+}
+async function drawPhotoWithFooter(type, srcInfo){
+    if (typeof currentStoragePercent !== 'undefined' && currentStoragePercent > 95) { alert('Bộ nhớ thiết bị đầy!'); return; }
+    const now = new Date();
+    const gpsMeta = typeof getCurrentGpsMeta === 'function' ? getCurrentGpsMeta() : null;
+    const address = typeof getAddressForGps === 'function' ? await getAddressForGps(gpsMeta) : '';
+    const info = typeof getCaptureContext === 'function' ? getCaptureContext(type, now, gpsMeta, address) : { type, gpsLine:'', address, prefix:$('tab1-prefix')?.value || '', team:$('tab1-team')?.value || '', note:$('tab1-note')?.value || '' };
+    const raw = buildRawCanvasFromSource(srcInfo);
+    const rawDataUrl = saveRawPref() ? canvasToDataURL(raw.canvas, rawQ()) : '';
+    const out = { width:raw.width, height:raw.height };
+    const scale = Math.max(0.75, out.width / 1000);
+    const enabledExtras = ['selfie','map','compass'].filter(key => { try { return typeof getExtraInsertPref === 'function' ? getExtraInsertPref(key) : true; } catch(e){ return true; } });
+    const mirrorLayout = (() => { try { return typeof shouldMirrorFooterLayout === 'function' ? shouldMirrorFooterLayout(type) : (type === 'SAU'); } catch(e){ return type === 'SAU'; } })();
+    const orderedExtras = mirrorLayout ? ['compass','map','selfie'].filter(key => enabledExtras.includes(key)) : enabledExtras;
+    const imgBoxSize = enabledExtras.length ? Math.min(240 * scale, out.width * 0.16) : 0;
+    const pad = 20 * scale;
+    const lineH = Math.max(25 * scale, 22);
+    const extrasTotalW = enabledExtras.length ? (enabledExtras.length * imgBoxSize + Math.max(0, enabledExtras.length - 1) * pad) : 0;
+    const textX = mirrorLayout ? (pad + extrasTotalW + (enabledExtras.length ? pad : 0)) : pad;
+    const maxTextW = Math.max(280 * scale, out.width - extrasTotalW - pad * 3);
+    const rows = footerRows(info);
+    const measureCtx = document.createElement('canvas').getContext('2d');
+    measureCtx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+    let headerH = 34 * scale;
+    try { if (typeof drawFooterHeaderBlock === 'function') headerH = drawFooterHeaderBlock(measureCtx, info, textX, 18 * scale, maxTextW, scale, mirrorLayout); } catch(e){}
+    const textBlockH = rows.reduce((sum,row) => {
+        try { return sum + (typeof measureWrappedTextHeight === 'function' ? measureWrappedTextHeight(measureCtx,row.text,maxTextW,lineH,row.max || 99) : lineH); }
+        catch(e){ return sum + lineH; }
+    }, 0);
+    const footerH = Math.ceil(Math.max((enabledExtras.length ? imgBoxSize + 56 * scale : 0), 18 * scale + headerH + 12 * scale + textBlockH + 34 * scale));
+    const canvas = document.createElement('canvas'); canvas.width = out.width; canvas.height = out.height + footerH;
+    const ctx = canvas.getContext('2d'); highSmooth(ctx);
+    ctx.drawImage(raw.canvas, 0, 0);
+    const fY = out.height;
+    ctx.fillStyle = '#090909'; ctx.fillRect(0, fY, canvas.width, footerH);
+    ctx.strokeStyle = type === 'TRƯỚC' ? '#0d6efd' : (type === 'QUÁ TRÌNH' ? '#ffc107' : '#20c997');
+    ctx.lineWidth = Math.max(2, 3 * scale); ctx.strokeRect(0, fY, canvas.width, footerH);
+    const drawExtra = (sourceDataUrl, canvasSourceId, labelText, xPos) => new Promise(resolve => {
+        if (!imgBoxSize) return resolve();
+        let sourceToDraw = sourceDataUrl;
+        if (!sourceToDraw && canvasSourceId) {
+            const c = $(canvasSourceId); if (c && !c.classList.contains('d-none')) { try { sourceToDraw = c.toDataURL('image/jpeg', jpegQ()); } catch(e){} }
+        }
+        if (!sourceToDraw) return resolve();
+        const img = new Image();
+        img.onload = () => {
+            const yPos = fY + 22 * scale;
+            drawContain(ctx, img, xPos, yPos, imgBoxSize, imgBoxSize, '#000');
+            const labelH = Math.max(20 * scale, imgBoxSize * 0.17);
+            ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(xPos, yPos + imgBoxSize - labelH, imgBoxSize, labelH);
+            ctx.fillStyle = '#0dcaf0'; ctx.font = `bold ${Math.max(10, labelH * 0.55)}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText(labelText, xPos + imgBoxSize/2, yPos + imgBoxSize - labelH/2, imgBoxSize - 4);
+            resolve();
+        };
+        img.onerror = resolve; img.src = sourceToDraw;
+    });
+    let extraX = mirrorLayout ? pad : (canvas.width - pad - (orderedExtras.length * imgBoxSize + Math.max(0, orderedExtras.length - 1) * pad));
+    const ge = (typeof globalExtras !== 'undefined' && globalExtras) ? globalExtras : {};
+    const tasks = [];
+    orderedExtras.forEach(key => {
+        if (key === 'compass') tasks.push(drawExtra(ge.compass, 'canvas-compass', 'LA BÀN', extraX));
+        if (key === 'map') tasks.push(drawExtra(ge.map, 'canvas-map', 'BẢN ĐỒ', extraX));
+        if (key === 'selfie') tasks.push(drawExtra(ge.selfie, null, 'NGƯỜI CHỤP', extraX));
+        extraX += imgBoxSize + pad;
+    });
+    await Promise.all(tasks);
+    let y = fY + 18 * scale;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    try { if (typeof drawFooterHeaderBlock === 'function') y += drawFooterHeaderBlock(ctx, info, textX, y, maxTextW, scale, mirrorLayout); } catch(e){}
+    y += 12 * scale;
+    ctx.font = `bold ${Math.max(16, 21 * scale)}px Arial`;
+    rows.forEach(row => {
+        ctx.fillStyle = row.color || '#fff';
+        try { y += (typeof drawWrappedTextBlock === 'function' ? drawWrappedTextBlock(ctx, row.text, textX, y, maxTextW, lineH, row.max || 99, 'left') : lineH); }
+        catch(e){ y += lineH; }
+    });
+    let photoObj = {
+        id:'img_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), type,
+        dataUrl: canvasToDataURL(canvas, jpegQ()),
+        rawDataUrl, rawWidth: rawDataUrl ? raw.width : 0, rawHeight: rawDataUrl ? raw.height : 0, rawSource:'CameraRawV134',
+        timestampMs: now.getTime(), timestampStr: now.toLocaleString('vi-VN'),
+        addressText: info.address, fieldName: info.prefix, teamText: info.team, noteText: info.note,
+        captureSource: srcInfo.kind, sourceWidth: srcInfo.width, sourceHeight: srcInfo.height, v134RawMaster: !!rawDataUrl
+    };
+    try { if (typeof applyGpsMeta === 'function') photoObj = applyGpsMeta(photoObj, gpsMeta); } catch(e){}
+    try { photoObj.name = typeof buildStandardPhotoName === 'function' ? buildStandardPhotoName(photoObj, type) : `${type}_${photoObj.id}.jpg`; } catch(e){ photoObj.name = `${type}_${photoObj.id}.jpg`; }
+    addPhotoToRepo(photoObj, type);
+    status(`✅ V134 đã chụp ${srcInfo.kind === 'ImageCapture' ? 'full-frame' : 'preview'}: nguồn <b>${srcInfo.width}×${srcInfo.height}</b>, ảnh có chân <b>${out.width}×${out.height}</b>${rawDataUrl ? ', đã lưu <b>ảnh gốc ẩn</b> để ghép nét hơn.' : '.'}`, rawDataUrl ? 'text-success' : 'text-warning');
+}
+function addPhotoToRepo(photoObj,type){
+    try {
+        if (type === 'TRƯỚC') { repoBefore.unshift(photoObj); captureBuffer.TRƯỚC = photoObj; const p=$('preview-before'); if(p) p.innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')">${typeof mapButtonHtml === 'function' ? mapButtonHtml(photoObj) : ''}`; }
+        else if (type === 'SAU') { repoAfter.unshift(photoObj); captureBuffer.SAU = photoObj; const p=$('preview-after'); if(p) p.innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')">${typeof mapButtonHtml === 'function' ? mapButtonHtml(photoObj) : ''}`; captureBuffer.QUÁ_TRÌNH = []; const q=$('preview-process'); if(q) q.innerHTML = '<span class="text-muted small text-center">Q.TRÌNH<br>(0)</span>'; }
+        else { repoProcess.unshift(photoObj); if(!captureBuffer.QUÁ_TRÌNH) captureBuffer.QUÁ_TRÌNH=[]; captureBuffer.QUÁ_TRÌNH.push(photoObj); const p=$('preview-process'); if(p) p.innerHTML = `<img src="${photoObj.dataUrl}" onclick="viewFullImageById('pending', '${photoObj.id}')"><span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1">${captureBuffer.QUÁ_TRÌNH.length} ảnh</span>${typeof mapButtonHtml === 'function' ? mapButtonHtml(photoObj) : ''}`; }
+        if (typeof saveToDB === 'function') saveToDB(photoObj);
+        if (captureBuffer.TRƯỚC && captureBuffer.SAU) { $('btn-stitch-fast-ts')?.removeAttribute('disabled'); $('btn-stitch-ts-only')?.removeAttribute('disabled'); $('btn-stitch-full')?.removeAttribute('disabled'); }
+        if (typeof updateUIState === 'function') updateUIState();
+    } catch(e) { console.warn(VERSION, 'addPhotoToRepo lỗi', e); }
+}
+async function v134CapturePhoto(type){
+    const video = $('video-preview');
+    if (typeof localStream === 'undefined' || !localStream || !video) return alert('Camera chưa sẵn sàng!');
+    let srcInfo = null;
+    try { status('V134 đang lấy ảnh tốt nhất và lưu thêm bản gốc ẩn...', 'text-info'); srcInfo = await getBestCameraSource(video); await drawPhotoWithFooter(type, srcInfo); }
+    catch(e){ console.error(VERSION, e); alert('Không chụp được ảnh V134: ' + (e && e.message ? e.message : e)); }
+    finally { try { srcInfo && srcInfo.close && srcInfo.close(); } catch(e){} }
+}
+function stitchSource(obj){ return stitchRawPref() && obj && obj.rawDataUrl ? obj.rawDataUrl : (obj && obj.dataUrl); }
+function loadForStitch(obj){ return new Promise(resolve => { const img = new Image(); const src = stitchSource(obj); img.onload = () => resolve({img,obj,usedRaw:!!(obj && obj.rawDataUrl && src === obj.rawDataUrl)}); img.onerror = () => { const fallback = new Image(); fallback.onload = () => resolve({img:fallback,obj,usedRaw:false}); fallback.onerror = () => resolve(null); fallback.src = obj && obj.dataUrl || ''; }; img.src = src || ''; }); }
+function renderLoadedIntoPanel(ctx, item, x, y, w, h, fallback){ drawContain(ctx, item.img, x, y, w, h, '#000'); if (item.usedRaw) drawPanelBadge(ctx, item.obj, x, y, w, h, fallback); }
+function repoRemoveAfterStitch(ids, marker){
+    try {
+        if (marker === 'QT') repoProcess = repoProcess.filter(x => !ids.includes(x.id));
+        else if (marker === 'FULL') { repoBefore = repoBefore.filter(x => !ids.includes(x.id)); repoProcess = repoProcess.filter(x => !ids.includes(x.id)); repoAfter = repoAfter.filter(x => !ids.includes(x.id)); }
+        else { repoBefore = repoBefore.filter(x => !ids.includes(x.id)); repoAfter = repoAfter.filter(x => !ids.includes(x.id)); }
+        ids.forEach(id => { try { if (typeof deleteFromDB === 'function') deleteFromDB(id); } catch(e){} });
+    } catch(e) { console.warn(VERSION, 'repoRemoveAfterStitch', e); }
+}
+function buildStitchNamePrefix(rawNote, marker){
+    let parts=[]; try { if($('tab1-prefix')?.value.trim()) parts.push($('tab1-prefix').value.trim()); if($('tab1-team')?.value.trim()) parts.push($('tab1-team').value.trim()); if(rawNote) parts.push(rawNote); } catch(e){}
+    let p = parts.map(v => String(v).replace(/\s+/g,'_')).join('_').replace(/_+/g,'_') || 'HT';
+    if (marker === 'QT') p = 'QT_' + p; else if (marker === 'FULL') p = 'FULL_' + p;
+    return p.replace(/[\\/:*?"<>|]+/g,'_');
+}
+function fmtTime(ts){ const d = new Date(Number(ts)||Date.now()); return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}${String(d.getSeconds()).padStart(2,'0')}`; }
+function installStitchOverrides(){
+    if (window.__gshtV134StitchWrapped) return;
+    window.processStitching = function(bObj, aObj, showAlert = true, customNote = null, callback = null, isQT = false, qtCount = 0){
+        return new Promise(resolve => {
+            Promise.all([loadForStitch(bObj), loadForStitch(aObj)]).then(async loaded => {
+                const first = loaded[0], second = loaded[1]; if (!first || !second) { alert('Không tải được ảnh để ghép.'); resolve(); return; }
+                const c = document.createElement('canvas'), ctx = c.getContext('2d'); highSmooth(ctx);
+                const bDim = stitchDims(first.img.width, first.img.height), aDim = stitchDims(second.img.width, second.img.height);
+                c.width = bDim.width + aDim.width; c.height = Math.max(bDim.height, aDim.height);
+                renderLoadedIntoPanel(ctx, first, 0, 0, bDim.width, c.height, isQT ? 'QT 1' : 'TRƯỚC');
+                renderLoadedIntoPanel(ctx, second, bDim.width, 0, aDim.width, c.height, isQT ? 'QT 2' : 'SAU');
+                const rawNote = customNote !== null ? customNote : ($('tab1-note')?.value.trim() || '');
+                const noteText = String(rawNote || '').toUpperCase(); const showQTLine = qtCount > 0 && !isQT; const qtText = showQTLine ? `QT: ${qtCount}` : '';
+                if (noteText || showQTLine) {
+                    const imgScale = Math.max(0.8, bDim.width / 1000); const noteSize = Math.round(45 * imgScale); ctx.font = `bold ${noteSize}px Arial`;
+                    let maxW = noteText ? ctx.measureText(noteText).width : 0; if (showQTLine) maxW = Math.max(maxW, ctx.measureText(qtText).width);
+                    const lineCount = noteText && showQTLine ? 2 : 1; const noteH = noteSize * lineCount + 40 * imgScale;
+                    const noteX = bDim.width; const noteY = c.height - (Math.min(280 * imgScale, bDim.width * 0.18) + 40 * imgScale);
+                    ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.beginPath(); roundRect(ctx,noteX-maxW/2-40*imgScale,noteY-noteH/2,maxW+80*imgScale,noteH,15*imgScale); ctx.fill();
+                    ctx.strokeStyle='#0dcaf0'; ctx.lineWidth=4*imgScale; ctx.beginPath(); roundRect(ctx,noteX-maxW/2-40*imgScale,noteY-noteH/2,maxW+80*imgScale,noteH,15*imgScale); ctx.stroke();
+                    ctx.fillStyle='#0dcaf0'; ctx.textBaseline='middle'; ctx.textAlign='center';
+                    if(lineCount===2){ ctx.fillText(noteText,noteX,noteY-noteSize/2-2*imgScale); ctx.fillText(qtText,noteX,noteY+noteSize/2+8*imgScale); }
+                    else ctx.fillText(noteText || qtText, noteX, noteY);
+                }
+                try { if (typeof appendInfoStripToCanvas === 'function') await appendInfoStripToCanvas(c, isQT ? 'QUÁ TRÌNH' : 'TRƯỚC / SAU', [bObj,aObj], rawNote); } catch(e){ console.warn(VERSION, 'appendInfoStrip', e); }
+                let gpsMeta = null, points = [];
+                try { gpsMeta = typeof getGpsMetaFromPhotos === 'function' ? getGpsMetaFromPhotos([bObj,aObj]) : null; } catch(e){}
+                try { points = typeof appendLocationQrStripToCanvas === 'function' ? await appendLocationQrStripToCanvas(c, [bObj,aObj]) : []; } catch(e){}
+                let item = { id:'stitched_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), type:isQT ? 'STITCHED_QT':'STITCHED', name:`${buildStitchNamePrefix(rawNote, isQT ? 'QT' : 'TS')}_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${fmtTime(bObj.timestampMs)}-${fmtTime(aObj.timestampMs)}-${fmtTime(Date.now())}.jpg`, dataUrl:canvasToDataURL(c,jpegQ()), timestampMs:Date.now(), timestampStr:new Date().toLocaleString('vi-VN'), sessionStartMs:Math.min(bObj.timestampMs||Date.now(),aObj.timestampMs||Date.now()), sessionEndMs:Math.max(bObj.timestampMs||Date.now(),aObj.timestampMs||Date.now()), v134StitchedFromRaw: !!(first.usedRaw || second.usedRaw) };
+                try { if (typeof applyGpsMeta === 'function') item = applyGpsMeta(item, gpsMeta); } catch(e){}
+                item.locationPoints = points || [];
+                repoStitched.unshift(item); if (typeof saveToDB === 'function') saveToDB(item);
+                repoRemoveAfterStitch([bObj.id,aObj.id], isQT ? 'QT' : 'TS');
+                if (typeof updateUIState === 'function') updateUIState(); if (callback) callback();
+                if (showAlert) { try { renderPending(); renderGallery(); } catch(e){} alert(`Đã ghép thành công${item.v134StitchedFromRaw ? ' từ ảnh gốc ẩn' : ''}:\n${item.name}`); }
+                resolve();
+            });
+        });
+    };
+    try { processStitching = window.processStitching; } catch(e){}
+    window.processMultiStitching = function(imgObjs, itemTypeMarker, customNote, callback){
+        return new Promise(resolve => {
+            if (!imgObjs || !imgObjs.length) { if(callback) callback(); resolve(); return; }
+            Promise.all(imgObjs.map(loadForStitch)).then(async loaded => {
+                loaded = loaded.filter(Boolean); if (!loaded.length) { if(callback) callback(); resolve(); return; }
+                const N = loaded.length; const useGrid = (($('qt-stitch-mode')?.value === 'all') || itemTypeMarker === 'FULL') && N > 2;
+                const cols = useGrid ? Math.ceil(Math.sqrt(N)) : N, rows = useGrid ? Math.ceil(N/cols) : 1;
+                const fd = stitchDims(loaded[0].img.width, loaded[0].img.height), singleW = fd.width, singleH = fd.height;
+                const c = document.createElement('canvas'), ctx = c.getContext('2d'); c.width = cols * singleW; c.height = rows * singleH; highSmooth(ctx);
+                loaded.forEach((it, index) => renderLoadedIntoPanel(ctx, it, (index%cols)*singleW, Math.floor(index/cols)*singleH, singleW, singleH, `ẢNH ${index+1}`));
+                const rawNote = customNote !== null ? customNote : ($('tab1-note')?.value.trim() || ''); const noteText = String(rawNote || '').toUpperCase();
+                if (noteText) {
+                    const imgScale = Math.max(0.8, singleW/1000), noteSize = Math.round(45*imgScale); ctx.font = `bold ${noteSize}px Arial`;
+                    const noteW = ctx.measureText(noteText).width, noteH = noteSize + 40*imgScale, noteX = c.width/2, noteY = c.height - (Math.min(280*imgScale,singleW*0.18)+40*imgScale);
+                    ctx.fillStyle='rgba(0,0,0,0.85)'; ctx.beginPath(); roundRect(ctx,noteX-noteW/2-40*imgScale,noteY-noteH/2,noteW+80*imgScale,noteH,15*imgScale); ctx.fill();
+                    ctx.strokeStyle='#0dcaf0'; ctx.lineWidth=4*imgScale; ctx.beginPath(); roundRect(ctx,noteX-noteW/2-40*imgScale,noteY-noteH/2,noteW+80*imgScale,noteH,15*imgScale); ctx.stroke();
+                    ctx.fillStyle='#0dcaf0'; ctx.textBaseline='middle'; ctx.textAlign='center'; ctx.fillText(noteText,noteX,noteY);
+                }
+                try { if (typeof appendInfoStripToCanvas === 'function') await appendInfoStripToCanvas(c, itemTypeMarker === 'QT' ? 'QUÁ TRÌNH' : (itemTypeMarker === 'FULL' ? 'TRƯỚC / QUÁ TRÌNH / SAU' : 'ẢNH GHÉP'), imgObjs, rawNote); } catch(e){}
+                let gpsMeta = null, points = [];
+                try { gpsMeta = typeof getGpsMetaFromPhotos === 'function' ? getGpsMetaFromPhotos(imgObjs) : null; } catch(e){}
+                try { points = typeof appendLocationQrStripToCanvas === 'function' ? await appendLocationQrStripToCanvas(c, imgObjs) : []; } catch(e){}
+                const earliestTs = Math.min(...imgObjs.map(o => Number(o.timestampMs || Date.now())));
+                let item = { id:'stitched_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), type:itemTypeMarker === 'QT' ? 'STITCHED_QT':'STITCHED', name:`${buildStitchNamePrefix(rawNote,itemTypeMarker)}_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_GRP_${Date.now()}.jpg`, dataUrl:canvasToDataURL(c,jpegQ()), timestampMs:Date.now(), timestampStr:new Date().toLocaleString('vi-VN'), qtTimeMs:earliestTs, v134StitchedFromRaw: loaded.some(x => x.usedRaw) };
+                try { if (typeof applyGpsMeta === 'function') item = applyGpsMeta(item, gpsMeta); } catch(e){}
+                item.locationPoints = points || [];
+                repoStitched.unshift(item); if (typeof saveToDB === 'function') saveToDB(item);
+                repoRemoveAfterStitch(loaded.map(x => x.obj.id), itemTypeMarker);
+                if (typeof updateUIState === 'function') updateUIState(); if(callback) callback(); resolve();
+            });
+        });
+    };
+    try { processMultiStitching = window.processMultiStitching; } catch(e){}
+    window.__gshtV134StitchWrapped = true;
+}
+function getAllPhotoObjects(){ const arr=[]; try { arr.push(...repoBefore,...repoAfter,...repoProcess,...repoStitched); } catch(e){} return arr; }
+function attachRawToNewItems(beforeIds, rawList, type){
+    if (!saveRawPref() || !rawList || !rawList.length) return;
+    const newItems = getAllPhotoObjects().filter(o => o && !beforeIds.has(o.id) && (!type || o.type === type));
+    const used = new Set();
+    newItems.forEach(obj => {
+        if (obj.rawDataUrl) return;
+        let idx = rawList.findIndex((r,i) => !used.has(i) && r && r.name && obj.sourceFileName === r.name);
+        if (idx < 0) idx = rawList.findIndex((r,i) => !used.has(i) && r);
+        if (idx < 0) return;
+        const r = rawList[idx]; used.add(idx);
+        obj.rawDataUrl = r.rawDataUrl; obj.rawWidth = r.rawWidth; obj.rawHeight = r.rawHeight; obj.rawSource = r.rawSource; obj.v134RawMaster = true;
+        try { if (typeof saveToDB === 'function') saveToDB(obj); } catch(e){}
+    });
+}
+function wrapImportHandlers(){
+    if (window.__gshtV134ImportWrapped) return;
+    const wrap = function(name){
+        const old = window[name]; if (typeof old !== 'function') return;
+        window[name] = async function(ev,type){
+            const files = Array.from(ev?.target?.files || []);
+            const beforeIds = new Set(getAllPhotoObjects().map(o => o.id));
+            const rawList = [];
+            if (saveRawPref() && files.length) {
+                status(`V134 đang chuẩn bị ảnh gốc ẩn cho ${files.length} file nhập ngoài...`, 'text-info');
+                for (const f of files) { try { const r = await makeRawDataUrlFromFile(f); r.name = f.name || ''; rawList.push(r); } catch(e){ console.warn(VERSION, 'Không tạo raw import', f && f.name, e); rawList.push(null); } }
+            }
+            const ret = await old.apply(this, arguments);
+            try { attachRawToNewItems(beforeIds, rawList, type); } catch(e){ console.warn(VERSION, 'attachRaw import lỗi', e); }
+            const n = rawList.filter(Boolean).length;
+            if (n) status(`✅ V134 đã lưu thêm <b>${n}</b> ảnh gốc ẩn cho ảnh nhập ngoài; ảnh ghép sẽ ưu tiên dùng bản này để nét hơn.`, 'text-success');
+            return ret;
+        };
+    };
+    wrap('gshtHandleExternalPhotos'); wrap('gshtHandleNativeCameraPhoto');
+    window.__gshtV134ImportWrapped = true;
+}
+function addPanel(){
+    const host = $('gsht-v133-quality-panel') || $('photo-quality-select')?.closest('.card');
+    if (!host || $('gsht-v134-raw-panel')) return;
+    if (getLS(KEY_SAVE_RAW,null) === null) setLS(KEY_SAVE_RAW,'1');
+    if (getLS(KEY_STITCH_RAW,null) === null) setLS(KEY_STITCH_RAW,'1');
+    if (getLS(KEY_RAW_QUALITY,null) === null) setLS(KEY_RAW_QUALITY,'jpeg-high');
+    const div = document.createElement('div'); div.id = 'gsht-v134-raw-panel';
+    div.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+            <div class="small text-success fw-bold"><i class="fa-solid fa-layer-group me-1"></i> V134 - GIỮ ẢNH GỐC ẨN / GHÉP TỪ ẢNH GỐC</div>
+            <span class="badge bg-success">RAW MASTER</span>
+        </div>
+        <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="gsht-v134-save-raw">
+            <label class="form-check-label text-warning fw-bold" for="gsht-v134-save-raw">Lưu thêm bản ảnh gốc ẩn khi chụp/nhập ảnh</label>
+            <div class="small text-secondary">Bản này không có chân trang, dùng làm nguồn ghép để tránh nén JPEG vòng 2. Tốn bộ nhớ hơn nhưng ảnh ghép nét hơn rõ rệt.</div>
+        </div>
+        <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="gsht-v134-stitch-raw">
+            <label class="form-check-label text-success fw-bold" for="gsht-v134-stitch-raw">Khi ghép, dùng ảnh gốc ẩn thay cho ảnh đã dán chân trang</label>
+            <div class="small text-secondary">Ảnh ghép vẫn có dải thông tin chung ở cuối ảnh; mỗi ô sẽ có nhãn thời gian nhỏ ở góc để nhận biết TRƯỚC / SAU / Q.TRÌNH.</div>
+        </div>
+        <div class="row g-2 align-items-end">
+            <div class="col-12 col-sm-6">
+                <label class="form-label text-info fw-bold mb-1" for="gsht-v134-raw-quality" style="font-size:10.5px;">Chất lượng bản gốc ẩn</label>
+                <select id="gsht-v134-raw-quality" class="form-select form-select-sm bg-dark text-info border-secondary">
+                    <option value="jpeg-high">JPEG cao - cân bằng bộ nhớ</option>
+                    <option value="jpeg-max">JPEG tối đa - nét nhất, file lớn</option>
+                </select>
+            </div>
+            <div class="col-12 col-sm-6"><div id="gsht-v134-raw-status" class="small mt-2 text-secondary"></div></div>
+        </div>`;
+    host.appendChild(div);
+    $('gsht-v134-save-raw').checked = saveRawPref(); $('gsht-v134-stitch-raw').checked = stitchRawPref(); $('gsht-v134-raw-quality').value = rawQualityPref();
+    $('gsht-v134-save-raw').addEventListener('change', e => { setLS(KEY_SAVE_RAW, e.target.checked ? '1':'0'); updatePanelStatus(); });
+    $('gsht-v134-stitch-raw').addEventListener('change', e => { setLS(KEY_STITCH_RAW, e.target.checked ? '1':'0'); updatePanelStatus(); });
+    $('gsht-v134-raw-quality').addEventListener('change', e => { setLS(KEY_RAW_QUALITY, e.target.value || 'jpeg-high'); updatePanelStatus(); });
+    updatePanelStatus();
+}
+function updatePanelStatus(){
+    const el = $('gsht-v134-raw-status'); if (!el) return;
+    const rawCount = getAllPhotoObjects().filter(o => o && o.rawDataUrl).length;
+    el.className = 'small mt-2 ' + (saveRawPref() && stitchRawPref() ? 'text-success' : 'text-warning');
+    el.innerHTML = `${saveRawPref() ? '✅ Sẽ lưu ảnh gốc ẩn' : '⚠️ Không lưu ảnh gốc ẩn'}; ${stitchRawPref() ? 'ghép ưu tiên ảnh gốc ẩn' : 'ghép dùng ảnh đã dán chân'}; hiện có <b>${rawCount}</b> ảnh có nguồn gốc ẩn.`;
+}
+function installCaptureOverride(){
+    window.capturePhoto = v134CapturePhoto;
+    try { capturePhoto = v134CapturePhoto; } catch(e){}
+    window.__gshtV134CaptureOverride = true;
+}
+function install(){
+    try {
+        addPanel(); installCaptureOverride(); installStitchOverrides(); wrapImportHandlers(); updatePanelStatus();
+        try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V134 raw-master stitch'; } catch(e){}
+        console.log('[GSHT] ' + VERSION + ' loaded');
+    } catch(e) { console.warn(VERSION, e); }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 7800)); else setTimeout(install, 7800);
+window.addEventListener('load', () => setTimeout(install, 9200));
+setTimeout(install, 12000);
 })();
 </script>
 
