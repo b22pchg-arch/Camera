@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V128)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V133 - Photo Quality Boost)</title>
     
     <link rel="manifest" href="manifest.json">
 	<link rel="icon" type="image/png" href="icon-192.png">
@@ -14558,7 +14558,7 @@ function addPiexifNote(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(addPiexifNote,1800)); else setTimeout(addPiexifNote,1800);
 window.addEventListener('load',()=>setTimeout(addPiexifNote,2400));
 setTimeout(addPiexifNote,4200);
-try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 piexif JPEG EXIF restored | V129 bulk session classify'; console.log('[GSHT] GSHT-V128-PIEXIF-JPEG-EXIF loaded; piexif=', !!window.piexif); } catch(e) {}
+try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 piexif JPEG EXIF restored | V129 bulk session classify | V133 photo/stitch quality boost'; console.log('[GSHT] GSHT-V128-PIEXIF-JPEG-EXIF loaded; piexif=', !!window.piexif); } catch(e) {}
 })();
 </script>
 
@@ -15008,6 +15008,325 @@ document.addEventListener('click', function(ev){
     } catch(e) {}
 }, true);
 try { console.log('[GSHT] V132 2FA safe opener loaded'); } catch(e) {}
+})();
+</script>
+
+
+
+<style id="gsht-v133-photo-quality-boost-style">
+/* GSHT V133: tăng chất lượng ảnh chụp và ảnh ghép nhưng vẫn giới hạn bộ nhớ để không treo điện thoại */
+#gsht-v133-quality-panel {
+    border: 1px solid #0dcaf0;
+    border-radius: 10px;
+    background: rgba(13, 202, 240, 0.07);
+    padding: 8px;
+    margin-top: 8px;
+}
+#gsht-v133-quality-panel .form-check-label,
+#gsht-v133-quality-panel .form-select,
+#gsht-v133-quality-panel .small { font-size: 10.5px; line-height: 1.35; }
+#gsht-v133-quality-panel .badge { font-size: 10px; }
+</style>
+<script id="gsht-v133-photo-quality-boost">
+(function(){
+'use strict';
+const VERSION = 'GSHT-V133-PHOTO-STITCH-QUALITY-BOOST';
+const KEY_FORCE_FULL = 'gsht_v133_force_full_frame';
+const KEY_STITCH_PROFILE = 'gsht_v133_stitch_profile';
+const KEY_CAPTURE_PROFILE = 'gsht_v133_capture_profile';
+const KEY_CAPTURE_MODE = 'gsht_camera_capture_mode_v92';
+const KEY_SPEED_MODE = 'gsht_camera_capture_speed_mode_v93';
+const $ = (id) => document.getElementById(id);
+
+function getLS(key, def){ try { const v = localStorage.getItem(key); return v === null ? def : v; } catch(e){ return def; } }
+function setLS(key, val){ try { localStorage.setItem(key, String(val)); } catch(e){} }
+function boolPref(key, def){ return getLS(key, def ? '1' : '0') !== '0'; }
+function qualityMode(){ const sel = $('photo-quality-select'); return sel ? (sel.value || 'balanced') : 'balanced'; }
+function stitchProfile(){ return getLS(KEY_STITCH_PROFILE, 'sharp'); }
+function captureProfile(){ return getLS(KEY_CAPTURE_PROFILE, 'sharp'); }
+
+// Lấy cấu hình tăng nét theo mức người dùng chọn. Không dùng exact constraint để tránh lỗi mở camera trên Android/iOS.
+function enhancedPreset(mode){
+    const cap = captureProfile();
+    const capLong = cap === 'max' ? 5120 : (cap === 'safe' ? 3200 : 4096);
+    const stp = stitchProfile();
+    const stitchLong = stp === 'max' ? 4096 : (stp === 'safe' ? 2560 : 3200);
+    const presets = {
+        saving: {
+            width: 1600, height: 1200, jpeg: 0.86, maxLongEdge: 1600, stitchPanelLongEdge: Math.min(stitchLong, 1600), extraSquare: 640,
+            videoMaxHeight: 720, fps: 20, videoBitsPerSecond: 2200000, canvasMaxPixels: 10000000, label: 'Tiết kiệm V133'
+        },
+        balanced: {
+            width: 2560, height: 1920, jpeg: 0.93, maxLongEdge: Math.min(capLong, 3200), stitchPanelLongEdge: Math.min(stitchLong, 2800), extraSquare: 900,
+            videoMaxHeight: 1080, fps: 25, videoBitsPerSecond: 5000000, canvasMaxPixels: 22000000, label: 'Chuẩn nét V133'
+        },
+        high: {
+            width: 3840, height: 2880, jpeg: 0.96, maxLongEdge: Math.min(capLong, 4096), stitchPanelLongEdge: Math.min(stitchLong, 3600), extraSquare: 1100,
+            videoMaxHeight: 1440, fps: 30, videoBitsPerSecond: 9000000, canvasMaxPixels: 36000000, label: 'Nét cao V133'
+        },
+        original: {
+            width: 4032, height: 3024, jpeg: 0.98, maxLongEdge: capLong, stitchPanelLongEdge: stitchLong, extraSquare: 1280,
+            videoMaxHeight: 2160, fps: 30, videoBitsPerSecond: 12000000, canvasMaxPixels: 52000000, label: 'Gốc camera V133'
+        }
+    };
+    return presets[mode] || presets.balanced;
+}
+
+function safeScale(srcW, srcH, maxLongEdge, maxPixels){
+    srcW = Math.max(1, Math.round(Number(srcW) || 1));
+    srcH = Math.max(1, Math.round(Number(srcH) || 1));
+    maxLongEdge = Math.max(0, Math.round(Number(maxLongEdge) || 0));
+    maxPixels = Math.max(0, Math.round(Number(maxPixels) || 0));
+    let ratio = 1;
+    if (maxLongEdge && Math.max(srcW, srcH) > maxLongEdge) ratio = Math.min(ratio, maxLongEdge / Math.max(srcW, srcH));
+    if (maxPixels && srcW * srcH * ratio * ratio > maxPixels) ratio = Math.min(ratio, Math.sqrt(maxPixels / (srcW * srcH)));
+    const width = Math.max(1, Math.round(srcW * ratio));
+    const height = Math.max(1, Math.round(srcH * ratio));
+    return { width, height, ratio };
+}
+
+function setHighSmoothing(ctx){
+    try {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+    } catch(e) {}
+}
+
+function enhanceQualityFromBase(base){
+    base = base || {};
+    const mode = qualityMode();
+    const p = enhancedPreset(mode);
+    const longBase = Math.max(base.width || 0, base.height || 0);
+    const out = Object.assign({}, base, p);
+    out.width = Math.max(base.width || 0, p.width);
+    out.height = Math.max(base.height || 0, p.height);
+    out.jpeg = Math.max(base.jpeg || 0, p.jpeg);
+    out.maxLongEdge = Math.max(base.maxLongEdge || 0, p.maxLongEdge, Math.min(longBase || 0, p.maxLongEdge));
+    out.stitchPanelLongEdge = Math.max(base.stitchPanelLongEdge || 0, p.stitchPanelLongEdge);
+    out.extraSquare = Math.max(base.extraSquare || 0, p.extraSquare);
+    out.videoMaxHeight = Math.max(base.videoMaxHeight || 0, p.videoMaxHeight);
+    out.fps = Math.max(base.fps || 0, p.fps);
+    out.videoBitsPerSecond = Math.max(base.videoBitsPerSecond || 0, p.videoBitsPerSecond);
+    out.canvasMaxPixels = Math.max(base.canvasMaxPixels || 0, p.canvasMaxPixels);
+    out.label = (base.label && /^Dò được/i.test(base.label)) ? (base.label + ' + V133 nét cao') : p.label;
+    out.v133Boost = true;
+    return out;
+}
+
+function wrapQualityFunctions(){
+    if (window.__gshtV133QualityBoostWrapped) return;
+    const oldGet = (typeof window.getPhotoQualitySetting === 'function') ? window.getPhotoQualitySetting : (typeof getPhotoQualitySetting === 'function' ? getPhotoQualitySetting : null);
+    const newGet = function(){
+        let base = {};
+        try { base = oldGet ? oldGet.apply(this, arguments) : {}; } catch(e) { base = {}; }
+        return enhanceQualityFromBase(base);
+    };
+    window.getPhotoQualitySetting = newGet;
+    try { getPhotoQualitySetting = newGet; } catch(e) {}
+
+    const newJpeg = function(){
+        try { return Math.max(0.84, Math.min(0.99, window.getPhotoQualitySetting().jpeg || 0.96)); } catch(e){ return 0.96; }
+    };
+    window.getJpegQuality = newJpeg;
+    try { getJpegQuality = newJpeg; } catch(e) {}
+
+    const newScale = function(srcW, srcH, maxLongEdge){
+        let q = {}; try { q = window.getPhotoQualitySetting(); } catch(e) {}
+        return safeScale(srcW, srcH, maxLongEdge || q.maxLongEdge, q.canvasMaxPixels);
+    };
+    window.getScaledDimensions = newScale;
+    try { getScaledDimensions = newScale; } catch(e) {}
+
+    const newCaptureDims = function(srcW, srcH){
+        const q = window.getPhotoQualitySetting();
+        return safeScale(srcW, srcH, q.maxLongEdge, q.canvasMaxPixels);
+    };
+    window.getCaptureOutputDimensions = newCaptureDims;
+    try { getCaptureOutputDimensions = newCaptureDims; } catch(e) {}
+
+    const oldContain = (typeof window.drawImageContain === 'function') ? window.drawImageContain : (typeof drawImageContain === 'function' ? drawImageContain : null);
+    const newContain = function(ctx, img, x, y, w, h, fill){
+        setHighSmoothing(ctx);
+        if (fill === undefined) fill = '#000';
+        if (fill) { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); }
+        const iw = img && (img.width || img.videoWidth || img.naturalWidth) || 1;
+        const ih = img && (img.height || img.videoHeight || img.naturalHeight) || 1;
+        const scale = Math.min(w / iw, h / ih);
+        const dw = iw * scale, dh = ih * scale;
+        const dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+        try { ctx.drawImage(img, dx, dy, dw, dh); }
+        catch(e) { if (oldContain) return oldContain.apply(this, arguments); }
+    };
+    window.drawImageContain = newContain;
+    try { drawImageContain = newContain; } catch(e) {}
+
+    const oldConstraints = (typeof window.getCameraConstraints === 'function') ? window.getCameraConstraints : (typeof getCameraConstraints === 'function' ? getCameraConstraints : null);
+    const newConstraints = function(){
+        let c = { video: {} };
+        try { c = oldConstraints ? (oldConstraints.apply(this, arguments) || { video: {} }) : { video: {} }; } catch(e) { c = { video: {} }; }
+        const v = (typeof c.video === 'object' && c.video) ? Object.assign({}, c.video) : {};
+        const q = window.getPhotoQualitySetting();
+        const ar = (q.width && q.height) ? (q.width / q.height) : (4 / 3);
+        v.width = { ideal: q.width || 2560 };
+        v.height = { ideal: q.height || 1920 };
+        v.aspectRatio = { ideal: ar };
+        v.frameRate = { ideal: q.fps || 25 };
+        // Không dùng exact; nếu có deviceId do chức năng DÒ CAM chọn thì giữ nguyên deviceId, không ép facingMode.
+        if (!v.deviceId && typeof currentFacingMode !== 'undefined') v.facingMode = currentFacingMode;
+        return Object.assign({}, c, { video: v });
+    };
+    window.getCameraConstraints = newConstraints;
+    try { getCameraConstraints = newConstraints; } catch(e) {}
+
+    const oldVideoQ = (typeof window.getVideoQualitySetting === 'function') ? window.getVideoQualitySetting : (typeof getVideoQualitySetting === 'function' ? getVideoQualitySetting : null);
+    const newVideoQ = function(){
+        const q = window.getPhotoQualitySetting();
+        let base = {}; try { base = oldVideoQ ? oldVideoQ.apply(this, arguments) : {}; } catch(e) {}
+        return Object.assign({}, base, { maxHeight: q.videoMaxHeight, fps: q.fps, videoBitsPerSecond: q.videoBitsPerSecond, label: q.label });
+    };
+    window.getVideoQualitySetting = newVideoQ;
+    try { getVideoQualitySetting = newVideoQ; } catch(e) {}
+
+    window.__gshtV133QualityBoostWrapped = true;
+}
+
+function syncCaptureModeToPref(){
+    const force = boolPref(KEY_FORCE_FULL, true);
+    // V131 đọc 2 khóa này để quyết định ImageCapture/full-frame hay chỉ preview video.
+    setLS(KEY_SPEED_MODE, force ? 'quality-full' : 'fast-preview');
+    setLS(KEY_CAPTURE_MODE, force ? 'auto-still' : 'preview');
+    const status = $('gsht-v133-quality-status');
+    if (status) {
+        const q = window.getPhotoQualitySetting ? window.getPhotoQualitySetting() : enhancedPreset(qualityMode());
+        status.innerHTML = `${force ? '✅ Đang ưu tiên ImageCapture/full-frame' : '⚠️ Đang ưu tiên preview nhanh'}; ảnh xuất tối đa <b>${q.maxLongEdge}px</b>, ghép mỗi ô tối đa <b>${q.stitchPanelLongEdge}px</b>, JPEG <b>${Math.round((q.jpeg||0.96)*100)}%</b>.`;
+        status.className = 'small mt-2 ' + (force ? 'text-success' : 'text-warning');
+    }
+}
+
+async function applyTrackHints(){
+    try {
+        const track = (typeof localStream !== 'undefined' && localStream && localStream.getVideoTracks) ? localStream.getVideoTracks()[0] : null;
+        if (!track || !track.getCapabilities || !track.applyConstraints) return;
+        const caps = track.getCapabilities();
+        const advanced = {};
+        if (caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) advanced.focusMode = 'continuous';
+        if (caps.exposureMode && Array.isArray(caps.exposureMode) && caps.exposureMode.includes('continuous')) advanced.exposureMode = 'continuous';
+        if (caps.whiteBalanceMode && Array.isArray(caps.whiteBalanceMode) && caps.whiteBalanceMode.includes('continuous')) advanced.whiteBalanceMode = 'continuous';
+        if (Object.keys(advanced).length) await track.applyConstraints({ advanced: [advanced] });
+    } catch(e) { try { console.warn(VERSION, 'track hints skipped', e); } catch(_){} }
+}
+
+function wrapInitCameraForHints(){
+    if (window.__gshtV133InitWrapped) return;
+    const oldInit = (typeof window.initCamera === 'function') ? window.initCamera : (typeof initCamera === 'function' ? initCamera : null);
+    if (!oldInit) return;
+    const wrapped = async function(){
+        const ret = await oldInit.apply(this, arguments);
+        setTimeout(applyTrackHints, 250);
+        setTimeout(syncCaptureModeToPref, 300);
+        return ret;
+    };
+    window.initCamera = wrapped;
+    try { initCamera = wrapped; } catch(e) {}
+    window.__gshtV133InitWrapped = true;
+}
+
+function addQualityPanel(){
+    const sel = $('photo-quality-select');
+    if (!sel) return;
+    // Cập nhật nhãn lựa chọn để người dùng hiểu rõ mức mới.
+    const labels = {
+        saving: 'Tiết kiệm V133 - 1600px / JPEG 86%',
+        balanced: 'Chuẩn nét V133 - 2560~3200px / JPEG 93%',
+        high: 'Nét cao V133 - ưu tiên 3840px / JPEG 96%',
+        original: 'Gốc camera V133 - ưu tiên full-frame / JPEG 98%'
+    };
+    Array.from(sel.options || []).forEach(opt => { if (labels[opt.value]) opt.textContent = labels[opt.value]; });
+    const card = sel.closest('.card') || sel.parentElement;
+    if (!card || $('gsht-v133-quality-panel')) return;
+    if (getLS(KEY_FORCE_FULL, null) === null) setLS(KEY_FORCE_FULL, '1');
+    if (getLS(KEY_CAPTURE_PROFILE, null) === null) setLS(KEY_CAPTURE_PROFILE, 'sharp');
+    if (getLS(KEY_STITCH_PROFILE, null) === null) setLS(KEY_STITCH_PROFILE, 'sharp');
+    const panel = document.createElement('div');
+    panel.id = 'gsht-v133-quality-panel';
+    panel.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+            <div class="small text-info fw-bold"><i class="fa-solid fa-wand-magic-sparkles me-1"></i> V133 - TĂNG CHẤT LƯỢNG ẢNH CHỤP / ẢNH GHÉP</div>
+            <span class="badge bg-info text-dark">PHOTO BOOST</span>
+        </div>
+        <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="gsht-v133-force-full-frame">
+            <label class="form-check-label text-warning fw-bold" for="gsht-v133-force-full-frame">Ưu tiên chụp ảnh tĩnh full-frame/ImageCapture cho 3 nút TRƯỚC / Q.TRÌNH / SAU</label>
+            <div class="small text-secondary">Khi thiết bị không hỗ trợ, app vẫn tự rơi về preview nên không gián đoạn hiện trường.</div>
+        </div>
+        <div class="row g-2">
+            <div class="col-12 col-sm-6">
+                <label class="form-label text-info fw-bold mb-1" for="gsht-v133-capture-profile">Giới hạn ảnh chụp</label>
+                <select id="gsht-v133-capture-profile" class="form-select form-select-sm bg-dark text-info border-secondary">
+                    <option value="safe">An toàn - tối đa 3200px</option>
+                    <option value="sharp">Nét cao - tối đa 4096px</option>
+                    <option value="max">Tối đa - tối đa 5120px</option>
+                </select>
+            </div>
+            <div class="col-12 col-sm-6">
+                <label class="form-label text-info fw-bold mb-1" for="gsht-v133-stitch-profile">Giới hạn mỗi ô ảnh ghép</label>
+                <select id="gsht-v133-stitch-profile" class="form-select form-select-sm bg-dark text-info border-secondary">
+                    <option value="safe">An toàn - 2560px/ô</option>
+                    <option value="sharp">Nét cao - 3200px/ô</option>
+                    <option value="max">Tối đa - 4096px/ô</option>
+                </select>
+            </div>
+        </div>
+        <div id="gsht-v133-quality-status" class="small mt-2 text-secondary"></div>
+        <div class="small text-secondary mt-1">Khuyến nghị: dùng <b>Gốc camera V133</b> + <b>Nét cao</b> cho ảnh nghiệm thu; nếu máy yếu hoặc ảnh ghép bị chậm thì chuyển giới hạn ảnh ghép về <b>An toàn</b>.</div>
+    `;
+    card.appendChild(panel);
+    $('gsht-v133-force-full-frame').checked = boolPref(KEY_FORCE_FULL, true);
+    $('gsht-v133-capture-profile').value = captureProfile();
+    $('gsht-v133-stitch-profile').value = stitchProfile();
+    $('gsht-v133-force-full-frame').addEventListener('change', e => { setLS(KEY_FORCE_FULL, e.target.checked ? '1' : '0'); syncCaptureModeToPref(); });
+    $('gsht-v133-capture-profile').addEventListener('change', e => { setLS(KEY_CAPTURE_PROFILE, e.target.value || 'sharp'); syncCaptureModeToPref(); try { if (typeof applyCameraQualitySetting === 'function') applyCameraQualitySetting(false); } catch(_){} });
+    $('gsht-v133-stitch-profile').addEventListener('change', e => { setLS(KEY_STITCH_PROFILE, e.target.value || 'sharp'); syncCaptureModeToPref(); });
+    sel.addEventListener('change', () => setTimeout(syncCaptureModeToPref, 50));
+    syncCaptureModeToPref();
+}
+
+function wrapQualityNote(){
+    if (window.__gshtV133ApplyNoteWrapped) return;
+    const oldApply = (typeof window.applyCameraQualitySetting === 'function') ? window.applyCameraQualitySetting : (typeof applyCameraQualitySetting === 'function' ? applyCameraQualitySetting : null);
+    if (!oldApply) return;
+    const wrapped = function(restartCamera){
+        let ret;
+        try { ret = oldApply.apply(this, arguments); } catch(e) { console.warn(VERSION, e); }
+        try {
+            const note = $('camera-frame-note');
+            const q = window.getPhotoQualitySetting();
+            if (note) note.innerHTML = `V133 đang dùng <b>${q.label}</b>: ảnh xuất tối đa <b>${q.maxLongEdge}px</b>, ảnh ghép mỗi ô <b>${q.stitchPanelLongEdge}px</b>, JPEG <b>${Math.round(q.jpeg*100)}%</b>. ${boolPref(KEY_FORCE_FULL,true) ? 'Ưu tiên chụp full-frame/ImageCapture.' : 'Đang ưu tiên chụp preview nhanh.'}`;
+            syncCaptureModeToPref();
+        } catch(e) {}
+        return ret;
+    };
+    window.applyCameraQualitySetting = wrapped;
+    try { applyCameraQualitySetting = wrapped; } catch(e) {}
+    window.__gshtV133ApplyNoteWrapped = true;
+}
+
+function install(){
+    try {
+        wrapQualityFunctions();
+        wrapInitCameraForHints();
+        wrapQualityNote();
+        addQualityPanel();
+        syncCaptureModeToPref();
+        setTimeout(applyTrackHints, 800);
+        try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V133 photo/stitch quality boost'; } catch(e) {}
+        console.log('[GSHT] ' + VERSION + ' loaded');
+    } catch(e) { console.warn(VERSION, e); }
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 3600)); else setTimeout(install, 3600);
+window.addEventListener('load', () => setTimeout(install, 4300));
+setTimeout(install, 6500);
 })();
 </script>
 
