@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V134 - Raw Master Photo Quality)</title>
+    <title>Giám Sát Hiện Trường - PC Tuyên Quang (PWA V135 - Footer Super Quality)</title>
     
     <link rel="manifest" href="manifest.json">
 	<link rel="icon" type="image/png" href="icon-192.png">
@@ -14558,7 +14558,7 @@ function addPiexifNote(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(addPiexifNote,1800)); else setTimeout(addPiexifNote,1800);
 window.addEventListener('load',()=>setTimeout(addPiexifNote,2400));
 setTimeout(addPiexifNote,4200);
-try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 piexif JPEG EXIF restored | V129 bulk session classify | V133 photo/stitch quality boost | V134 raw-master stitch'; console.log('[GSHT] GSHT-V128-PIEXIF-JPEG-EXIF loaded; piexif=', !!window.piexif); } catch(e) {}
+try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V128 piexif JPEG EXIF restored | V129 bulk session classify | V133 photo/stitch quality boost | V134 raw-master stitch | V135 footer JPEG 100'; console.log('[GSHT] GSHT-V128-PIEXIF-JPEG-EXIF loaded; piexif=', !!window.piexif); } catch(e) {}
 })();
 </script>
 
@@ -15768,13 +15768,270 @@ function installCaptureOverride(){
 function install(){
     try {
         addPanel(); installCaptureOverride(); installStitchOverrides(); wrapImportHandlers(); updatePanelStatus();
-        try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V134 raw-master stitch'; } catch(e){}
+        try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V134 raw-master stitch | V135 footer JPEG 100'; } catch(e){}
         console.log('[GSHT] ' + VERSION + ' loaded');
     } catch(e) { console.warn(VERSION, e); }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 7800)); else setTimeout(install, 7800);
 window.addEventListener('load', () => setTimeout(install, 9200));
 setTimeout(install, 12000);
+})();
+</script>
+
+<style id="gsht-v135-footer-super-quality-style">
+/* GSHT V135: chế độ nghiệm thu - ưu tiên ảnh có chân trang thật nét */
+#gsht-v135-footer-quality-panel {
+    border: 1px solid #ffc107;
+    border-radius: 10px;
+    background: rgba(255, 193, 7, 0.08);
+    padding: 8px;
+    margin-top: 8px;
+}
+#gsht-v135-footer-quality-panel .form-check-label,
+#gsht-v135-footer-quality-panel .form-select,
+#gsht-v135-footer-quality-panel .small { font-size: 10.5px; line-height: 1.35; }
+#gsht-v135-footer-quality-panel .badge { font-size: 10px; }
+</style>
+<script id="gsht-v135-footer-super-quality">
+/* GSHT V135: giảm suy hao ảnh ngay sau khi thêm chân trang bằng JPEG 100 + không co ảnh nếu máy chịu được */
+(function(){
+'use strict';
+const VERSION = 'GSHT-V135-FOOTER-SUPER-QUALITY';
+const KEY_ENABLE = 'gsht_v135_footer_super_quality';
+const KEY_LONG_EDGE = 'gsht_v135_footer_max_long_edge';
+const KEY_PIXEL_CAP = 'gsht_v135_footer_pixel_cap';
+const KEY_JPEG_MODE = 'gsht_v135_footer_jpeg_mode';
+const KEY_DEFAULTED = 'gsht_v135_defaulted_once';
+const $ = id => document.getElementById(id);
+function getLS(k,d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch(e){ return d; } }
+function setLS(k,v){ try { localStorage.setItem(k, String(v)); } catch(e){} }
+function boolPref(k,d){ return getLS(k, d ? '1' : '0') !== '0'; }
+function enabled(){ return boolPref(KEY_ENABLE, true); }
+function longEdge(){ return Math.max(0, parseInt(getLS(KEY_LONG_EDGE, '8192'), 10) || 8192); }
+function pixelCap(){ return Math.max(10000000, parseInt(getLS(KEY_PIXEL_CAP, '120000000'), 10) || 120000000); }
+function jpegMode(){ return getLS(KEY_JPEG_MODE, 'jpeg100'); }
+function jpegQuality(){ return jpegMode() === 'jpeg995' ? 0.995 : 1.0; }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function safeScale(srcW, srcH, maxLongEdge, maxPixels){
+    srcW = Math.max(1, Math.round(Number(srcW) || 1));
+    srcH = Math.max(1, Math.round(Number(srcH) || 1));
+    maxLongEdge = Math.max(0, Math.round(Number(maxLongEdge) || 0));
+    maxPixels = Math.max(0, Math.round(Number(maxPixels) || 0));
+    let r = 1;
+    if (maxLongEdge && Math.max(srcW, srcH) > maxLongEdge) r = Math.min(r, maxLongEdge / Math.max(srcW, srcH));
+    if (maxPixels && srcW * srcH * r * r > maxPixels) r = Math.min(r, Math.sqrt(maxPixels / (srcW * srcH)));
+    return { width: Math.max(1, Math.round(srcW * r)), height: Math.max(1, Math.round(srcH * r)), ratio: r };
+}
+function mbFromDataUrl(dataUrl){
+    try {
+        const i = String(dataUrl || '').indexOf(',');
+        if (i < 0) return 0;
+        return Math.round(((String(dataUrl).length - i - 1) * 3 / 4) / 1024 / 1024 * 100) / 100;
+    } catch(e){ return 0; }
+}
+function status(html, cls){
+    ['gsht-v135-footer-status','gsht-v134-raw-status','gsht-v133-quality-status','gsht-camera-full-sensor-status'].forEach(id => {
+        const el = $(id); if (el) { el.className = 'small mt-2 ' + (cls || 'text-secondary'); el.innerHTML = html; }
+    });
+}
+function installDefaultsOnce(){
+    if (getLS(KEY_DEFAULTED, '0') === '1') return;
+    setLS(KEY_ENABLE, '1');
+    setLS(KEY_LONG_EDGE, '8192');
+    setLS(KEY_PIXEL_CAP, '120000000');
+    setLS(KEY_JPEG_MODE, 'jpeg100');
+    // Đồng bộ với các bản vá trước: ép full-frame, mức ảnh gốc, profile tối đa.
+    setLS('gsht_v133_force_full_frame', '1');
+    setLS('gsht_camera_capture_speed_mode_v93', 'quality-full');
+    setLS('gsht_camera_capture_mode_v92', 'auto-still');
+    setLS('gsht_v133_capture_profile', 'max');
+    setLS('gsht_v133_stitch_profile', 'sharp');
+    setLS('gsht_v134_raw_quality', 'jpeg-max');
+    setLS(KEY_DEFAULTED, '1');
+}
+function applySelectDefault(){
+    try {
+        const sel = $('photo-quality-select');
+        if (sel && sel.value !== 'original') {
+            sel.value = 'original';
+            if (typeof applyCameraQualitySetting === 'function') setTimeout(() => { try { applyCameraQualitySetting(true); } catch(e){} }, 250);
+        }
+    } catch(e){}
+}
+function wrapQualityFunctions(){
+    if (window.__gshtV135QualityWrapped) return;
+    const oldGet = (typeof window.getPhotoQualitySetting === 'function') ? window.getPhotoQualitySetting : (typeof getPhotoQualitySetting === 'function' ? getPhotoQualitySetting : null);
+    const newGet = function(){
+        let q = {};
+        try { q = oldGet ? (oldGet.apply(this, arguments) || {}) : {}; } catch(e){ q = {}; }
+        if (!enabled()) return q;
+        const maxEdge = longEdge();
+        const cap = pixelCap();
+        const jq = jpegQuality();
+        const out = Object.assign({}, q);
+        out.jpeg = Math.max(Number(out.jpeg) || 0, jq);
+        out.maxLongEdge = Math.max(Number(out.maxLongEdge) || 0, maxEdge);
+        out.stitchPanelLongEdge = Math.max(Number(out.stitchPanelLongEdge) || 0, Math.min(maxEdge, 6144));
+        out.extraSquare = Math.max(Number(out.extraSquare) || 0, 1600);
+        out.canvasMaxPixels = Math.max(Number(out.canvasMaxPixels) || 0, cap);
+        out.width = Math.max(Number(out.width) || 0, Math.min(maxEdge, 7680));
+        out.height = Math.max(Number(out.height) || 0, Math.min(Math.round(maxEdge * 0.75), 5760));
+        out.label = (out.label || 'Ảnh') + ' + V135 nghiệm thu';
+        out.v135FooterSuperQuality = true;
+        return out;
+    };
+    window.getPhotoQualitySetting = newGet;
+    try { getPhotoQualitySetting = newGet; } catch(e){}
+    const oldJpeg = (typeof window.getJpegQuality === 'function') ? window.getJpegQuality : (typeof getJpegQuality === 'function' ? getJpegQuality : null);
+    const newJpeg = function(){
+        if (enabled()) return jpegQuality();
+        try { return oldJpeg ? oldJpeg.apply(this, arguments) : 0.98; } catch(e){ return 0.98; }
+    };
+    window.getJpegQuality = newJpeg;
+    try { getJpegQuality = newJpeg; } catch(e){}
+    const oldScaled = (typeof window.getScaledDimensions === 'function') ? window.getScaledDimensions : (typeof getScaledDimensions === 'function' ? getScaledDimensions : null);
+    const newScaled = function(srcW, srcH, maxLongEdge){
+        if (!enabled()) {
+            try { return oldScaled ? oldScaled.apply(this, arguments) : safeScale(srcW, srcH, maxLongEdge || 4096, 52000000); } catch(e){}
+        }
+        return safeScale(srcW, srcH, maxLongEdge || longEdge(), pixelCap());
+    };
+    window.getScaledDimensions = newScaled;
+    try { getScaledDimensions = newScaled; } catch(e){}
+    const newCaptureDims = function(srcW, srcH){
+        if (!enabled()) {
+            try { return oldScaled ? oldScaled(srcW, srcH, 4096) : safeScale(srcW, srcH, 4096, 52000000); } catch(e){}
+        }
+        return safeScale(srcW, srcH, longEdge(), pixelCap());
+    };
+    window.getCaptureOutputDimensions = newCaptureDims;
+    try { getCaptureOutputDimensions = newCaptureDims; } catch(e){}
+    window.__gshtV135QualityWrapped = true;
+}
+function wrapCanvasExport(){
+    if (window.__gshtV135CanvasExportWrapped) return;
+    const nativeToDataURL = HTMLCanvasElement.prototype.toDataURL;
+    HTMLCanvasElement.prototype.toDataURL = function(type, quality){
+        try {
+            const t = String(type || 'image/png').toLowerCase();
+            if (enabled() && (t === 'image/jpeg' || t === 'image/jpg')) {
+                const q = jpegQuality();
+                const asked = Number(quality);
+                quality = Number.isFinite(asked) ? Math.max(asked, q) : q;
+            }
+        } catch(e){}
+        return nativeToDataURL.call(this, type, quality);
+    };
+    window.__gshtV135CanvasExportWrapped = true;
+}
+function wrapRepoAddStatus(){
+    if (window.__gshtV135RepoStatusWrapped) return;
+    const oldSave = (typeof window.saveToDB === 'function') ? window.saveToDB : (typeof saveToDB === 'function' ? saveToDB : null);
+    if (oldSave) {
+        const wrappedSave = function(obj){
+            const r = oldSave.apply(this, arguments);
+            try {
+                if (enabled() && obj && obj.dataUrl && /^img_|^img_ext_|^uploaded_/.test(String(obj.id || ''))) {
+                    const mb = mbFromDataUrl(obj.dataUrl);
+                    const rawMb = obj.rawDataUrl ? mbFromDataUrl(obj.rawDataUrl) : 0;
+                    const sizeText = obj.sourceWidth && obj.sourceHeight ? `nguồn <b>${obj.sourceWidth}×${obj.sourceHeight}</b>` : 'nguồn ảnh';
+                    status(`✅ V135 đã xuất ảnh có chân trang ở chế độ nghiệm thu: ${sizeText}, JPEG <b>${Math.round(jpegQuality()*100)}%</b>, file khoảng <b>${mb} MB</b>${rawMb ? `; bản gốc ẩn khoảng <b>${rawMb} MB</b>` : ''}.`, 'text-success');
+                }
+            } catch(e){}
+            return r;
+        };
+        window.saveToDB = wrappedSave;
+        try { saveToDB = wrappedSave; } catch(e){}
+    }
+    window.__gshtV135RepoStatusWrapped = true;
+}
+function addPanel(){
+    if ($('gsht-v135-footer-quality-panel')) { updatePanelStatus(); return; }
+    const host = $('gsht-v134-raw-panel') || $('gsht-v133-quality-panel') || $('camera-frame-note')?.closest('.card') || $('photo-quality-select')?.closest('.card');
+    if (!host || !host.parentNode) return;
+    const div = document.createElement('div');
+    div.id = 'gsht-v135-footer-quality-panel';
+    div.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <div>
+                <div class="small text-warning fw-bold"><i class="fa-solid fa-certificate me-1"></i> V135 - ẢNH CHÂN TRANG CHẤT LƯỢNG NGHIỆM THU</div>
+                <div class="small text-secondary">Dùng khi ảnh thêm chân trang bị mờ nhiều: ép full-frame, hạn chế co ảnh, xuất JPEG gần tối đa. File sẽ lớn hơn nhưng nét hơn.</div>
+            </div>
+            <span class="badge bg-warning text-dark">V135</span>
+        </div>
+        <div class="row g-2 align-items-end">
+            <div class="col-12">
+                <div class="form-check form-switch border border-warning rounded p-2 d-flex align-items-center justify-content-between bg-black bg-opacity-25">
+                    <label class="form-check-label text-warning fw-bold ms-1" for="gsht-v135-enable">Bật chế độ nghiệm thu cho ảnh có chân trang</label>
+                    <input class="form-check-input me-1" type="checkbox" id="gsht-v135-enable">
+                </div>
+            </div>
+            <div class="col-12 col-sm-4">
+                <label class="form-label text-warning fw-bold small mb-1">JPEG xuất ảnh</label>
+                <select id="gsht-v135-jpeg-mode" class="form-select form-select-sm bg-dark text-warning border-secondary">
+                    <option value="jpeg100">JPEG 100% - nét nhất, file lớn</option>
+                    <option value="jpeg995">JPEG 99.5% - rất nét, đỡ nặng hơn</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-4">
+                <label class="form-label text-warning fw-bold small mb-1">Cạnh dài tối đa</label>
+                <select id="gsht-v135-long-edge" class="form-select form-select-sm bg-dark text-warning border-secondary">
+                    <option value="4096">4096 px - an toàn</option>
+                    <option value="5120">5120 px - nét cao</option>
+                    <option value="6144">6144 px - rất nét</option>
+                    <option value="8192">8192 px - gần như không co</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-4">
+                <label class="form-label text-warning fw-bold small mb-1">Giới hạn bộ nhớ</label>
+                <select id="gsht-v135-pixel-cap" class="form-select form-select-sm bg-dark text-warning border-secondary">
+                    <option value="60000000">60 MP - máy yếu</option>
+                    <option value="90000000">90 MP - cân bằng</option>
+                    <option value="120000000">120 MP - máy khỏe</option>
+                </select>
+            </div>
+            <div class="col-12"><div id="gsht-v135-footer-status" class="small mt-2 text-secondary"></div></div>
+        </div>`;
+    host.parentNode.insertBefore(div, host.nextSibling);
+    $('gsht-v135-enable').checked = enabled();
+    $('gsht-v135-jpeg-mode').value = jpegMode();
+    $('gsht-v135-long-edge').value = String(longEdge());
+    $('gsht-v135-pixel-cap').value = String(pixelCap());
+    $('gsht-v135-enable').addEventListener('change', e => { setLS(KEY_ENABLE, e.target.checked ? '1':'0'); refreshAll(); });
+    $('gsht-v135-jpeg-mode').addEventListener('change', e => { setLS(KEY_JPEG_MODE, e.target.value || 'jpeg100'); refreshAll(); });
+    $('gsht-v135-long-edge').addEventListener('change', e => { setLS(KEY_LONG_EDGE, e.target.value || '8192'); refreshAll(); });
+    $('gsht-v135-pixel-cap').addEventListener('change', e => { setLS(KEY_PIXEL_CAP, e.target.value || '120000000'); refreshAll(); });
+    updatePanelStatus();
+}
+function updatePanelStatus(){
+    const el = $('gsht-v135-footer-status'); if (!el) return;
+    const mp = Math.round(pixelCap()/1000000);
+    el.className = 'small mt-2 ' + (enabled() ? 'text-success' : 'text-warning');
+    el.innerHTML = enabled()
+        ? `✅ Đang bật: ảnh có chân trang sẽ xuất <b>${jpegMode()==='jpeg100'?'JPEG 100%':'JPEG 99.5%'}</b>, cạnh dài tối đa <b>${longEdge()} px</b>, trần <b>${mp} MP</b>. File có thể lớn hơn ảnh gốc nhưng sẽ ít bệt/mờ hơn.`
+        : '⚠️ Đang tắt V135, app sẽ dùng lại mức nén/cỡ ảnh của các bản trước.';
+}
+function refreshAll(){
+    try { wrapQualityFunctions(); wrapCanvasExport(); applySelectDefault(); } catch(e){}
+    updatePanelStatus();
+    try { if (typeof applyCameraQualitySetting === 'function') applyCameraQualitySetting(true); } catch(e){}
+}
+function install(){
+    try {
+        installDefaultsOnce();
+        wrapQualityFunctions();
+        wrapCanvasExport();
+        wrapRepoAddStatus();
+        applySelectDefault();
+        addPanel();
+        updatePanelStatus();
+        try { window.GSHT_VERSION_NOTE = (window.GSHT_VERSION_NOTE || '') + ' | V135 footer JPEG 100 no-downscale'; } catch(e){}
+        console.log('[GSHT] ' + VERSION + ' loaded');
+    } catch(e){ console.warn(VERSION, e); }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 10400)); else setTimeout(install, 10400);
+window.addEventListener('load', () => setTimeout(install, 11200));
+setTimeout(install, 13500);
 })();
 </script>
 
